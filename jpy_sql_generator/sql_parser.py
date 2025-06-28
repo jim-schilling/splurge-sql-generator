@@ -79,32 +79,14 @@ class SqlParser:
                 method_name = parts[i].strip()
                 sql_query = parts[i + 1].strip()
                 
-                # Clean up the SQL query
-                sql_query = self._clean_sql_query(sql_query)
+                # Clean up the SQL query - remove trailing semicolon if present
+                if sql_query.endswith(';'):
+                    sql_query = sql_query[:-1]
                 
                 if method_name and sql_query:
                     method_queries[method_name] = sql_query
         
         return method_queries
-    
-    def _clean_sql_query(self, sql_query: str) -> str:
-        """
-        Clean and format SQL query.
-        
-        Args:
-            sql_query: Raw SQL query string
-            
-        Returns:
-            Cleaned SQL query
-        """
-        # Remove leading/trailing whitespace and newlines
-        sql_query = sql_query.strip()
-        
-        # Remove trailing semicolon if present
-        if sql_query.endswith(';'):
-            sql_query = sql_query[:-1]
-        
-        return sql_query
     
     def get_method_info(self, sql_query: str) -> Dict[str, any]:
         """

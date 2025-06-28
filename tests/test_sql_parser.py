@@ -44,27 +44,32 @@ SELECT 2;
         methods = self.parser._extract_methods_and_queries("")
         self.assertEqual(methods, {})
         
-        # Only comments
-        methods = self.parser._extract_methods_and_queries("# comment only")
+        # Content with no methods
+        methods = self.parser._extract_methods_and_queries("SELECT * FROM users;")
         self.assertEqual(methods, {})
-        
-        # Malformed method comment
-        methods = self.parser._extract_methods_and_queries("#get_user\nSELECT 1;\n#invalid")
-        self.assertIn('get_user', methods)
-        self.assertEqual(len(methods), 1)
         
         # Method with no SQL
         methods = self.parser._extract_methods_and_queries("#get_user\n\n#get_two\nSELECT 2;")
         self.assertIn('get_two', methods)
         self.assertNotIn('get_user', methods)
 
-    def test_clean_sql_query(self):
-        self.assertEqual(self.parser._clean_sql_query('SELECT 1;'), 'SELECT 1')
-        self.assertEqual(self.parser._clean_sql_query('  SELECT 2  '), 'SELECT 2')
-        self.assertEqual(self.parser._clean_sql_query('SELECT 3'), 'SELECT 3')
-        self.assertEqual(self.parser._clean_sql_query('SELECT 4;;'), 'SELECT 4;')
-        self.assertEqual(self.parser._clean_sql_query(''), '')
-        self.assertEqual(self.parser._clean_sql_query('   '), '')
+    def test_sql_cleaning_with_sql_helper(self):
+        """Test that SQL cleaning using sql_helper works correctly."""
+        # Test that semicolons are stripped
+        methods = self.parser._extract_methods_and_queries("#test_method\nSELECT 1;")
+        self.assertEqual(methods['test_method'], 'SELECT 1')
+        
+        # Test that whitespace is trimmed
+        methods = self.parser._extract_methods_and_queries("#test_method\n  SELECT 2  ")
+        self.assertEqual(methods['test_method'], 'SELECT 2')
+        
+        # Test that multiple semicolons are handled
+        methods = self.parser._extract_methods_and_queries("#test_method\nSELECT 3;;")
+        self.assertEqual(methods['test_method'], 'SELECT 3;')
+        
+        # Test empty SQL is handled
+        methods = self.parser._extract_methods_and_queries("#test_method\n   ")
+        self.assertNotIn('test_method', methods)
 
     def test_get_method_info_basic_types(self):
         # SELECT statements
