@@ -103,10 +103,16 @@ SELECT 2;
             'has_returning': False
         }
         docstring = self.generator._generate_method_docstring('get_user', method_info)
-        self.assertIn('Select operation: get_user', docstring[1])
-        self.assertIn('Statement type: fetch', docstring[2])
-        self.assertIn('user_id', docstring[5])
-        self.assertIn('List of result rows', docstring[8])
+        docstring_text = '\n'.join(docstring)
+        
+        # Validate docstring structure and content semantically
+        self.assertIn('"""', docstring_text)  # Should have triple quotes
+        self.assertIn('Select operation: get_user', docstring_text)
+        self.assertIn('Statement type: fetch', docstring_text)
+        self.assertIn('Args:', docstring_text)
+        self.assertIn('user_id: Parameter for user_id', docstring_text)
+        self.assertIn('Returns:', docstring_text)
+        self.assertIn('List of result rows', docstring_text)
 
         # Test execute statement docstring
         method_info = {
@@ -117,11 +123,16 @@ SELECT 2;
             'has_returning': True
         }
         docstring = self.generator._generate_method_docstring('create_user', method_info)
-        self.assertIn('Insert operation: create_user', docstring[1])
-        self.assertIn('Statement type: execute', docstring[2])
-        self.assertIn('name', docstring[5])
-        self.assertIn('email', docstring[6])
-        self.assertIn('SQLAlchemy Result object', docstring[9])
+        docstring_text = '\n'.join(docstring)
+        
+        # Validate docstring structure and content semantically
+        self.assertIn('Insert operation: create_user', docstring_text)
+        self.assertIn('Statement type: execute', docstring_text)
+        self.assertIn('Args:', docstring_text)
+        self.assertIn('name: Parameter for name', docstring_text)
+        self.assertIn('email: Parameter for email', docstring_text)
+        self.assertIn('Returns:', docstring_text)
+        self.assertIn('SQLAlchemy Result object', docstring_text)
 
         # Test method with no parameters
         method_info = {
@@ -132,8 +143,18 @@ SELECT 2;
             'has_returning': False
         }
         docstring = self.generator._generate_method_docstring('get_all', method_info)
-        self.assertIn('Select operation: get_all', docstring[1])
-        self.assertNotIn('Args:', docstring)
+        docstring_text = '\n'.join(docstring)
+        
+        # Validate docstring structure and content semantically
+        self.assertIn('Select operation: get_all', docstring_text)
+        self.assertIn('Statement type: fetch', docstring_text)
+        self.assertNotIn('Args:', docstring_text)  # Should not have Args section
+        self.assertIn('Returns:', docstring_text)
+        self.assertIn('List of result rows', docstring_text)
+        
+        # Validate docstring structure (accounting for indentation)
+        self.assertTrue(docstring_text.strip().startswith('"""'))
+        self.assertTrue(docstring_text.strip().endswith('"""'))
 
     def test_method_body_generation(self):
         # Test fetch statement body
