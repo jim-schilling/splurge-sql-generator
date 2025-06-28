@@ -20,7 +20,7 @@ from jpy_sql_generator.sql_helper import (
 from jpy_sql_generator.sql_parser import SqlParser
 from jpy_sql_generator.code_generator import PythonCodeGenerator
 
-__version__ = "0.1.2"
+__version__ = "0.2.0"
 __author__ = "Jim Schilling"
 
 __all__ = [

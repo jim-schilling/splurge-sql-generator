@@ -84,20 +84,50 @@ from generated.UserRepository import UserRepository
 engine = create_engine('sqlite:///example.db')
 connection = engine.connect()
 
-# Use the generated repository
-user_repo = UserRepository(connection)
-
-# Get user by ID
-users = user_repo.get_user_by_id(user_id=1)
-
-# Create new user
-result = user_repo.create_user(
-    username='john_doe',
-    email='john@example.com',
-    password_hash='hashed_password',
-    status='active'
+# Use the generated class methods (class methods only)
+users = UserRepository.get_user_by_id(
+    connection=connection,
+    user_id=1,
 )
+
+# For data modification operations, use transaction blocks
+with connection.begin():
+    result = UserRepository.create_user(
+        connection=connection,
+        username='john_doe',
+        email='john@example.com',
+        password_hash='hashed_password',
+        status='active',
+    )
+    # Transaction commits automatically when context exits
+
+# You can also pass a custom logger if desired
+import logging
+custom_logger = logging.getLogger('my.custom.logger')
+users = UserRepository.get_user_by_id(
+    connection=connection,
+    user_id=1,
+    logger=custom_logger,
+)
+
+# For multiple operations in a single transaction:
+with connection.begin():
+    UserRepository.create_user(
+        connection=connection,
+        username='jane',
+        email='jane@example.com',
+        password_hash='pw',
+        status='active',
+    )
+    UserRepository.update_user_status(
+        connection=connection,
+        user_id=1,
+        new_status='active',
+    )
+    # All operations commit together, or all rollback on error
 ```
+
+> **Note:** All generated methods are class methods. You must always pass the connection and parameters as named arguments. **For data modification operations (INSERT, UPDATE, DELETE), use `with connection.begin():` blocks to manage transactions explicitly.** This gives you full control over transaction boundaries and ensures data consistency.
 
 ## Usage Examples
 
@@ -252,26 +282,27 @@ MIT License - see LICENSE file for details.
 
 ## Changelog
 
-### [0.1.2] - 2025-06-28
+### [0.2.0] - 2025-06-28
 
 #### Changed
-- **Made connection variable private**: Changed `self.connection` to `self._connection` throughout generated code for better encapsulation
-- **Added automatic transaction management**: Non-fetch operations (INSERT, UPDATE, DELETE) now automatically commit changes
-- **Enhanced exception handling**: Added try-catch blocks with proper rollback for failed data modification operations
-- **Improved error handling accuracy**: Rollback comments now only appear for operations that actually perform rollback
+- **Switched to class-methods-only approach**: Removed instance methods and constructors for better transaction control
+- **Removed automatic commit/rollback**: Data modification operations no longer automatically commit or rollback, allowing explicit transaction management
+- **Added comprehensive logging**: All operations now include debug and error logging with customizable logger support
+- **Improved parameter formatting**: All method parameters are now on separate lines with proper PEP8 formatting
+- **Enhanced error handling**: Simplified exception handling without automatic rollback interference
 
 #### Technical Improvements
-- **Better encapsulation**: Private connection variable follows Python naming conventions
-- **Automatic commits**: Data modification operations are automatically committed, ensuring changes are persisted
-- **Robust error handling**: Failed operations are properly rolled back to maintain database consistency
-- **Selective rollback**: Only data modification operations trigger rollback (appropriate for read operations)
-- **Exception transparency**: Original exceptions are preserved and re-raised after rollback
+- **Explicit transaction control**: Users must use `with connection.begin():` blocks for data modifications
+- **Better encapsulation**: No shared state between method calls, improving thread safety
+- **Named parameters required**: All methods use `*` to force named parameter usage for clarity
+- **Class-level logger**: Default logger with optional override per method call
+- **Production-ready**: Generated code is now suitable for production use with proper transaction management
 
 #### Generated Code Enhancements
-- **Transaction safety**: Database operations are now atomic with proper commit/rollback handling
-- **Resource cleanup**: Database connections remain in consistent state even after errors
-- **Production readiness**: Generated code is now suitable for production use with robust error handling
-- **Maintained API compatibility**: All existing functionality preserved while adding safety features
+- **Transaction safety**: No automatic commits that could interfere with user-managed transactions
+- **Cleaner API**: Class methods only, no instance state to manage
+- **Better error propagation**: Exceptions are logged but not automatically rolled back
+- **Maintained API compatibility**: Public API remains consistent while improving safety
 
 ### [0.1.1] - 2025-06-28
 

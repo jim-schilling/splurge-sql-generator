@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jpy-sql-generator"
-version = "0.1.2"
+version = "0.2.0"
 description = "Jim's Python SQL generator"
 authors = [
     {name = "Jim Schilling", email = "your.email@example.com"}
