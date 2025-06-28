@@ -252,6 +252,27 @@ MIT License - see LICENSE file for details.
 
 ## Changelog
 
+### [0.1.2] - 2025-06-28
+
+#### Changed
+- **Made connection variable private**: Changed `self.connection` to `self._connection` throughout generated code for better encapsulation
+- **Added automatic transaction management**: Non-fetch operations (INSERT, UPDATE, DELETE) now automatically commit changes
+- **Enhanced exception handling**: Added try-catch blocks with proper rollback for failed data modification operations
+- **Improved error handling accuracy**: Rollback comments now only appear for operations that actually perform rollback
+
+#### Technical Improvements
+- **Better encapsulation**: Private connection variable follows Python naming conventions
+- **Automatic commits**: Data modification operations are automatically committed, ensuring changes are persisted
+- **Robust error handling**: Failed operations are properly rolled back to maintain database consistency
+- **Selective rollback**: Only data modification operations trigger rollback (appropriate for read operations)
+- **Exception transparency**: Original exceptions are preserved and re-raised after rollback
+
+#### Generated Code Enhancements
+- **Transaction safety**: Database operations are now atomic with proper commit/rollback handling
+- **Resource cleanup**: Database connections remain in consistent state even after errors
+- **Production readiness**: Generated code is now suitable for production use with robust error handling
+- **Maintained API compatibility**: All existing functionality preserved while adding safety features
+
 ### [0.1.1] - 2025-06-28
 
 #### Changed

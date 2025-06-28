@@ -174,11 +174,11 @@ INSERT INTO users DEFAULT VALUES;
             self.assertIn('sql = """', code)
             self.assertIn('params = {', code)
             self.assertIn('"user_id": user_id,', code)
-            self.assertIn('result = self.connection.execute(text(sql), params)', code)
+            self.assertIn('result = self._connection.execute(text(sql), params)', code)
             self.assertIn('return result.fetchall()', code)
             
             # Test execute statement body
-            self.assertIn('result = self.connection.execute(text(sql))', code)
+            self.assertIn('result = self._connection.execute(text(sql))', code)
             self.assertIn('return result', code)
             
         finally:

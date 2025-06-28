@@ -23,7 +23,7 @@ class {{ class_name }}:
         Args:
             connection: SQLAlchemy database connection
         """
-        self.connection = connection
+        self._connection = connection
 
 {% for method in methods %}
     def {{ method.name }}(self{% if method.parameters %}, {{ method.parameters }}{% endif %}) -> {{ method.return_type }}:
@@ -60,18 +60,27 @@ class {{ class_name }}:
 
 {% endif %}
         # Execute SQL query
+        try:
 {% if method.parameters_list %}
-        result = self.connection.execute(text(sql), params)
+            result = self._connection.execute(text(sql), params)
 {% else %}
-        result = self.connection.execute(text(sql))
+            result = self._connection.execute(text(sql))
 {% endif %}
 
 {% if method.is_fetch %}
-        # Fetch results
-        return result.fetchall()
+            # Fetch results
+            return result.fetchall()
 {% else %}
-        # Return result for non-select operations
-        return result
+            # Commit changes for non-select operations
+            self._connection.commit()
+            # Return result for non-select operations
+            return result
 {% endif %}
+        except Exception as e:
+{% if not method.is_fetch %}
+            # Rollback on error for non-select operations
+            self._connection.rollback()
+{% endif %}
+            raise e
 
 {% endfor %} 
