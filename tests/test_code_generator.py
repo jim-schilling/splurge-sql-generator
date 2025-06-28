@@ -4,6 +4,7 @@ import os
 import ast
 from jpy_sql_generator.code_generator import PythonCodeGenerator
 from jpy_sql_generator.sql_parser import SqlParser
+import logging
 
 class TestPythonCodeGenerator(unittest.TestCase):
     def setUp(self):
@@ -114,40 +115,27 @@ SELECT * FROM users;
         try:
             code = self.generator.generate_class(fname)
             
-            # Validate docstring structure and content semantically
-            self.assertIn('"""', code)  # Should have triple quotes
+            # Test method with parameters
             self.assertIn('Select operation: get_user', code)
             self.assertIn('Statement type: fetch', code)
             self.assertIn('Args:', code)
+            self.assertIn('connection: SQLAlchemy database connection', code)
             self.assertIn('user_id: Parameter for user_id', code)
-            self.assertIn('Returns:', code)
             self.assertIn('List of result rows', code)
             
-            # Test execute statement docstring
+            # Test method with multiple parameters
             self.assertIn('Insert operation: create_user', code)
             self.assertIn('Statement type: execute', code)
             self.assertIn('name: Parameter for name', code)
             self.assertIn('email: Parameter for email', code)
             self.assertIn('SQLAlchemy Result object', code)
             
-            # Test method with no parameters - check specifically in the get_all method section
+            # Test method with no SQL parameters (only connection and logger)
             self.assertIn('Select operation: get_all', code)
             self.assertIn('Statement type: fetch', code)
-            # Find the get_all method and verify it doesn't have Args section
-            lines = code.split('\n')
-            in_get_all_method = False
-            get_all_has_args = False
-            for line in lines:
-                if 'def get_all(' in line:
-                    in_get_all_method = True
-                elif in_get_all_method and line.strip().startswith('def '):
-                    # We've moved to the next method
-                    break
-                elif in_get_all_method and 'Args:' in line:
-                    get_all_has_args = True
-                    break
-            
-            self.assertFalse(get_all_has_args, "get_all method should not have Args section")
+            # All methods now have Args section due to connection parameter
+            self.assertIn('Args:', code)
+            self.assertIn('connection: SQLAlchemy database connection', code)
             self.assertIn('Returns:', code)
             self.assertIn('List of result rows', code)
             
@@ -170,15 +158,21 @@ INSERT INTO users DEFAULT VALUES;
         try:
             code = self.generator.generate_class(fname)
             
+            # Test class method structure
+            self.assertIn('@classmethod', code)
+            self.assertIn('def get_user(', code)
+            self.assertIn('def create_user(', code)
+            
             # Test fetch statement body
             self.assertIn('sql = """', code)
             self.assertIn('params = {', code)
             self.assertIn('"user_id": user_id,', code)
-            self.assertIn('result = self.connection.execute(text(sql), params)', code)
-            self.assertIn('return result.fetchall()', code)
+            self.assertIn('result = connection.execute(text(sql), params)', code)
+            self.assertIn('return rows', code)
             
-            # Test execute statement body
-            self.assertIn('result = self.connection.execute(text(sql))', code)
+            # Test execute statement body (no automatic commit)
+            self.assertIn('result = connection.execute(text(sql))', code)
+            self.assertIn('Executed non-select operation', code)
             self.assertIn('return result', code)
             
         finally:
@@ -204,8 +198,11 @@ WHERE u.id = :user_id AND u.status = :status
         try:
             code = self.generator.generate_class(fname)
             self.assertIn('class TestClass', code)
-            self.assertIn('def get_user_stats', code)
-            self.assertIn('user_id: Any, status: Any', code)
+            self.assertIn('@classmethod', code)
+            self.assertIn('def get_user_stats(', code)
+            self.assertIn('connection: Connection,', code)
+            self.assertIn('user_id: Any,', code)
+            self.assertIn('status: Any,', code)
             self.assertIn('"user_id": user_id', code)
             self.assertIn('"status": status', code)
             self.assertIn('WITH user_orders AS', code)
@@ -258,15 +255,19 @@ WITH cte AS (SELECT 1) SELECT * FROM cte;
             fname = f.name
         try:
             code = self.generator.generate_class(fname)
-            # Check that all methods are generated
+            # Check that all methods are generated as class methods
             self.assertIn('class TestClass', code)
-            self.assertIn('def get_users', code)
-            self.assertIn('def create_user', code)
-            self.assertIn('def update_user', code)
-            self.assertIn('def delete_user', code)
-            self.assertIn('def show_tables', code)
-            self.assertIn('def describe_table', code)
-            self.assertIn('def with_cte', code)
+            self.assertIn('@classmethod', code)
+            self.assertIn('def get_users(', code)
+            self.assertIn('def create_user(', code)
+            self.assertIn('def update_user(', code)
+            self.assertIn('def delete_user(', code)
+            self.assertIn('def show_tables(', code)
+            self.assertIn('def describe_table(', code)
+            self.assertIn('def with_cte(', code)
+            
+            # Check for named parameters
+            self.assertIn('connection: Connection,', code)
             
             # Check return types
             self.assertIn('-> List[Row]', code)  # Fetch statements
@@ -311,6 +312,42 @@ SELECT 2;
                 os.remove(os.path.join(output_dir, file))
             os.rmdir(output_dir)
 
+    def test_class_methods_only_generation(self):
+        """Test that only class methods are generated, no instance methods or constructors."""
+        sql = """# TestClass
+#get_user
+SELECT * FROM users WHERE id = :user_id;
+#create_user
+INSERT INTO users (name) VALUES (:name);
+        """
+        
+        with tempfile.NamedTemporaryFile('w+', delete=False, suffix='.sql') as f:
+            f.write(sql)
+            fname = f.name
+        
+        try:
+            code = self.generator.generate_class(fname)
+            
+            # Verify only class methods are generated
+            self.assertIn('@classmethod', code)
+            self.assertIn('def get_user(', code)
+            self.assertIn('def create_user(', code)
+            
+            # Verify no instance methods or constructors
+            self.assertNotIn('def __init__', code)
+            self.assertNotIn('self.', code)
+            self.assertNotIn('self._connection', code)
+            
+            # Verify named parameters are used
+            self.assertIn('connection: Connection,', code)
+            self.assertIn('logger: Optional[logging.Logger] = None,', code)
+            
+            # Verify class logger is defined
+            self.assertIn('logger = logging.getLogger', code)
+            
+        finally:
+            os.remove(fname)
+
     def test_template_based_generation(self):
         """Test that the Jinja2 template-based generation works correctly."""
         sql = """# TemplateTest
@@ -327,11 +364,14 @@ SELECT * FROM test WHERE id = :test_id;
             
             # Verify template-generated structure
             self.assertIn('class TemplateTest:', code)
-            self.assertIn('def simple_query(self, test_id: Any) -> List[Row]:', code)
+            self.assertIn('@classmethod', code)
+            self.assertIn('def simple_query(', code)
+            self.assertIn('connection: Connection,', code)
+            self.assertIn('test_id: Any,', code)
             self.assertIn('Select operation: simple_query', code)
             self.assertIn('Statement type: fetch', code)
             self.assertIn('"test_id": test_id,', code)
-            self.assertIn('return result.fetchall()', code)
+            self.assertIn('return rows', code)
             
             # Verify imports are present
             self.assertIn('from typing import Optional, List, Dict, Any', code)
