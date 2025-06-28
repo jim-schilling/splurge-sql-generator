@@ -95,93 +95,94 @@ SELECT 2;
             self.assertEqual(signature, expected)
 
     def test_method_docstring_generation(self):
-        # Test fetch statement docstring
-        method_info = {
-            'type': 'select',
-            'is_fetch': True,
-            'statement_type': 'fetch',
-            'parameters': ['user_id'],
-            'has_returning': False
-        }
-        docstring = self.generator._generate_method_docstring('get_user', method_info)
-        docstring_text = '\n'.join(docstring)
+        # Test that the template correctly generates docstrings for different method types
+        # Create a simple test case and verify the generated code contains expected docstring elements
         
-        # Validate docstring structure and content semantically
-        self.assertIn('"""', docstring_text)  # Should have triple quotes
-        self.assertIn('Select operation: get_user', docstring_text)
-        self.assertIn('Statement type: fetch', docstring_text)
-        self.assertIn('Args:', docstring_text)
-        self.assertIn('user_id: Parameter for user_id', docstring_text)
-        self.assertIn('Returns:', docstring_text)
-        self.assertIn('List of result rows', docstring_text)
-
-        # Test execute statement docstring
-        method_info = {
-            'type': 'insert',
-            'is_fetch': False,
-            'statement_type': 'execute',
-            'parameters': ['name', 'email'],
-            'has_returning': True
-        }
-        docstring = self.generator._generate_method_docstring('create_user', method_info)
-        docstring_text = '\n'.join(docstring)
+        sql = """# TestClass
+#get_user
+SELECT * FROM users WHERE id = :user_id;
+#create_user
+INSERT INTO users (name, email) VALUES (:name, :email);
+#get_all
+SELECT * FROM users;
+        """
         
-        # Validate docstring structure and content semantically
-        self.assertIn('Insert operation: create_user', docstring_text)
-        self.assertIn('Statement type: execute', docstring_text)
-        self.assertIn('Args:', docstring_text)
-        self.assertIn('name: Parameter for name', docstring_text)
-        self.assertIn('email: Parameter for email', docstring_text)
-        self.assertIn('Returns:', docstring_text)
-        self.assertIn('SQLAlchemy Result object', docstring_text)
-
-        # Test method with no parameters
-        method_info = {
-            'type': 'select',
-            'is_fetch': True,
-            'statement_type': 'fetch',
-            'parameters': [],
-            'has_returning': False
-        }
-        docstring = self.generator._generate_method_docstring('get_all', method_info)
-        docstring_text = '\n'.join(docstring)
+        with tempfile.NamedTemporaryFile('w+', delete=False, suffix='.sql') as f:
+            f.write(sql)
+            fname = f.name
         
-        # Validate docstring structure and content semantically
-        self.assertIn('Select operation: get_all', docstring_text)
-        self.assertIn('Statement type: fetch', docstring_text)
-        self.assertNotIn('Args:', docstring_text)  # Should not have Args section
-        self.assertIn('Returns:', docstring_text)
-        self.assertIn('List of result rows', docstring_text)
-        
-        # Validate docstring structure (accounting for indentation)
-        self.assertTrue(docstring_text.strip().startswith('"""'))
-        self.assertTrue(docstring_text.strip().endswith('"""'))
+        try:
+            code = self.generator.generate_class(fname)
+            
+            # Validate docstring structure and content semantically
+            self.assertIn('"""', code)  # Should have triple quotes
+            self.assertIn('Select operation: get_user', code)
+            self.assertIn('Statement type: fetch', code)
+            self.assertIn('Args:', code)
+            self.assertIn('user_id: Parameter for user_id', code)
+            self.assertIn('Returns:', code)
+            self.assertIn('List of result rows', code)
+            
+            # Test execute statement docstring
+            self.assertIn('Insert operation: create_user', code)
+            self.assertIn('Statement type: execute', code)
+            self.assertIn('name: Parameter for name', code)
+            self.assertIn('email: Parameter for email', code)
+            self.assertIn('SQLAlchemy Result object', code)
+            
+            # Test method with no parameters - check specifically in the get_all method section
+            self.assertIn('Select operation: get_all', code)
+            self.assertIn('Statement type: fetch', code)
+            # Find the get_all method and verify it doesn't have Args section
+            lines = code.split('\n')
+            in_get_all_method = False
+            get_all_has_args = False
+            for line in lines:
+                if 'def get_all(' in line:
+                    in_get_all_method = True
+                elif in_get_all_method and line.strip().startswith('def '):
+                    # We've moved to the next method
+                    break
+                elif in_get_all_method and 'Args:' in line:
+                    get_all_has_args = True
+                    break
+            
+            self.assertFalse(get_all_has_args, "get_all method should not have Args section")
+            self.assertIn('Returns:', code)
+            self.assertIn('List of result rows', code)
+            
+        finally:
+            os.remove(fname)
 
     def test_method_body_generation(self):
-        # Test fetch statement body
-        method_info = {
-            'type': 'select',
-            'is_fetch': True,
-            'parameters': ['user_id'],
-            'has_returning': False
-        }
-        body = self.generator._generate_method_body('SELECT * FROM users WHERE id = :user_id', method_info)
-        self.assertTrue(any('sql = """' in line for line in body))
-        self.assertTrue(any('params = {' in line for line in body))
-        self.assertTrue(any('"user_id": user_id,' in line for line in body))
-        self.assertTrue(any('result = self.connection.execute(text(sql), params)' in line for line in body))
-        self.assertTrue(any('return result.fetchall()' in line for line in body))
-
-        # Test execute statement body
-        method_info = {
-            'type': 'insert',
-            'is_fetch': False,
-            'parameters': [],
-            'has_returning': False
-        }
-        body = self.generator._generate_method_body('INSERT INTO users DEFAULT VALUES', method_info)
-        self.assertTrue(any('result = self.connection.execute(text(sql))' in line for line in body))
-        self.assertTrue(any('return result' in line for line in body))
+        # Test that the template correctly generates method bodies for different SQL types
+        sql = """# TestClass
+#get_user
+SELECT * FROM users WHERE id = :user_id;
+#create_user
+INSERT INTO users DEFAULT VALUES;
+        """
+        
+        with tempfile.NamedTemporaryFile('w+', delete=False, suffix='.sql') as f:
+            f.write(sql)
+            fname = f.name
+        
+        try:
+            code = self.generator.generate_class(fname)
+            
+            # Test fetch statement body
+            self.assertIn('sql = """', code)
+            self.assertIn('params = {', code)
+            self.assertIn('"user_id": user_id,', code)
+            self.assertIn('result = self.connection.execute(text(sql), params)', code)
+            self.assertIn('return result.fetchall()', code)
+            
+            # Test execute statement body
+            self.assertIn('result = self.connection.execute(text(sql))', code)
+            self.assertIn('return result', code)
+            
+        finally:
+            os.remove(fname)
 
     def test_complex_sql_generation(self):
         # Test CTE with multiple parameters
@@ -309,6 +310,37 @@ SELECT 2;
             for file in os.listdir(output_dir):
                 os.remove(os.path.join(output_dir, file))
             os.rmdir(output_dir)
+
+    def test_template_based_generation(self):
+        """Test that the Jinja2 template-based generation works correctly."""
+        sql = """# TemplateTest
+#simple_query
+SELECT * FROM test WHERE id = :test_id;
+        """
+        
+        with tempfile.NamedTemporaryFile('w+', delete=False, suffix='.sql') as f:
+            f.write(sql)
+            fname = f.name
+        
+        try:
+            code = self.generator.generate_class(fname)
+            
+            # Verify template-generated structure
+            self.assertIn('class TemplateTest:', code)
+            self.assertIn('def simple_query(self, test_id: Any) -> List[Row]:', code)
+            self.assertIn('Select operation: simple_query', code)
+            self.assertIn('Statement type: fetch', code)
+            self.assertIn('"test_id": test_id,', code)
+            self.assertIn('return result.fetchall()', code)
+            
+            # Verify imports are present
+            self.assertIn('from typing import Optional, List, Dict, Any', code)
+            self.assertIn('from sqlalchemy import text', code)
+            self.assertIn('from sqlalchemy.engine import Connection, Result', code)
+            self.assertIn('from sqlalchemy.engine.row import Row', code)
+            
+        finally:
+            os.remove(fname)
 
 if __name__ == '__main__':
     unittest.main() 

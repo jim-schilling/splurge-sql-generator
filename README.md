@@ -252,6 +252,21 @@ MIT License - see LICENSE file for details.
 
 ## Changelog
 
+### [0.1.1] - 2025-06-28
+
+#### Changed
+- **Refactored code generator to use Jinja2 templates**: Replaced string concatenation with template-based code generation for better maintainability and flexibility
+- **Added Jinja2 dependency**: Added `jinja2>=3.1.0` to requirements.txt
+- **Created templates directory**: Added `jpy_sql_generator/templates/` with `python_class.j2` template
+- **Simplified code generation logic**: Removed individual method generation functions in favor of template rendering
+- **Updated test suite**: Modified tests to work with new template-based approach while maintaining full functionality
+
+#### Technical Improvements
+- **Template-based generation**: All Python code is now generated using Jinja2 templates, making it easier to modify output format
+- **Better separation of concerns**: Template logic is separated from Python generation logic
+- **Maintained API compatibility**: Public API remains unchanged, ensuring backward compatibility
+- **Enhanced maintainability**: Code generation format can now be modified by editing templates without touching Python logic
+
 ### [0.1.0] - 2025-06-28
 
 #### Added
