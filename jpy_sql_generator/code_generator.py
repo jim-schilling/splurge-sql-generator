@@ -6,6 +6,7 @@ Copyright (c) 2025, Jim Schilling
 This module is licensed under the MIT License.
 """
 
+from pathlib import Path
 from typing import Dict, List
 from jpy_sql_generator.sql_parser import SqlParser
 
@@ -110,7 +111,9 @@ class PythonCodeGenerator:
         
         # Generate method signature
         params = self._generate_method_signature(method_info['parameters'])
-        lines.append(f'    def {method_name}(self, {params}) -> {"List[Row]" if method_info["is_fetch"] else "Result"}:')
+        # Only include comma if there are parameters
+        param_part = f', {params}' if params else ''
+        lines.append(f'    def {method_name}(self{param_part}) -> {"List[Row]" if method_info["is_fetch"] else "Result"}:')
         
         # Generate docstring
         docstring = self._generate_method_docstring(method_name, method_info)
@@ -262,7 +265,7 @@ class PythonCodeGenerator:
             
             # Save to file if output directory provided
             if output_dir:
-                output_path = f"{output_dir}/{class_name}.py"
+                output_path = Path(output_dir) / f"{class_name}.py"
                 try:
                     with open(output_path, 'w', encoding='utf-8') as f:
                         f.write(python_code)
