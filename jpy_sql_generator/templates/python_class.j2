@@ -76,11 +76,11 @@ class {{ class_name }}:
             # Return result for non-select operations
             return result
 {% endif %}
-        except Exception as e:
+        except Exception:
 {% if not method.is_fetch %}
             # Rollback on error for non-select operations
             self._connection.rollback()
 {% endif %}
-            raise e
+            raise
 
 {% endfor %} 
