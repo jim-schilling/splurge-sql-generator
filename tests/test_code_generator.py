@@ -130,10 +130,24 @@ SELECT * FROM users;
             self.assertIn('email: Parameter for email', code)
             self.assertIn('SQLAlchemy Result object', code)
             
-            # Test method with no parameters
+            # Test method with no parameters - check specifically in the get_all method section
             self.assertIn('Select operation: get_all', code)
             self.assertIn('Statement type: fetch', code)
-            # Should not have Args section for methods without parameters
+            # Find the get_all method and verify it doesn't have Args section
+            lines = code.split('\n')
+            in_get_all_method = False
+            get_all_has_args = False
+            for line in lines:
+                if 'def get_all(' in line:
+                    in_get_all_method = True
+                elif in_get_all_method and line.strip().startswith('def '):
+                    # We've moved to the next method
+                    break
+                elif in_get_all_method and 'Args:' in line:
+                    get_all_has_args = True
+                    break
+            
+            self.assertFalse(get_all_has_args, "get_all method should not have Args section")
             self.assertIn('Returns:', code)
             self.assertIn('List of result rows', code)
             

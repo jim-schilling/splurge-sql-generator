@@ -8,7 +8,7 @@ This module is licensed under the MIT License.
 
 from pathlib import Path
 from typing import Dict, List, Any
-from jinja2 import Environment, FileSystemLoader, Template
+from jinja2 import Environment, FileSystemLoader
 from jpy_sql_generator.sql_parser import SqlParser
 
 
