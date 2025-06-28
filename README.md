@@ -11,6 +11,14 @@ A Python library for generating SQLAlchemy classes from SQL template files with 
 - **CLI Interface**: Command-line tool for batch processing
 - **Comprehensive Error Handling**: Robust error handling for file operations and SQL parsing
 
+## SQL File Format Requirement
+
+> **Important:** The first line of every SQL file must be a class comment specifying the class name, e.g.:
+>
+>     # UserRepository
+>
+> This class name will be used for the generated Python class. The filename is no longer used for class naming.
+
 ## Installation
 
 ```bash
@@ -32,6 +40,7 @@ pip install -e .
 Create a file named `UserRepository.sql`:
 
 ```sql
+# UserRepository
 #get_user_by_id
 SELECT id, username, email, created_at 
 FROM users 
@@ -112,6 +121,7 @@ print(is_fetch_statement(sql2))     # False
 ### Complex SQL with CTEs
 
 ```sql
+# UserStats
 #get_user_stats
 WITH user_orders AS (
     SELECT user_id, COUNT(*) as order_count

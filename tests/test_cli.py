@@ -40,7 +40,7 @@ class TestCLI(unittest.TestCase):
             os.remove(fname)
 
     def test_cli_dry_run(self):
-        sql = """
+        sql = """# TestClass
 #get_foo
 SELECT 1;
         """
@@ -49,7 +49,7 @@ SELECT 1;
             fname = f.name
         try:
             result = subprocess.run([sys.executable, '-m', 'jpy_sql_generator.cli', fname, '--dry-run'], capture_output=True, text=True)
-            self.assertIn('class', result.stdout)
+            self.assertIn('class TestClass', result.stdout)
             self.assertIn('def get_foo', result.stdout)
             self.assertEqual(result.returncode, 0)
         finally:

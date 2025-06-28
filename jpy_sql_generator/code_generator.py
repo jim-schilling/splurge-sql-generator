@@ -93,7 +93,7 @@ class PythonCodeGenerator:
             code_lines.extend(method_code)
             code_lines.append('')  # Add blank line between methods
         
-        return '\n'.join(code_lines)
+        return '\n'.join(code_lines) + '\n'
     
     def _generate_method(self, method_name: str, sql_query: str, method_info: Dict) -> List[str]:
         """

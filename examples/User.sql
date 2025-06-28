@@ -1,3 +1,4 @@
+# User
 # get_user_by_id
 SELECT id, username, email, created_at 
 FROM users 
@@ -26,4 +27,4 @@ WHERE id = :user_id;
 # get_user_count_by_status
 SELECT status, COUNT(*) as user_count 
 FROM users 
-GROUP BY status;
+GROUP BY status; 

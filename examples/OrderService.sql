@@ -1,3 +1,4 @@
+# OrderService
 # get_order_by_id
 SELECT o.id, o.user_id, o.total_amount, o.status, o.created_at,
        u.username, u.email

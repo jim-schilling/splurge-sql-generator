@@ -8,7 +8,7 @@ class TestSqlParser(unittest.TestCase):
         self.parser = SqlParser()
 
     def test_parse_file_and_extract_methods(self):
-        sql = """
+        sql = """# TestClass
 #get_user
 SELECT * FROM users WHERE id = :user_id;
 
@@ -20,7 +20,7 @@ INSERT INTO users (name, email) VALUES (:name, :email);
             fname = f.name
         try:
             class_name, methods = self.parser.parse_file(fname)
-            self.assertTrue(class_name.startswith('tmp'))
+            self.assertEqual(class_name, 'TestClass')
             self.assertIn('get_user', methods)
             self.assertIn('create_user', methods)
             self.assertTrue(methods['get_user'].startswith('SELECT'))
@@ -224,7 +224,7 @@ SELECT 2;
 
     def test_parse_file_encoding(self):
         # Test with UTF-8 content
-        sql = """
+        sql = """# TestClass
 #get_user_with_unicode
 SELECT * FROM users WHERE name = :name;
         """
@@ -233,7 +233,67 @@ SELECT * FROM users WHERE name = :name;
             fname = f.name
         try:
             class_name, methods = self.parser.parse_file(fname)
+            self.assertEqual(class_name, 'TestClass')
             self.assertIn('get_user_with_unicode', methods)
+        finally:
+            os.remove(fname)
+
+    def test_parse_file_missing_class_comment(self):
+        """Test that parse_file raises ValueError when first line is not a class comment."""
+        sql = """#get_user
+SELECT * FROM users WHERE id = :user_id;
+        """
+        with tempfile.NamedTemporaryFile('w+', delete=False, suffix='.sql') as f:
+            f.write(sql)
+            fname = f.name
+        try:
+            with self.assertRaises(ValueError) as cm:
+                self.parser.parse_file(fname)
+            self.assertIn("Class comment must start with '# '", str(cm.exception))
+        finally:
+            os.remove(fname)
+
+    def test_parse_file_empty_class_comment(self):
+        """Test that parse_file raises ValueError when class comment is empty."""
+        sql = """# 
+#get_user
+SELECT * FROM users WHERE id = :user_id;
+        """
+        with tempfile.NamedTemporaryFile('w+', delete=False, suffix='.sql') as f:
+            f.write(sql)
+            fname = f.name
+        try:
+            with self.assertRaises(ValueError) as cm:
+                self.parser.parse_file(fname)
+            self.assertIn("Class comment must start with '# '", str(cm.exception))
+        finally:
+            os.remove(fname)
+
+    def test_parse_file_invalid_class_comment_format(self):
+        """Test that parse_file raises ValueError when class comment doesn't start with '# '."""
+        sql = """#TestClass
+#get_user
+SELECT * FROM users WHERE id = :user_id;
+        """
+        with tempfile.NamedTemporaryFile('w+', delete=False, suffix='.sql') as f:
+            f.write(sql)
+            fname = f.name
+        try:
+            with self.assertRaises(ValueError) as cm:
+                self.parser.parse_file(fname)
+            self.assertIn("Class comment must start with '# '", str(cm.exception))
+        finally:
+            os.remove(fname)
+
+    def test_parse_file_empty_file(self):
+        """Test that parse_file raises ValueError when file is empty."""
+        with tempfile.NamedTemporaryFile('w+', delete=False, suffix='.sql') as f:
+            f.write("")
+            fname = f.name
+        try:
+            with self.assertRaises(ValueError) as cm:
+                self.parser.parse_file(fname)
+            self.assertIn("First line must be a class comment starting with #", str(cm.exception))
         finally:
             os.remove(fname)
 

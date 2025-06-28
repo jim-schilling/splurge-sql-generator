@@ -11,7 +11,7 @@ class TestPythonCodeGenerator(unittest.TestCase):
         self.parser = SqlParser()
 
     def test_generate_class_and_methods(self):
-        sql = """
+        sql = """# TestClass
 #get_user
 SELECT * FROM users WHERE id = :user_id;
 #create_user
@@ -22,7 +22,7 @@ INSERT INTO users (name, email) VALUES (:name, :email);
             fname = f.name
         try:
             code = self.generator.generate_class(fname)
-            self.assertIn('class', code)
+            self.assertIn('class TestClass', code)
             self.assertIn('def get_user', code)
             self.assertIn('def create_user', code)
             self.assertIn('user_id', code)
@@ -32,7 +32,7 @@ INSERT INTO users (name, email) VALUES (:name, :email);
             os.remove(fname)
 
     def test_generate_class_output_file(self):
-        sql = """
+        sql = """# TestClass
 #get_one
 SELECT 1;
         """
@@ -46,18 +46,18 @@ SELECT 1;
             self.assertTrue(os.path.exists(py_fname))
             with open(py_fname, 'r') as f:
                 content = f.read()
-                self.assertIn('class', content)
+                self.assertIn('class TestClass', content)
                 self.assertIn('def get_one', content)
         finally:
             os.remove(sql_fname)
             os.remove(py_fname)
 
     def test_generate_multiple_classes(self):
-        sql1 = """
+        sql1 = """# ClassA
 #get_a
 SELECT 1;
         """
-        sql2 = """
+        sql2 = """# ClassB
 #get_b
 SELECT 2;
         """
@@ -70,7 +70,8 @@ SELECT 2;
         try:
             result = self.generator.generate_multiple_classes([fname1, fname2])
             self.assertEqual(len(result), 2)
-            self.assertIn('tmp', list(result.keys())[0])
+            self.assertIn('ClassA', result)
+            self.assertIn('ClassB', result)
         finally:
             os.remove(fname1)
             os.remove(fname2)
@@ -184,7 +185,7 @@ SELECT 2;
 
     def test_complex_sql_generation(self):
         # Test CTE with multiple parameters
-        sql = """
+        sql = """# TestClass
 #get_user_stats
 WITH user_orders AS (
     SELECT user_id, COUNT(*) as order_count
@@ -201,6 +202,7 @@ WHERE u.id = :user_id AND u.status = :status
             fname = f.name
         try:
             code = self.generator.generate_class(fname)
+            self.assertIn('class TestClass', code)
             self.assertIn('def get_user_stats', code)
             self.assertIn('user_id: Any, status: Any', code)
             self.assertIn('"user_id": user_id', code)
@@ -211,7 +213,7 @@ WHERE u.id = :user_id AND u.status = :status
 
     def test_generated_code_syntax_validation(self):
         # Test that generated code is valid Python syntax
-        sql = """
+        sql = """# TestClass
 #get_user
 SELECT * FROM users WHERE id = :user_id;
 #create_user
@@ -228,7 +230,7 @@ INSERT INTO users (name, email) VALUES (:name, :email);
             os.remove(fname)
 
     def test_generate_class_with_various_statement_types(self):
-        sql = """
+        sql = """# TestClass
 #get_users
 SELECT * FROM users;
 
@@ -256,6 +258,7 @@ WITH cte AS (SELECT 1) SELECT * FROM cte;
         try:
             code = self.generator.generate_class(fname)
             # Check that all methods are generated
+            self.assertIn('class TestClass', code)
             self.assertIn('def get_users', code)
             self.assertIn('def create_user', code)
             self.assertIn('def update_user', code)
@@ -274,11 +277,11 @@ WITH cte AS (SELECT 1) SELECT * FROM cte;
             os.remove(fname)
 
     def test_generate_multiple_classes_with_output_dir(self):
-        sql1 = """
+        sql1 = """# ClassA
 #get_a
 SELECT 1;
         """
-        sql2 = """
+        sql2 = """# ClassB
 #get_b
 SELECT 2;
         """
@@ -293,6 +296,8 @@ SELECT 2;
         try:
             result = self.generator.generate_multiple_classes([fname1, fname2], output_dir)
             self.assertEqual(len(result), 2)
+            self.assertIn('ClassA', result)
+            self.assertIn('ClassB', result)
             
             # Check that files were created
             files = os.listdir(output_dir)

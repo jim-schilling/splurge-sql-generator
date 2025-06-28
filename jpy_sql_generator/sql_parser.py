@@ -33,15 +33,25 @@ class SqlParser:
         if not file_path.exists():
             raise FileNotFoundError(f"SQL file not found: {file_path}")
         
-        # Extract class name from filename (remove .sql extension)
-        class_name = file_path.stem
-        
         # Read file content
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
         except OSError as e:
             raise OSError(f"Error reading SQL file {file_path}: {e}") from e
+        
+        # Extract class name from first line comment
+        lines = content.split('\n')
+        if not lines or not lines[0].strip().startswith('#'):
+            raise ValueError(f"First line must be a class comment starting with #: {file_path}")
+        
+        class_comment = lines[0].strip()
+        if not class_comment.startswith('# '):
+            raise ValueError(f"Class comment must start with '# ': {class_comment}")
+        
+        class_name = class_comment[2:].strip()  # Remove '# ' prefix
+        if not class_name:
+            raise ValueError(f"Class name cannot be empty: {class_comment}")
         
         # Parse methods and queries
         method_queries = self._extract_methods_and_queries(content)

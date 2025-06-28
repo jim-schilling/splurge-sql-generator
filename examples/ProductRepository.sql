@@ -1,3 +1,4 @@
+# ProductRepository
 # get_product_by_id
 SELECT id, name, description, price, category_id, stock_quantity, created_at 
 FROM products 

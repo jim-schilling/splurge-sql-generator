@@ -7,7 +7,8 @@ Please keep this header when you use this code.
 
 This module is licensed under the MIT License.
 """
-from typing import List, Optional, Tuple
+from pathlib import Path
+from typing import List, Optional, Tuple, Union
 import sqlparse
 from sqlparse.tokens import Comment, DML
 from sqlparse.sql import Statement, Token
@@ -413,7 +414,7 @@ def parse_sql_statements(sql_text: str, strip_semicolon: bool = False) -> List[s
     return filtered_stmts
 
 
-def split_sql_file(file_path: str, strip_semicolon: bool = False) -> List[str]:
+def split_sql_file(file_path: Union[str, Path], strip_semicolon: bool = False) -> List[str]:
     """
     Read a SQL file and split it into individual statements.
     
@@ -431,9 +432,6 @@ def split_sql_file(file_path: str, strip_semicolon: bool = False) -> List[str]:
     """
     if not file_path:
         raise ValueError("file_path cannot be empty")
-    
-    if not isinstance(file_path, str):
-        raise ValueError("file_path must be a string")
     
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
