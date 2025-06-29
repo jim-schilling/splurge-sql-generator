@@ -101,15 +101,6 @@ with connection.begin():
     )
     # Transaction commits automatically when context exits
 
-# You can also pass a custom logger if desired
-import logging
-custom_logger = logging.getLogger('my.custom.logger')
-users = UserRepository.get_user_by_id(
-    connection=connection,
-    user_id=1,
-    logger=custom_logger,
-)
-
 # For multiple operations in a single transaction:
 with connection.begin():
     UserRepository.create_user(
@@ -125,6 +116,10 @@ with connection.begin():
         new_status='active',
     )
     # All operations commit together, or all rollback on error
+
+# Note: All generated methods now use a class-level logger automatically. There is no optional logger parameter. To customize logging, configure the class logger as needed:
+# import logging
+# UserRepository.logger.setLevel(logging.INFO)
 ```
 
 > **Note:** All generated methods are class methods. You must always pass the connection and parameters as named arguments. **For data modification operations (INSERT, UPDATE, DELETE), use `with connection.begin():` blocks to manage transactions explicitly.** This gives you full control over transaction boundaries and ensures data consistency.
