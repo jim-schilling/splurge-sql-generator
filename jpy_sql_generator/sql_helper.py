@@ -430,8 +430,14 @@ def split_sql_file(file_path: Union[str, Path], strip_semicolon: bool = False) -
         OSError: If there's an error reading the file
         ValueError: If file_path is empty or invalid
     """
+    if file_path is None:
+        raise ValueError("file_path cannot be None")
+    
+    if not isinstance(file_path, (str, Path)):
+        raise ValueError("file_path must be a string or Path object")
+    
     if not file_path:
-        raise ValueError("file_path cannot be empty")
+        raise ValueError("file_path cannot be empty")   
     
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
