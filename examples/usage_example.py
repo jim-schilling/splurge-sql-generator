@@ -7,8 +7,12 @@ This example demonstrates how to use the generated classes with the simplified l
 
 import logging
 import os
+import sys
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection
+
+# Add the parent directory to the path to import from output
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 # Import the generated classes
 from output.User import User
