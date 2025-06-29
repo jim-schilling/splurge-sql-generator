@@ -284,6 +284,18 @@ MIT License - see LICENSE file for details.
 
 ### [0.2.2] - 2025-06-29
 
+#### Changed
+- **Simplified logger handling**: Removed optional `logger` parameter from all generated methods to always use class-level logger
+- **Cleaner API**: Reduced parameter clutter by eliminating the optional logger parameter
+- **Consistent logging**: All methods now use the same class-level logger for uniform logging behavior
+- **Updated test suite**: Modified tests to reflect the simplified logger approach
+
+#### Technical Improvements
+- **Simplified method signatures**: Generated methods now have fewer parameters and cleaner interfaces
+- **Consistent logging pattern**: Class-level logger approach follows common Python utility class patterns
+- **Reduced complexity**: Eliminated conditional logger assignment logic in generated code
+- **Better maintainability**: Generated code is simpler and easier to understand
+
 ### [0.2.1] - 2025-06-29
 
 #### Changed
