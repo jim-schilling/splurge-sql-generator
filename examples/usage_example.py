@@ -8,25 +8,29 @@ This example demonstrates how to use the generated classes with the simplified l
 import logging
 import os
 import sys
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection
 
 # Add the parent directory to the path to import from output
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from output.OrderService import OrderService
+from output.ProductRepository import ProductRepository
 
 # Import the generated classes
 from output.User import User
-from output.ProductRepository import ProductRepository
-from output.OrderService import OrderService
 
 
 def setup_database():
     """Create a test database and tables."""
-    engine = create_engine('sqlite:///example.db')
-    
+    engine = create_engine("sqlite:///example.db")
+
     with engine.connect() as conn:
         # Create tables
-        conn.execute(text("""
+        conn.execute(
+            text(
+                """
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
@@ -36,9 +40,13 @@ def setup_database():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        """))
-        
-        conn.execute(text("""
+        """
+            )
+        )
+
+        conn.execute(
+            text(
+                """
             CREATE TABLE IF NOT EXISTS products (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -49,9 +57,13 @@ def setup_database():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        """))
-        
-        conn.execute(text("""
+        """
+            )
+        )
+
+        conn.execute(
+            text(
+                """
             CREATE TABLE IF NOT EXISTS orders (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
@@ -61,9 +73,13 @@ def setup_database():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
-        """))
-        
-        conn.execute(text("""
+        """
+            )
+        )
+
+        conn.execute(
+            text(
+                """
             CREATE TABLE IF NOT EXISTS order_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 order_id INTEGER NOT NULL,
@@ -73,10 +89,12 @@ def setup_database():
                 FOREIGN KEY (order_id) REFERENCES orders (id),
                 FOREIGN KEY (product_id) REFERENCES products (id)
             )
-        """))
-        
+        """
+            )
+        )
+
         conn.commit()
-    
+
     return engine
 
 
@@ -84,40 +102,40 @@ def setup_logging():
     """Configure logging to see the class-level logger in action."""
     logging.basicConfig(
         level=logging.DEBUG,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
 
 def demonstrate_user_operations(connection: Connection):
     """Demonstrate User class operations with simplified logger."""
     print("\n=== User Operations ===")
-    
+
     # Create users
     with connection.begin():
         result = User.create_user(
             connection=connection,
-            username='john_doe',
-            email='john@example.com',
-            password_hash='hashed_password_123',
-            status='active'
+            username="john_doe",
+            email="john@example.com",
+            password_hash="hashed_password_123",
+            status="active",
         )
         print(f"Created user with ID: {result.fetchone()[0]}")
-        
+
         result = User.create_user(
             connection=connection,
-            username='jane_smith',
-            email='jane@example.com',
-            password_hash='hashed_password_456',
-            status='active'
+            username="jane_smith",
+            email="jane@example.com",
+            password_hash="hashed_password_456",
+            status="active",
         )
         print(f"Created user with ID: {result.fetchone()[0]}")
-    
+
     # Fetch users
-    users = User.get_users_by_status(connection=connection, status='active')
+    users = User.get_users_by_status(connection=connection, status="active")
     print(f"Found {len(users)} active users:")
     for user in users:
         print(f"  - {user.username} ({user.email})")
-    
+
     # Get user count by status
     status_counts = User.get_user_count_by_status(connection=connection)
     print("User counts by status:")
@@ -128,42 +146,40 @@ def demonstrate_user_operations(connection: Connection):
 def demonstrate_product_operations(connection: Connection):
     """Demonstrate ProductRepository class operations."""
     print("\n=== Product Operations ===")
-    
+
     # Create products
     with connection.begin():
         result = ProductRepository.create_product(
             connection=connection,
-            name='Laptop',
-            description='High-performance laptop',
+            name="Laptop",
+            description="High-performance laptop",
             price=999.99,
             category_id=1,
-            stock_quantity=10
+            stock_quantity=10,
         )
         print(f"Created product with ID: {result.fetchone()[0]}")
-        
+
         result = ProductRepository.create_product(
             connection=connection,
-            name='Mouse',
-            description='Wireless mouse',
+            name="Mouse",
+            description="Wireless mouse",
             price=29.99,
             category_id=1,
-            stock_quantity=50
+            stock_quantity=50,
         )
         print(f"Created product with ID: {result.fetchone()[0]}")
-    
+
     # Search products
     products = ProductRepository.search_products(
-        connection=connection,
-        search_term='%laptop%'
+        connection=connection, search_term="%laptop%"
     )
     print(f"Found {len(products)} products matching 'laptop':")
     for product in products:
         print(f"  - {product.name}: ${product.price}")
-    
+
     # Check low stock
     low_stock = ProductRepository.get_low_stock_products(
-        connection=connection,
-        threshold=20
+        connection=connection, threshold=20
     )
     print(f"Found {len(low_stock)} products with low stock:")
     for product in low_stock:
@@ -173,25 +189,22 @@ def demonstrate_product_operations(connection: Connection):
 def demonstrate_order_operations(connection: Connection):
     """Demonstrate OrderService class operations."""
     print("\n=== Order Operations ===")
-    
+
     # Create an order
     with connection.begin():
         result = OrderService.create_order(
-            connection=connection,
-            user_id=1,
-            total_amount=1029.98,
-            status='pending'
+            connection=connection, user_id=1, total_amount=1029.98, status="pending"
         )
         order_id = result.fetchone()[0]
         print(f"Created order with ID: {order_id}")
-    
+
     # Get order details
     orders = OrderService.get_order_by_id(connection=connection, order_id=order_id)
     if orders:
         order = orders[0]
         print(f"Order {order.id}: ${order.total_amount} - {order.status}")
         print(f"  Customer: {order.username} ({order.email})")
-    
+
     # Get user orders
     user_orders = OrderService.get_user_orders(connection=connection, user_id=1)
     print(f"User has {len(user_orders)} orders:")
@@ -204,7 +217,9 @@ def demonstrate_logger_behavior():
     print("\n=== Logger Behavior ===")
     print("Notice that all operations use the same class-level logger:")
     print("- User.logger: jpy_sql_generator.output.User.User")
-    print("- ProductRepository.logger: jpy_sql_generator.output.ProductRepository.ProductRepository")
+    print(
+        "- ProductRepository.logger: jpy_sql_generator.output.ProductRepository.ProductRepository"
+    )
     print("- OrderService.logger: jpy_sql_generator.output.OrderService.OrderService")
     print("\nNo need to pass logger parameters - it's handled automatically!")
 
@@ -213,22 +228,22 @@ def main():
     """Main example function."""
     print("jpy-sql-generator Usage Example")
     print("=" * 50)
-    
+
     # Setup logging to see the class-level loggers in action
     setup_logging()
-    
+
     # Create database and tables
     engine = setup_database()
-    
+
     with engine.connect() as connection:
         # Demonstrate the simplified logger approach
         demonstrate_logger_behavior()
-        
+
         # Demonstrate operations with each generated class
         demonstrate_user_operations(connection)
         demonstrate_product_operations(connection)
         demonstrate_order_operations(connection)
-    
+
     print("\n" + "=" * 50)
     print("Example completed successfully!")
     print("\nKey benefits of the simplified logger approach:")
@@ -239,4 +254,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
+    main()
