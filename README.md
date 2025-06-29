@@ -282,6 +282,14 @@ MIT License - see LICENSE file for details.
 
 ## Changelog
 
+### [0.2.1] - 2025-07-01
+
+#### Changed
+- **Refactored `sql_helper.py`**: Improved error handling and input validation for file operations.
+- **Stricter type checks**: Functions now validate input types and raise clear exceptions for invalid arguments.
+- **Robust SQL parsing utilities**: Enhanced parsing and comment removal logic for more accurate statement detection and splitting.
+- **Improved documentation**: Expanded and clarified docstrings for all helper functions.
+
 ### [0.2.0] - 2025-06-28
 
 #### Changed
