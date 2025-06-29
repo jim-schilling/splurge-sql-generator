@@ -130,10 +130,9 @@ SELECT * FROM users;
             self.assertIn('email: Parameter for email', code)
             self.assertIn('SQLAlchemy Result object', code)
             
-            # Test method with no SQL parameters (only connection and logger)
+            # Test method with no SQL parameters (only connection)
             self.assertIn('Select operation: get_all', code)
             self.assertIn('Statement type: fetch', code)
-            # All methods now have Args section due to connection parameter
             self.assertIn('Args:', code)
             self.assertIn('connection: SQLAlchemy database connection', code)
             self.assertIn('Returns:', code)
@@ -340,7 +339,6 @@ INSERT INTO users (name) VALUES (:name);
             
             # Verify named parameters are used
             self.assertIn('connection: Connection,', code)
-            self.assertIn('logger: Optional[logging.Logger] = None,', code)
             
             # Verify class logger is defined
             self.assertIn('logger = logging.getLogger', code)

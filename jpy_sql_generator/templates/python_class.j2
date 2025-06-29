@@ -33,7 +33,6 @@ class {{ class_name }}:
 {% for param in method.parameters_list %}
         {{ param }}: Any,
 {% endfor %}
-        logger: Optional[logging.Logger] = None,
     ) -> {{ method.return_type }}:
         """
         {{ method.type.title() }} operation: {{ method.name }} (class method).
@@ -48,7 +47,6 @@ class {{ class_name }}:
         Args:
             connection: SQLAlchemy database connection
 {% endif %}
-            logger: Optional logger instance (defaults to class logger)
 
         Returns:
 {% if method.is_fetch %}
@@ -57,8 +55,7 @@ class {{ class_name }}:
             SQLAlchemy Result object
 {% endif %}
         """
-        if logger is None:
-            logger = cls.logger
+        logger = cls.logger
         
         logger.debug("Executing {{ method.name }} operation")
         

@@ -282,7 +282,9 @@ MIT License - see LICENSE file for details.
 
 ## Changelog
 
-### [0.2.1] - 2025-07-01
+### [0.2.2] - 2025-06-29
+
+### [0.2.1] - 2025-06-29
 
 #### Changed
 - **Refactored `sql_helper.py`**: Improved error handling and input validation for file operations.
