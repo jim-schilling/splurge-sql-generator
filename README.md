@@ -101,15 +101,6 @@ with connection.begin():
     )
     # Transaction commits automatically when context exits
 
-# You can also pass a custom logger if desired
-import logging
-custom_logger = logging.getLogger('my.custom.logger')
-users = UserRepository.get_user_by_id(
-    connection=connection,
-    user_id=1,
-    logger=custom_logger,
-)
-
 # For multiple operations in a single transaction:
 with connection.begin():
     UserRepository.create_user(
@@ -125,6 +116,10 @@ with connection.begin():
         new_status='active',
     )
     # All operations commit together, or all rollback on error
+
+# Note: All generated methods now use a class-level logger automatically. There is no optional logger parameter. To customize logging, configure the class logger as needed:
+# import logging
+# UserRepository.logger.setLevel(logging.INFO)
 ```
 
 > **Note:** All generated methods are class methods. You must always pass the connection and parameters as named arguments. **For data modification operations (INSERT, UPDATE, DELETE), use `with connection.begin():` blocks to manage transactions explicitly.** This gives you full control over transaction boundaries and ensures data consistency.
@@ -282,7 +277,21 @@ MIT License - see LICENSE file for details.
 
 ## Changelog
 
-### [0.2.1] - 2025-07-01
+### [0.2.2] - 2025-06-29
+
+#### Changed
+- **Simplified logger handling**: Removed optional `logger` parameter from all generated methods to always use class-level logger
+- **Cleaner API**: Reduced parameter clutter by eliminating the optional logger parameter
+- **Consistent logging**: All methods now use the same class-level logger for uniform logging behavior
+- **Updated test suite**: Modified tests to reflect the simplified logger approach
+
+#### Technical Improvements
+- **Simplified method signatures**: Generated methods now have fewer parameters and cleaner interfaces
+- **Consistent logging pattern**: Class-level logger approach follows common Python utility class patterns
+- **Reduced complexity**: Eliminated conditional logger assignment logic in generated code
+- **Better maintainability**: Generated code is simpler and easier to understand
+
+### [0.2.1] - 2025-06-29
 
 #### Changed
 - **Refactored `sql_helper.py`**: Improved error handling and input validation for file operations.
