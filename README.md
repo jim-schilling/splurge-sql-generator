@@ -277,6 +277,30 @@ MIT License - see LICENSE file for details.
 
 ## Changelog
 
+### [0.2.3] - 2025-06-29
+
+#### Changed
+- **Updated pyproject.toml**: Modernized build configuration with current best practices and comprehensive metadata
+- **Enhanced development setup**: Added optional dependency groups for dev, test, and docs tools
+- **Improved package metadata**: Added keywords, comprehensive classifiers, and better project description
+- **Type safety improvements**: Fixed all mypy type checking issues throughout the codebase
+- **Enhanced test coverage**: Added comprehensive test cases to achieve 81% overall coverage
+
+#### Technical Improvements
+- **Modern build system**: Upgraded to setuptools 68.0+ for better compatibility
+- **Development dependencies**: Added pytest, black, isort, flake8, mypy, and sphinx for development workflow
+- **Type annotations**: Added missing return type annotations and fixed type compatibility issues
+- **Code quality tools**: Integrated Black (formatter), isort (import sorter), flake8 (linter), and mypy (type checker)
+- **Comprehensive testing**: Added tests for CLI error handling, edge cases, and public API coverage
+- **Cross-platform compatibility**: Ensured all tests work reliably on Windows and Unix systems
+
+#### Development Experience
+- **One-command setup**: `pip install -e ".[dev]"` installs all development tools
+- **Automated code formatting**: Black and isort ensure consistent code style
+- **Static analysis**: flake8 and mypy provide comprehensive code quality checks
+- **Test automation**: pytest with coverage reporting for quality assurance
+- **Documentation support**: Sphinx integration for generating project documentation
+
 ### [0.2.2] - 2025-06-29
 
 #### Changed
