@@ -1,7 +1,9 @@
-import unittest
-import tempfile
 import os
+import tempfile
+import unittest
+
 from jpy_sql_generator.sql_parser import SqlParser
+
 
 class TestSqlParser(unittest.TestCase):
     def setUp(self):
@@ -15,15 +17,15 @@ SELECT * FROM users WHERE id = :user_id;
 #create_user
 INSERT INTO users (name, email) VALUES (:name, :email);
         """
-        with tempfile.NamedTemporaryFile('w+', delete=False, suffix='.sql') as f:
+        with tempfile.NamedTemporaryFile("w+", delete=False, suffix=".sql") as f:
             f.write(sql)
             fname = f.name
         try:
             class_name, methods = self.parser.parse_file(fname)
-            self.assertEqual(class_name, 'TestClass')
-            self.assertIn('get_user', methods)
-            self.assertIn('create_user', methods)
-            self.assertTrue(methods['get_user'].startswith('SELECT'))
+            self.assertEqual(class_name, "TestClass")
+            self.assertIn("get_user", methods)
+            self.assertIn("create_user", methods)
+            self.assertTrue(methods["get_user"].startswith("SELECT"))
         finally:
             os.remove(fname)
 
@@ -36,89 +38,93 @@ SELECT 2;
         """
         methods = self.parser._extract_methods_and_queries(sql)
         self.assertEqual(len(methods), 2)
-        self.assertIn('get_one', methods)
-        self.assertIn('get_two', methods)
+        self.assertIn("get_one", methods)
+        self.assertIn("get_two", methods)
 
     def test_extract_methods_edge_cases(self):
         # Empty content
         methods = self.parser._extract_methods_and_queries("")
         self.assertEqual(methods, {})
-        
+
         # Content with no methods
         methods = self.parser._extract_methods_and_queries("SELECT * FROM users;")
         self.assertEqual(methods, {})
-        
+
         # Method with no SQL
-        methods = self.parser._extract_methods_and_queries("#get_user\n\n#get_two\nSELECT 2;")
-        self.assertIn('get_two', methods)
-        self.assertNotIn('get_user', methods)
+        methods = self.parser._extract_methods_and_queries(
+            "#get_user\n\n#get_two\nSELECT 2;"
+        )
+        self.assertIn("get_two", methods)
+        self.assertNotIn("get_user", methods)
 
     def test_sql_cleaning_with_sql_helper(self):
         """Test that SQL cleaning using sql_helper works correctly."""
         # Test that semicolons are stripped
         methods = self.parser._extract_methods_and_queries("#test_method\nSELECT 1;")
-        self.assertEqual(methods['test_method'], 'SELECT 1')
-        
+        self.assertEqual(methods["test_method"], "SELECT 1")
+
         # Test that whitespace is trimmed
         methods = self.parser._extract_methods_and_queries("#test_method\n  SELECT 2  ")
-        self.assertEqual(methods['test_method'], 'SELECT 2')
-        
+        self.assertEqual(methods["test_method"], "SELECT 2")
+
         # Test that multiple semicolons are handled
         methods = self.parser._extract_methods_and_queries("#test_method\nSELECT 3;;")
-        self.assertEqual(methods['test_method'], 'SELECT 3;')
-        
+        self.assertEqual(methods["test_method"], "SELECT 3;")
+
         # Test empty SQL is handled
         methods = self.parser._extract_methods_and_queries("#test_method\n   ")
-        self.assertNotIn('test_method', methods)
+        self.assertNotIn("test_method", methods)
 
     def test_get_method_info_basic_types(self):
         # SELECT statements
-        info = self.parser.get_method_info('SELECT * FROM users WHERE id = :user_id')
-        self.assertEqual(info['type'], 'select')
-        self.assertTrue(info['is_fetch'])
-        self.assertIn('user_id', info['parameters'])
-        self.assertFalse(info['has_returning'])
+        info = self.parser.get_method_info("SELECT * FROM users WHERE id = :user_id")
+        self.assertEqual(info["type"], "select")
+        self.assertTrue(info["is_fetch"])
+        self.assertIn("user_id", info["parameters"])
+        self.assertFalse(info["has_returning"])
 
         # INSERT statements
-        info = self.parser.get_method_info('INSERT INTO users (name) VALUES (:name) RETURNING id')
-        self.assertEqual(info['type'], 'insert')
-        self.assertFalse(info['is_fetch'])
-        self.assertIn('name', info['parameters'])
-        self.assertTrue(info['has_returning'])
+        info = self.parser.get_method_info(
+            "INSERT INTO users (name) VALUES (:name) RETURNING id"
+        )
+        self.assertEqual(info["type"], "insert")
+        self.assertFalse(info["is_fetch"])
+        self.assertIn("name", info["parameters"])
+        self.assertTrue(info["has_returning"])
 
         # UPDATE statements
-        info = self.parser.get_method_info('UPDATE users SET x=1 WHERE id=:id')
-        self.assertEqual(info['type'], 'update')
-        self.assertFalse(info['is_fetch'])
-        self.assertIn('id', info['parameters'])
+        info = self.parser.get_method_info("UPDATE users SET x=1 WHERE id=:id")
+        self.assertEqual(info["type"], "update")
+        self.assertFalse(info["is_fetch"])
+        self.assertIn("id", info["parameters"])
 
         # DELETE statements
-        info = self.parser.get_method_info('DELETE FROM users WHERE id=:id')
-        self.assertEqual(info['type'], 'delete')
-        self.assertFalse(info['is_fetch'])
-        self.assertIn('id', info['parameters'])
+        info = self.parser.get_method_info("DELETE FROM users WHERE id=:id")
+        self.assertEqual(info["type"], "delete")
+        self.assertFalse(info["is_fetch"])
+        self.assertIn("id", info["parameters"])
 
         # CTE statements
-        info = self.parser.get_method_info('WITH cte AS (SELECT 1) SELECT * FROM cte')
-        self.assertEqual(info['type'], 'cte')
-        self.assertTrue(info['is_fetch'])
+        info = self.parser.get_method_info("WITH cte AS (SELECT 1) SELECT * FROM cte")
+        self.assertEqual(info["type"], "cte")
+        self.assertTrue(info["is_fetch"])
 
         # Other statement types
-        info = self.parser.get_method_info('SHOW TABLES')
-        self.assertEqual(info['type'], 'show')
-        self.assertTrue(info['is_fetch'])
+        info = self.parser.get_method_info("SHOW TABLES")
+        self.assertEqual(info["type"], "show")
+        self.assertTrue(info["is_fetch"])
 
-        info = self.parser.get_method_info('EXPLAIN SELECT 1')
-        self.assertEqual(info['type'], 'explain')
-        self.assertTrue(info['is_fetch'])
+        info = self.parser.get_method_info("EXPLAIN SELECT 1")
+        self.assertEqual(info["type"], "explain")
+        self.assertTrue(info["is_fetch"])
 
-        info = self.parser.get_method_info('DESCRIBE users')
-        self.assertEqual(info['type'], 'describe')
-        self.assertTrue(info['is_fetch'])
+        info = self.parser.get_method_info("DESCRIBE users")
+        self.assertEqual(info["type"], "describe")
+        self.assertTrue(info["is_fetch"])
 
-        info = self.parser.get_method_info('VALUES (1, 2), (3, 4)')
-        self.assertEqual(info['type'], 'values')
-        self.assertTrue(info['is_fetch'])
+        info = self.parser.get_method_info("VALUES (1, 2), (3, 4)")
+        self.assertEqual(info["type"], "values")
+        self.assertTrue(info["is_fetch"])
 
     def test_get_method_info_complex_sql(self):
         # Complex CTE with multiple CTEs
@@ -128,8 +134,8 @@ SELECT 2;
         SELECT * FROM cte1 UNION SELECT * FROM cte2
         """
         info = self.parser.get_method_info(sql)
-        self.assertEqual(info['type'], 'cte')
-        self.assertTrue(info['is_fetch'])
+        self.assertEqual(info["type"], "cte")
+        self.assertTrue(info["is_fetch"])
 
         # CTE with INSERT
         sql = """
@@ -138,15 +144,15 @@ SELECT 2;
         SELECT id, name FROM temp_data
         """
         info = self.parser.get_method_info(sql)
-        self.assertEqual(info['type'], 'cte')
-        self.assertFalse(info['is_fetch'])
+        self.assertEqual(info["type"], "cte")
+        self.assertFalse(info["is_fetch"])
 
         # Subquery in FROM clause
         sql = "SELECT * FROM (SELECT id, name FROM users) AS u WHERE u.id = :user_id"
         info = self.parser.get_method_info(sql)
-        self.assertEqual(info['type'], 'select')
-        self.assertTrue(info['is_fetch'])
-        self.assertIn('user_id', info['parameters'])
+        self.assertEqual(info["type"], "select")
+        self.assertTrue(info["is_fetch"])
+        self.assertIn("user_id", info["parameters"])
 
         # Complex parameter extraction
         sql = """
@@ -156,33 +162,33 @@ SELECT 2;
         WHERE u.id = :user_id AND p.status = :status
         """
         info = self.parser.get_method_info(sql)
-        self.assertIn('user_id', info['parameters'])
-        self.assertIn('status', info['parameters'])
-        self.assertEqual(len(info['parameters']), 2)
+        self.assertIn("user_id", info["parameters"])
+        self.assertIn("status", info["parameters"])
+        self.assertEqual(len(info["parameters"]), 2)
 
     def test_get_method_info_parameter_extraction(self):
         # Multiple parameters
         sql = "SELECT * FROM users WHERE id = :user_id AND status = :status"
         info = self.parser.get_method_info(sql)
-        self.assertIn('user_id', info['parameters'])
-        self.assertIn('status', info['parameters'])
-        self.assertEqual(len(info['parameters']), 2)
+        self.assertIn("user_id", info["parameters"])
+        self.assertIn("status", info["parameters"])
+        self.assertEqual(len(info["parameters"]), 2)
 
         # Duplicate parameters (should be deduplicated)
         sql = "SELECT * FROM users WHERE id = :user_id OR parent_id = :user_id"
         info = self.parser.get_method_info(sql)
-        self.assertIn('user_id', info['parameters'])
-        self.assertEqual(len(info['parameters']), 1)
+        self.assertIn("user_id", info["parameters"])
+        self.assertEqual(len(info["parameters"]), 1)
 
         # Parameters with underscores and numbers
         sql = "SELECT * FROM users WHERE user_id_123 = :user_id_123"
         info = self.parser.get_method_info(sql)
-        self.assertIn('user_id_123', info['parameters'])
+        self.assertIn("user_id_123", info["parameters"])
 
         # No parameters
         sql = "SELECT COUNT(*) FROM users"
         info = self.parser.get_method_info(sql)
-        self.assertEqual(info['parameters'], [])
+        self.assertEqual(info["parameters"], [])
 
         # Parameters in different contexts
         sql = """
@@ -191,41 +197,41 @@ SELECT 2;
         RETURNING id
         """
         info = self.parser.get_method_info(sql)
-        self.assertIn('name', info['parameters'])
-        self.assertIn('email', info['parameters'])
-        self.assertIn('status', info['parameters'])
-        self.assertTrue(info['has_returning'])
+        self.assertIn("name", info["parameters"])
+        self.assertIn("email", info["parameters"])
+        self.assertIn("status", info["parameters"])
+        self.assertTrue(info["has_returning"])
 
     def test_get_method_info_edge_cases(self):
         # Empty SQL
-        info = self.parser.get_method_info('')
-        self.assertEqual(info['type'], 'other')
-        self.assertFalse(info['is_fetch'])
-        self.assertEqual(info['parameters'], [])
+        info = self.parser.get_method_info("")
+        self.assertEqual(info["type"], "other")
+        self.assertFalse(info["is_fetch"])
+        self.assertEqual(info["parameters"], [])
 
         # Whitespace only
-        info = self.parser.get_method_info('   ')
-        self.assertEqual(info['type'], 'other')
-        self.assertFalse(info['is_fetch'])
+        info = self.parser.get_method_info("   ")
+        self.assertEqual(info["type"], "other")
+        self.assertFalse(info["is_fetch"])
 
         # SQL with comments
         sql = "SELECT * FROM users -- comment\nWHERE id = :user_id"
         info = self.parser.get_method_info(sql)
-        self.assertEqual(info['type'], 'select')
-        self.assertIn('user_id', info['parameters'])
+        self.assertEqual(info["type"], "select")
+        self.assertIn("user_id", info["parameters"])
 
         # Case insensitive matching
         sql = "select * from users where id = :user_id"
         info = self.parser.get_method_info(sql)
-        self.assertEqual(info['type'], 'select')
+        self.assertEqual(info["type"], "select")
 
         sql = "Select * from users where id = :user_id"
         info = self.parser.get_method_info(sql)
-        self.assertEqual(info['type'], 'select')
+        self.assertEqual(info["type"], "select")
 
     def test_parse_file_not_found(self):
         with self.assertRaises(FileNotFoundError):
-            self.parser.parse_file('nonexistent_file.sql')
+            self.parser.parse_file("nonexistent_file.sql")
 
     def test_parse_file_encoding(self):
         # Test with UTF-8 content
@@ -233,13 +239,15 @@ SELECT 2;
 #get_user_with_unicode
 SELECT * FROM users WHERE name = :name;
         """
-        with tempfile.NamedTemporaryFile('w+', delete=False, suffix='.sql', encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(
+            "w+", delete=False, suffix=".sql", encoding="utf-8"
+        ) as f:
             f.write(sql)
             fname = f.name
         try:
             class_name, methods = self.parser.parse_file(fname)
-            self.assertEqual(class_name, 'TestClass')
-            self.assertIn('get_user_with_unicode', methods)
+            self.assertEqual(class_name, "TestClass")
+            self.assertIn("get_user_with_unicode", methods)
         finally:
             os.remove(fname)
 
@@ -248,7 +256,7 @@ SELECT * FROM users WHERE name = :name;
         sql = """#get_user
 SELECT * FROM users WHERE id = :user_id;
         """
-        with tempfile.NamedTemporaryFile('w+', delete=False, suffix='.sql') as f:
+        with tempfile.NamedTemporaryFile("w+", delete=False, suffix=".sql") as f:
             f.write(sql)
             fname = f.name
         try:
@@ -264,7 +272,7 @@ SELECT * FROM users WHERE id = :user_id;
 #get_user
 SELECT * FROM users WHERE id = :user_id;
         """
-        with tempfile.NamedTemporaryFile('w+', delete=False, suffix='.sql') as f:
+        with tempfile.NamedTemporaryFile("w+", delete=False, suffix=".sql") as f:
             f.write(sql)
             fname = f.name
         try:
@@ -280,7 +288,7 @@ SELECT * FROM users WHERE id = :user_id;
 #get_user
 SELECT * FROM users WHERE id = :user_id;
         """
-        with tempfile.NamedTemporaryFile('w+', delete=False, suffix='.sql') as f:
+        with tempfile.NamedTemporaryFile("w+", delete=False, suffix=".sql") as f:
             f.write(sql)
             fname = f.name
         try:
@@ -292,15 +300,18 @@ SELECT * FROM users WHERE id = :user_id;
 
     def test_parse_file_empty_file(self):
         """Test that parse_file raises ValueError when file is empty."""
-        with tempfile.NamedTemporaryFile('w+', delete=False, suffix='.sql') as f:
+        with tempfile.NamedTemporaryFile("w+", delete=False, suffix=".sql") as f:
             f.write("")
             fname = f.name
         try:
             with self.assertRaises(ValueError) as cm:
                 self.parser.parse_file(fname)
-            self.assertIn("First line must be a class comment starting with #", str(cm.exception))
+            self.assertIn(
+                "First line must be a class comment starting with #", str(cm.exception)
+            )
         finally:
             os.remove(fname)
 
-if __name__ == '__main__':
-    unittest.main() 
+
+if __name__ == "__main__":
+    unittest.main()
