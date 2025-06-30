@@ -366,11 +366,10 @@ def detect_statement_type(sql: str) -> str:
             return FETCH_STATEMENT
         # If no main statement found after CTE, but there are more statements, check the next statement
         if main_stmt is None and len(parsed) > 1:
-            # Recursively check the next statement
-            rest_sql = str(sqlparse.format(sql.strip(), strip_comments=True))
-            stmts = sqlparse.split(rest_sql)
-            if len(stmts) > 1:
-                return detect_statement_type(stmts[1])
+            # Recursively check the next parsed statement
+            next_stmt_str = str(parsed[1]).strip()
+            if next_stmt_str:
+                return detect_statement_type(next_stmt_str)
         return EXECUTE_STATEMENT
 
     # SELECT
