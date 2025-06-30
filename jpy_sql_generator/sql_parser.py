@@ -7,6 +7,7 @@ This module is licensed under the MIT License.
 """
 
 import re
+import keyword  # Added for reserved keyword check
 from pathlib import Path
 from typing import Dict, Tuple, Any
 
@@ -85,8 +86,8 @@ class SqlParser:
         class_name = class_comment[2:].strip()  # Remove '# ' prefix
         if not class_name:
             raise ValueError(f"Class name cannot be empty: {class_comment}")
-        if not class_name.isidentifier():
-            raise ValueError(f"Class name must be a valid Python identifier: {class_name}")
+        if not class_name.isidentifier() or keyword.iskeyword(class_name):
+            raise ValueError(f"Class name must be a valid Python identifier and not a reserved keyword: {class_name}")
 
         # Parse methods and queries
         method_queries = self._extract_methods_and_queries(content)
@@ -118,7 +119,10 @@ class SqlParser:
                 if sql_query.endswith(";"):
                     sql_query = sql_query[:-1]
 
+                # Check for valid Python identifier and not a reserved keyword
                 if method_name and sql_query:
+                    if not method_name.isidentifier() or keyword.iskeyword(method_name):
+                        raise ValueError(f"Method name must be a valid Python identifier and not a reserved keyword: {method_name}")
                     method_queries[method_name] = sql_query
 
         return method_queries
@@ -165,6 +169,10 @@ class SqlParser:
         parameters = self._PARAM_PATTERN.findall(sql_query)
         # Deduplicate while preserving order
         parameters = list(dict.fromkeys(parameters))
+        # Check for reserved keywords in parameters
+        for param in parameters:
+            if keyword.iskeyword(param):
+                raise ValueError(f"Parameter name cannot be a reserved keyword: {param}")
 
         return {
             "type": query_type,
