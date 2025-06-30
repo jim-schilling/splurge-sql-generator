@@ -277,6 +277,15 @@ MIT License - see LICENSE file for details.
 
 ## Changelog
 
+### [0.2.4] - 2025-06-30
+
+#### Changed
+- **Strict Python identifier enforcement**: Method names, class names, and parameter names extracted from SQL templates must now be valid Python identifiers. Invalid names will raise errors during code generation.
+- **Improved error messages**: Clearer error reporting when invalid names are detected in SQL templates.
+- **Documentation update**: The requirement for valid Python names is now explicitly documented in the README and enforced in the code generator.
+
+> **Note:** All method names, class names, and parameter names in your SQL templates must be valid Python identifiers (letters, numbers, and underscores, not starting with a number, and not a Python keyword). This ensures the generated code is always valid and importable.
+
 ### [0.2.3] - 2025-06-29
 
 #### Changed

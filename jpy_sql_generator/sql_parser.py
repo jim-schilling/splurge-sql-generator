@@ -85,6 +85,8 @@ class SqlParser:
         class_name = class_comment[2:].strip()  # Remove '# ' prefix
         if not class_name:
             raise ValueError(f"Class name cannot be empty: {class_comment}")
+        if not class_name.isidentifier():
+            raise ValueError(f"Class name must be a valid Python identifier: {class_name}")
 
         # Parse methods and queries
         method_queries = self._extract_methods_and_queries(content)
