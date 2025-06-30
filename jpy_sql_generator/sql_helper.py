@@ -28,6 +28,7 @@ _FETCH_STATEMENT_TYPES = (
 _DML_STATEMENT_TYPES = ("SELECT", "INSERT", "UPDATE", "DELETE")
 _DESCRIBE_STATEMENT_TYPES = ("DESC", "DESCRIBE")
 _MODIFY_DML_TYPES = ("INSERT", "UPDATE", "DELETE")
+_DDL_STATEMENT_TYPES = ("CREATE", "ALTER", "DROP")
 
 # Private constants for SQL keywords and symbols
 _WITH_KEYWORD = "WITH"
@@ -354,12 +355,22 @@ def detect_statement_type(sql: str) -> str:
             # Fallback to the simpler approach
             main_stmt = _find_first_dml_keyword_top_level(after_with_tokens)
 
+        # Patch: DDL detection after CTE
+        if main_stmt is not None and main_stmt in _DDL_STATEMENT_TYPES:
+            return EXECUTE_STATEMENT
         if main_stmt == _SELECT_KEYWORD:
             return FETCH_STATEMENT
         elif main_stmt in _MODIFY_DML_TYPES:
             return EXECUTE_STATEMENT
         elif main_stmt is not None and _is_fetch_statement(main_stmt):
             return FETCH_STATEMENT
+        # If no main statement found after CTE, but there are more statements, check the next statement
+        if main_stmt is None and len(parsed) > 1:
+            # Recursively check the next statement
+            rest_sql = str(sqlparse.format(sql.strip(), strip_comments=True))
+            stmts = sqlparse.split(rest_sql)
+            if len(stmts) > 1:
+                return detect_statement_type(stmts[1])
         return EXECUTE_STATEMENT
 
     # SELECT
@@ -459,43 +470,3 @@ def split_sql_file(
         raise FileNotFoundError(f"SQL file not found: {file_path}")
     except OSError as e:
         raise OSError(f"Error reading SQL file {file_path}: {e}") from e
-
-
-# Usage examples
-if __name__ == "__main__":
-    # Example 1: Remove comments
-    sql_with_comments = """
-    CREATE TABLE users (
-        id INTEGER PRIMARY KEY, -- user id
-        name TEXT NOT NULL,     /* user name */
-        email TEXT              -- user email
-    );
-    """
-
-    clean_sql = remove_sql_comments(sql_with_comments)
-    print("Clean SQL:")
-    print(clean_sql)
-    print()
-
-    # Example 2: Parse multiple statements (preserve semicolons by default)
-    multi_sql = """
-    CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);
-    INSERT INTO users VALUES (1, 'John');
-    INSERT INTO users VALUES (2, 'Jane');
-    SELECT * FROM users;
-    """
-
-    statements = parse_sql_statements(multi_sql)
-    print("Individual statements (semicolons preserved):")
-    for i, stmt in enumerate(statements, 1):
-        print(f"{i}. {stmt}")
-    print()
-
-    # Example 3: Parse multiple statements (strip semicolons)
-    statements_without_semicolons = parse_sql_statements(
-        multi_sql, strip_semicolon=True
-    )
-    print("Individual statements (semicolons stripped):")
-    for i, stmt in enumerate(statements_without_semicolons, 1):
-        print(f"{i}. {stmt}")
-    print()
