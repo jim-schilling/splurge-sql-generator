@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jpy-sql-generator"
-version = "0.2.3"
+version = "0.2.4"
 description = "A Python tool for generating Python classes from SQL files"
 authors = [
     {name = "Jim Schilling"}
