@@ -12,11 +12,32 @@ import sys
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection
 
-# Add the parent directory to the path to import from output
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# Add the project root to the path so we can import from 'output' and the package
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, PROJECT_ROOT)
 
-# Import the generated classes
-from output.User import User
+
+def _ensure_generated_classes() -> None:
+    """Generate required example classes into project-root 'output' if missing.
+
+    Creates 'output' package and generates `User.py` from `examples/User.sql` when
+    the module does not exist yet. This makes the example runnable without a
+    prior CLI step.
+    """
+    output_dir = os.path.join(PROJECT_ROOT, "output")
+    os.makedirs(output_dir, exist_ok=True)
+
+    init_file = os.path.join(output_dir, "__init__.py")
+    if not os.path.exists(init_file):
+        with open(init_file, "w", encoding="utf-8") as f:
+            f.write("")
+
+    user_module_path = os.path.join(output_dir, "User.py")
+    if not os.path.exists(user_module_path):
+        from splurge_sql_generator import generate_class
+
+        sql_path = os.path.join(PROJECT_ROOT, "examples", "User.sql")
+        generate_class(sql_path, output_file_path=user_module_path)
 
 
 def setup_logging():
@@ -72,6 +93,10 @@ def demonstrate_simplified_logger():
 
     # Setup logging
     setup_logging()
+
+    # Ensure generated classes and import
+    _ensure_generated_classes()
+    from output.User import User
 
     # Create database
     engine = create_test_database()
@@ -129,12 +154,12 @@ def demonstrate_simplified_logger():
 def show_logger_benefits():
     """Show the benefits of the simplified logger approach."""
     print("\n=== Benefits of Simplified Logger ===")
-    print("✅ No optional logger parameter in method signatures")
-    print("✅ Consistent logging behavior across all methods")
-    print("✅ Class-level logger follows Python best practices")
-    print("✅ Cleaner, more maintainable generated code")
-    print("✅ Simpler API for users")
-    print("✅ Automatic error logging with proper context")
+    print("- No optional logger parameter in method signatures")
+    print("- Consistent logging behavior across all methods")
+    print("- Class-level logger follows Python best practices")
+    print("- Cleaner, more maintainable generated code")
+    print("- Simpler API for users")
+    print("- Automatic error logging with proper context")
 
 
 def main():

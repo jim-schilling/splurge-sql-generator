@@ -12,11 +12,27 @@ import sys
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection
 
-# Add the parent directory to the path to import from output
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# Add the project root to the path to import from 'output'
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, PROJECT_ROOT)
 
-# Import the generated classes
-from output.User import User
+
+def _ensure_generated_classes() -> None:
+    """Generate User class into project-root 'output' if missing."""
+    output_dir = os.path.join(PROJECT_ROOT, "output")
+    os.makedirs(output_dir, exist_ok=True)
+
+    init_file = os.path.join(output_dir, "__init__.py")
+    if not os.path.exists(init_file):
+        with open(init_file, "w", encoding="utf-8") as f:
+            f.write("")
+
+    user_module_path = os.path.join(output_dir, "User.py")
+    if not os.path.exists(user_module_path):
+        from splurge_sql_generator import generate_class
+
+        sql_path = os.path.join(PROJECT_ROOT, "examples", "User.sql")
+        generate_class(sql_path, output_file_path=user_module_path)
 
 
 def setup_logging():
@@ -98,6 +114,9 @@ def demonstrate_new_approach():
 def demonstrate_actual_usage():
     """Show actual usage with the new approach."""
     print("\n=== ACTUAL USAGE EXAMPLE ===")
+
+    _ensure_generated_classes()
+    from output.User import User
 
     # Create a simple in-memory database
     engine = create_engine("sqlite:///:memory:")

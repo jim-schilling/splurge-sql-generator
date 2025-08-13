@@ -219,6 +219,8 @@ class PythonCodeGenerator:
 
             # Save to file if output directory provided
             if output_dir:
+                # Ensure output directory exists
+                Path(output_dir).mkdir(parents=True, exist_ok=True)
                 output_path = Path(output_dir) / f"{class_name}.py"
                 try:
                     output_path.write_text(python_code, encoding="utf-8")

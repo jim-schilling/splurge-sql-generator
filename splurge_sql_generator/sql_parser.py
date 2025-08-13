@@ -21,7 +21,7 @@ class SqlParser:
     # Only allow valid Python identifiers for method names
     _METHOD_PATTERN = re.compile(r"^\s*#\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*$", re.MULTILINE)
     # Only allow valid Python identifiers for parameter names
-    _PARAM_PATTERN = re.compile(r":([a-zA-Z_][a-zA-Z0-9_]*)")
+    _PARAM_PATTERN = re.compile(r"(?<!:):([a-zA-Z_][a-zA-Z0-9_]*)\b")
 
     # Query type constants (private)
     _TYPE_SELECT = "select"
