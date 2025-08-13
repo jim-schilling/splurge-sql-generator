@@ -9,9 +9,10 @@ This module is licensed under the MIT License.
 import re
 import keyword  # Added for reserved keyword check
 from pathlib import Path
-from typing import Dict, Tuple, Any
+from typing import Any
 
-from jpy_sql_generator.sql_helper import FETCH_STATEMENT, detect_statement_type
+from splurge_sql_generator.sql_helper import FETCH_STATEMENT, detect_statement_type
+from splurge_sql_generator.errors import SqlValidationError
 
 
 class SqlParser:
@@ -50,7 +51,7 @@ class SqlParser:
     def __init__(self) -> None:
         pass  # No need to compile pattern in __init__
 
-    def parse_file(self, file_path: str | Path) -> Tuple[str, Dict[str, str]]:
+    def parse_file(self, file_path: str | Path) -> tuple[str, dict[str, str]]:
         """
         Parse a SQL file and extract class name and method-query mappings.
 
@@ -67,34 +68,35 @@ class SqlParser:
 
         # Read file content
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
+            content = file_path.read_text(encoding="utf-8")
         except OSError as e:
             raise OSError(f"Error reading SQL file {file_path}: {e}") from e
 
         # Extract class name from first line comment
         lines = content.split("\n")
         if not lines or not lines[0].strip().startswith("#"):
-            raise ValueError(
+            raise SqlValidationError(
                 f"First line must be a class comment starting with #: {file_path}"
             )
 
         class_comment = lines[0].strip()
         if not class_comment.startswith("# "):
-            raise ValueError(f"Class comment must start with '# ': {class_comment}")
+            raise SqlValidationError(f"Class comment must start with '# ': {class_comment}")
 
         class_name = class_comment[2:].strip()  # Remove '# ' prefix
         if not class_name:
-            raise ValueError(f"Class name cannot be empty: {class_comment}")
+            raise SqlValidationError(f"Class name cannot be empty: {class_comment}")
         if not class_name.isidentifier() or keyword.iskeyword(class_name):
-            raise ValueError(f"Class name must be a valid Python identifier and not a reserved keyword: {class_name}")
+            raise SqlValidationError(
+                f"Class name must be a valid Python identifier and not a reserved keyword: {class_name}"
+            )
 
         # Parse methods and queries
         method_queries = self._extract_methods_and_queries(content)
 
         return class_name, method_queries
 
-    def _extract_methods_and_queries(self, content: str) -> Dict[str, str]:
+    def _extract_methods_and_queries(self, content: str) -> dict[str, str]:
         """
         Extract method names and their corresponding SQL queries.
 
@@ -122,12 +124,14 @@ class SqlParser:
                 # Check for valid Python identifier and not a reserved keyword
                 if method_name and sql_query:
                     if not method_name.isidentifier() or keyword.iskeyword(method_name):
-                        raise ValueError(f"Method name must be a valid Python identifier and not a reserved keyword: {method_name}")
+                        raise SqlValidationError(
+                            f"Method name must be a valid Python identifier and not a reserved keyword: {method_name}"
+                        )
                     method_queries[method_name] = sql_query
 
         return method_queries
 
-    def get_method_info(self, sql_query: str) -> Dict[str, Any]:
+    def get_method_info(self, sql_query: str) -> dict[str, Any]:
         """
         Analyze SQL query to determine method type and parameters.
         Uses sql_helper.detect_statement_type() for accurate statement type detection.
@@ -138,6 +142,16 @@ class SqlParser:
         Returns:
             Dictionary with method analysis info
         """
+        # Guard clause: trivial inputs return default analysis without extra work
+        if not sql_query or not sql_query.strip():
+            return {
+                "type": self._TYPE_OTHER,
+                "is_fetch": False,
+                "statement_type": detect_statement_type(sql_query),
+                "parameters": [],
+                "has_returning": False,
+            }
+
         # Use sql_helper to determine if this is a fetch or execute statement
         statement_type = detect_statement_type(sql_query)
         is_fetch = statement_type == FETCH_STATEMENT
@@ -172,7 +186,7 @@ class SqlParser:
         # Check for reserved keywords in parameters
         for param in parameters:
             if keyword.iskeyword(param):
-                raise ValueError(f"Parameter name cannot be a reserved keyword: {param}")
+                raise SqlValidationError(f"Parameter name cannot be a reserved keyword: {param}")
 
         return {
             "type": query_type,

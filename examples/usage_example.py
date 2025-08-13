@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Usage Example for jpy-sql-generator
+Usage Example for splurge-sql-generator
 
 This example demonstrates how to use the generated classes with the simplified logger approach.
 """
@@ -216,17 +216,17 @@ def demonstrate_logger_behavior():
     """Demonstrate the simplified logger approach."""
     print("\n=== Logger Behavior ===")
     print("Notice that all operations use the same class-level logger:")
-    print("- User.logger: jpy_sql_generator.output.User.User")
+    print("- User.logger: output.User.User")
     print(
-        "- ProductRepository.logger: jpy_sql_generator.output.ProductRepository.ProductRepository"
+        "- ProductRepository.logger: output.ProductRepository.ProductRepository"
     )
-    print("- OrderService.logger: jpy_sql_generator.output.OrderService.OrderService")
+    print("- OrderService.logger: output.OrderService.OrderService")
     print("\nNo need to pass logger parameters - it's handled automatically!")
 
 
 def main():
     """Main example function."""
-    print("jpy-sql-generator Usage Example")
+    print("splurge-sql-generator Usage Example")
     print("=" * 50)
 
     # Setup logging to see the class-level loggers in action

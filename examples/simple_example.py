@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple Example for jpy-sql-generator
+Simple Example for splurge-sql-generator
 
 This example demonstrates the simplified logger approach with a working database setup.
 """
@@ -139,7 +139,7 @@ def show_logger_benefits():
 
 def main():
     """Main example function."""
-    print("jpy-sql-generator Simple Example")
+    print("splurge-sql-generator Simple Example")
     print("=" * 50)
     print()
 

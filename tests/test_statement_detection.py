@@ -3,7 +3,7 @@
 Simple test script demonstrating the easy-to-use statement detection functions.
 """
 
-from jpy_sql_generator import (
+from splurge_sql_generator import (
     detect_statement_type,
     is_execute_statement,
     is_fetch_statement,

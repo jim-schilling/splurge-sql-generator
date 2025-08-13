@@ -7,7 +7,7 @@ from pathlib import Path
 import shutil
 import pytest
 
-SCRIPT = os.path.join(os.path.dirname(__file__), '..', 'jpy_sql_generator', 'cli.py')
+SCRIPT = os.path.join(os.path.dirname(__file__), '..', 'splurge_sql_generator', 'cli.py')
 
 
 def run_cli(args, input_sql=None):

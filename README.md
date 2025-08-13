@@ -1,4 +1,4 @@
-# jpy-sql-generator
+# splurge-sql-generator
 
 A Python library for generating SQLAlchemy classes from SQL template files with sophisticated SQL parsing and statement type detection.
 
@@ -22,14 +22,14 @@ A Python library for generating SQLAlchemy classes from SQL template files with 
 ## Installation
 
 ```bash
-pip install jpy-sql-generator
+pip install splurge-sql-generator
 ```
 
 Or install from source:
 
 ```bash
-git clone https://github.com/yourusername/jpy-sql-generator.git
-cd jpy-sql-generator
+git clone https://github.com/yourusername/splurge-sql-generator.git
+cd splurge-sql-generator
 pip install -e .
 ```
 
@@ -62,16 +62,29 @@ WHERE id = :user_id;
 Using the CLI:
 
 ```bash
-python -m jpy_sql_generator.cli UserRepository.sql --output generated/
+# Module invocation
+python -m splurge_sql_generator.cli UserRepository.sql --output generated/
+
+# Or via the installed console script
+splurge-sql-gen UserRepository.sql --output generated/
 ```
 
 Or using Python:
 
 ```python
-from jpy_sql_generator import PythonCodeGenerator
+from splurge_sql_generator import PythonCodeGenerator, generate_class
 
 generator = PythonCodeGenerator()
-code = generator.generate_class('UserRepository.sql', 'generated/UserRepository.py')
+code = generator.generate_class(
+    'UserRepository.sql',
+    output_file_path='generated/UserRepository.py',
+)
+
+# Or use the convenience function
+code2 = generate_class(
+    'UserRepository.sql',
+    output_file_path='generated/UserRepository.py',
+)
 ```
 
 ### 3. Use the Generated Class
@@ -129,7 +142,7 @@ with connection.begin():
 ### Statement Type Detection
 
 ```python
-from jpy_sql_generator import detect_statement_type, is_fetch_statement
+from splurge_sql_generator import detect_statement_type, is_fetch_statement
 
 # Detect statement types
 sql1 = "SELECT * FROM users WHERE id = :user_id"
@@ -164,17 +177,26 @@ The generator will correctly detect this as a fetch statement and generate appro
 ### CLI Usage
 
 ```bash
-# Generate single class
-python -m jpy_sql_generator.cli UserRepository.sql --output generated/
+# Generate single class (module)
+python -m splurge_sql_generator.cli UserRepository.sql --output generated/
 
-# Generate multiple classes
-python -m jpy_sql_generator.cli *.sql --output generated/
+# Generate single class (console script)
+splurge-sql-gen UserRepository.sql --output generated/
+
+# Generate multiple classes (globs expanded by shell)
+splurge-sql-gen *.sql --output generated/
+
+# Generate from a directory recursively
+splurge-sql-gen path/to/sqls/ --output generated/
 
 # Preview generated code without saving
-python -m jpy_sql_generator.cli UserRepository.sql --dry-run
+splurge-sql-gen UserRepository.sql --dry-run
+
+# Strict mode: treat warnings (e.g., non-.sql inputs, empty dir) as errors
+splurge-sql-gen path/to/sqls/ --output generated/ --strict
 
 # Generate to specific output directory
-python -m jpy_sql_generator.cli UserRepository.sql -o src/repositories/
+splurge-sql-gen UserRepository.sql -o src/repositories/
 ```
 
 ## API Reference
@@ -248,16 +270,17 @@ python -m unittest discover -s tests -v
 ### Project Structure
 
 ```
-jpy_sql_generator/
-├── jpy_sql_generator/
+splurge-sql-generator/
+├── splurge_sql_generator/
 │   ├── __init__.py          # Main package exports
 │   ├── sql_helper.py        # SQL parsing utilities
 │   ├── sql_parser.py        # SQL template parser
 │   ├── code_generator.py    # Python code generator
-│   └── cli.py              # Command-line interface
+│   ├── cli.py               # Command-line interface
+│   └── templates/           # Jinja2 templates (python_class.j2)
 ├── tests/                   # Test suite
-├── examples/               # Example SQL templates
-└── output/                 # Generated code examples
+├── examples/                # Example SQL templates
+└── output/                  # Generated code examples
 ```
 
 ## License
@@ -276,6 +299,20 @@ MIT License - see LICENSE file for details.
 ---
 
 ## Changelog
+
+### [2025.3.0] - 2025-08-13
+
+#### Changed
+- Package renamed and unified under `splurge-sql-generator` / `splurge_sql_generator`
+- Keyword-only, fully typed public APIs (Python 3.10+ unions, precise return types)
+- CLI improvements: directory input recursion and `--strict` mode
+- Narrowed public exports to user-facing helpers and classes
+- Consistent exceptions: `SqlValidationError` for validation; now inherits from `ValueError`
+- Generated classes add a `NullHandler` to the class logger to avoid warnings
+- Faster generation: preloaded Jinja template and single-parse batch generation
+- Documentation updates and examples migrated to new package/module names
+
+> Note: Backwards-compatibility with positional arguments was intentionally removed. Use keyword-only parameters (`output_file_path=...`, `output_dir=...`).
 
 ### [0.2.4] - 2025-06-30
 
@@ -359,7 +396,7 @@ MIT License - see LICENSE file for details.
 #### Changed
 - **Refactored code generator to use Jinja2 templates**: Replaced string concatenation with template-based code generation for better maintainability and flexibility
 - **Added Jinja2 dependency**: Added `jinja2>=3.1.0` to requirements.txt
-- **Created templates directory**: Added `jpy_sql_generator/templates/` with `python_class.j2` template
+- **Created templates directory**: Added `splurge_sql_generator/templates/` with `python_class.j2` template
 - **Simplified code generation logic**: Removed individual method generation functions in favor of template rendering
 - **Updated test suite**: Modified tests to work with new template-based approach while maintaining full functionality
 
@@ -372,7 +409,7 @@ MIT License - see LICENSE file for details.
 ### [0.1.0] - 2025-06-28
 
 #### Added
-- Initial release of jpy-sql-generator
+- Initial release of splurge-sql-generator
 - SQL template parsing with method name extraction
 - Sophisticated SQL statement type detection (fetch vs execute)
 - Support for Common Table Expressions (CTEs)

@@ -1,5 +1,5 @@
 """
-jpy_sql_generator CLI - Command-line interface for SQL code generation.
+splurge_sql_generator CLI - Command-line interface for SQL code generation.
 
 Copyright (c) 2025, Jim Schilling
 
@@ -10,7 +10,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from jpy_sql_generator.code_generator import PythonCodeGenerator
+from splurge_sql_generator.code_generator import PythonCodeGenerator
 
 
 def main() -> None:
@@ -21,13 +21,13 @@ def main() -> None:
         epilog="""
 Examples:
   # Generate a single class
-  python -m jpy_sql_generator.cli examples/UserRepository.sql -o generated/
+  python -m splurge_sql_generator.cli examples/User.sql -o generated/
   
   # Generate multiple classes
-  python -m jpy_sql_generator.cli examples/*.sql -o generated/
+  python -m splurge_sql_generator.cli examples/*.sql -o generated/
   
   # Print generated code to stdout
-  python -m jpy_sql_generator.cli examples/ProductRepository.sql
+  python -m splurge_sql_generator.cli examples/ProductRepository.sql
         """,
     )
 
@@ -43,21 +43,42 @@ Examples:
         help="Print generated code to stdout without saving files",
     )
 
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Treat warnings (e.g., non-.sql inputs, empty directory) as errors",
+    )
+
     args = parser.parse_args()
 
-    # Validate input files
-    sql_files = []
+    # Validate input files or expand directories
+    sql_files: list[str] = []
     for file_path in args.sql_files:
         path = Path(file_path)
         if not path.exists():
             print(f"Error: SQL file not found: {file_path}", file=sys.stderr)
             sys.exit(1)
-        if not path.suffix.lower() == ".sql":
-            print(
-                f"Warning: File {file_path} doesn't have .sql extension",
-                file=sys.stderr,
-            )
-        sql_files.append(str(path))
+
+        if path.is_dir():
+            discovered = [str(p) for p in path.rglob("*.sql")]
+            if not discovered:
+                msg = f"Warning: No .sql files found in directory {file_path}"
+                if args.strict:
+                    print(f"Error: {msg}", file=sys.stderr)
+                    sys.exit(1)
+                print(msg, file=sys.stderr)
+                continue
+            sql_files.extend(discovered)
+            continue
+
+        if path.is_file():
+            if path.suffix.lower() != ".sql":
+                msg = f"Warning: File {file_path} doesn't have .sql extension"
+                if args.strict:
+                    print(f"Error: {msg}", file=sys.stderr)
+                    sys.exit(1)
+                print(msg, file=sys.stderr)
+            sql_files.append(str(path))
 
     # Create output directory if specified
     if args.output and not args.dry_run:
@@ -75,7 +96,8 @@ Examples:
         else:
             # Multiple files or save to directory
             generated_classes = generator.generate_multiple_classes(
-                sql_files, args.output if not args.dry_run else None
+                sql_files,
+                output_dir=args.output if not args.dry_run else None,
             )
 
             if args.dry_run:

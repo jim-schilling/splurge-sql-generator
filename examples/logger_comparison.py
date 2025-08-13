@@ -155,7 +155,7 @@ def show_benefits():
 
 def main():
     """Main comparison function."""
-    print("jpy-sql-generator Logger Comparison")
+    print("splurge-sql-generator Logger Comparison")
     print("=" * 50)
 
     # Setup logging to see the class-level logger in action

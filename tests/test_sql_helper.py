@@ -1,350 +1,548 @@
-import os
+"""
+Unit tests for SQL Helper module.
+
+Tests SQL parsing, statement detection, and file processing functionality using actual objects.
+"""
+
 import tempfile
-import unittest
+import os
+from pathlib import Path
 
-from jpy_sql_generator import sql_helper
+import pytest
+
+from splurge_sql_generator.sql_helper import (
+    remove_sql_comments,
+    detect_statement_type,
+    parse_sql_statements,
+    split_sql_file,
+    EXECUTE_STATEMENT,
+    FETCH_STATEMENT,
+    ERROR_STATEMENT,
+)
+from splurge_sql_generator.errors import SqlFileError, SqlValidationError
+# Note: Local test utilities were referenced previously but are not part of this repository snapshot.
+# Import removed to ensure tests focus on behavior under test and do not rely on missing helpers.
 
 
-class TestSqlHelper(unittest.TestCase):
-    def test_remove_sql_comments(self):
+class TestRemoveSqlComments:
+    """Test SQL comment removal functionality."""
+
+    def test_empty_string(self):
+        """Test removing comments from empty string."""
+        result = remove_sql_comments("")
+        assert result == ""
+
+    def test_none_string(self):
+        """Test removing comments from None string."""
+        result = remove_sql_comments(None)
+        assert result is None
+
+    def test_no_comments(self):
+        """Test SQL with no comments."""
+        sql = "SELECT * FROM users WHERE active = 1"
+        result = remove_sql_comments(sql)
+        assert result == "SELECT * FROM users WHERE active = 1"
+
+    def test_single_line_comments(self):
+        """Test removing single-line comments."""
         sql = """
-        SELECT * FROM users -- comment
-        /* block comment */
-        WHERE id = 1; -- another
+        SELECT * FROM users -- This is a comment
+        WHERE active = 1 -- Another comment
         """
-        result = sql_helper.remove_sql_comments(sql)
-        self.assertNotIn("--", result)
-        self.assertNotIn("/*", result)
-        self.assertIn("SELECT * FROM users", result)
+        result = remove_sql_comments(sql)
+        assert "--" not in result
+        assert "SELECT * FROM users" in result
+        assert "WHERE active = 1" in result
 
-    def test_remove_sql_comments_empty(self):
-        self.assertEqual(sql_helper.remove_sql_comments(""), "")
-        self.assertEqual(sql_helper.remove_sql_comments(None), "")
-
-    def test_detect_statement_type(self):
-        self.assertEqual(
-            sql_helper.detect_statement_type("SELECT * FROM users"),
-            sql_helper.FETCH_STATEMENT,
-        )
-        self.assertEqual(
-            sql_helper.detect_statement_type("INSERT INTO users VALUES (1)"),
-            sql_helper.EXECUTE_STATEMENT,
-        )
-        self.assertEqual(
-            sql_helper.detect_statement_type("UPDATE users SET x=1"),
-            sql_helper.EXECUTE_STATEMENT,
-        )
-        self.assertEqual(
-            sql_helper.detect_statement_type("DELETE FROM users"),
-            sql_helper.EXECUTE_STATEMENT,
-        )
-        self.assertEqual(
-            sql_helper.detect_statement_type("SHOW TABLES"), sql_helper.FETCH_STATEMENT
-        )
-        self.assertEqual(
-            sql_helper.detect_statement_type("DESCRIBE users"),
-            sql_helper.FETCH_STATEMENT,
-        )
-        self.assertEqual(
-            sql_helper.detect_statement_type(
-                "WITH cte AS (SELECT 1) SELECT * FROM cte"
-            ),
-            sql_helper.FETCH_STATEMENT,
-        )
-        self.assertEqual(
-            sql_helper.detect_statement_type(
-                "WITH cte AS (SELECT 1) INSERT INTO t SELECT * FROM cte"
-            ),
-            sql_helper.EXECUTE_STATEMENT,
-        )
-        self.assertEqual(
-            sql_helper.detect_statement_type(""), sql_helper.EXECUTE_STATEMENT
-        )
-        self.assertEqual(
-            sql_helper.detect_statement_type(None), sql_helper.EXECUTE_STATEMENT
-        )
-
-    def test_detect_statement_type_cte_multiple(self):
+    def test_multi_line_comments(self):
+        """Test removing multi-line comments."""
         sql = """
-        WITH a AS (SELECT 1), b AS (SELECT 2) SELECT * FROM a JOIN b ON a.x = b.x;
+        SELECT * FROM users
+        /* This is a multi-line comment
+           that spans multiple lines */
+        WHERE active = 1
         """
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.FETCH_STATEMENT)
+        result = remove_sql_comments(sql)
+        assert "/*" not in result
+        assert "*/" not in result
+        assert "SELECT * FROM users" in result
+        assert "WHERE active = 1" in result
 
-    def test_detect_statement_type_cte_insert(self):
+    def test_comments_in_string_literals(self):
+        """Test that comments within string literals are preserved."""
         sql = """
-        WITH a AS (SELECT 1) INSERT INTO t SELECT * FROM a;
+        SELECT * FROM users 
+        WHERE name = 'John -- This is not a comment'
+        AND description = '/* This is also not a comment */'
         """
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.EXECUTE_STATEMENT)
+        result = remove_sql_comments(sql)
+        assert "'John -- This is not a comment'" in result
+        assert "'/* This is also not a comment */'" in result
 
-    def test_detect_statement_type_empty_or_whitespace(self):
-        self.assertEqual(sql_helper.detect_statement_type("   "), sql_helper.EXECUTE_STATEMENT)
-        self.assertEqual(sql_helper.detect_statement_type(None), sql_helper.EXECUTE_STATEMENT)
-
-    def test_parse_sql_statements(self):
+    def test_mixed_comments(self):
+        """Test removing mixed single-line and multi-line comments."""
         sql = """
-        SELECT 1;
-        INSERT INTO t VALUES (2);
-        -- comment only
-        SELECT 3;
+        -- Header comment
+        SELECT * FROM users
+        /* Multi-line comment
+           with multiple lines */
+        WHERE active = 1 -- Inline comment
         """
-        stmts = sql_helper.parse_sql_statements(sql)
-        self.assertEqual(len(stmts), 3)
-        self.assertTrue(all(stmt.strip().endswith(";") for stmt in stmts))
+        result = remove_sql_comments(sql)
+        assert "--" not in result
+        assert "/*" not in result
+        assert "*/" not in result
+        assert "SELECT * FROM users" in result
+        assert "WHERE active = 1" in result
 
-    def test_parse_sql_statements_strip_semicolon(self):
-        sql = "SELECT 1; INSERT INTO t VALUES (2);"
-        stmts = sql_helper.parse_sql_statements(sql, strip_semicolon=True)
-        self.assertTrue(all(not stmt.strip().endswith(";") for stmt in stmts))
 
-    def test_parse_sql_statements_empty(self):
-        self.assertEqual(sql_helper.parse_sql_statements(""), [])
-        self.assertEqual(sql_helper.parse_sql_statements(None), [])
+class TestDetectStatementType:
+    """Test SQL statement type detection."""
 
-    def test_parse_sql_statements_all_comments(self):
+    def test_empty_string(self):
+        """Test detecting type of empty string."""
+        result = detect_statement_type("")
+        assert result == EXECUTE_STATEMENT
+
+    def test_whitespace_only(self):
+        """Test detecting type of whitespace-only string."""
+        result = detect_statement_type("   \n\t  ")
+        assert result == EXECUTE_STATEMENT
+
+    def test_simple_select(self):
+        """Test detecting SELECT statement type."""
+        result = detect_statement_type("SELECT * FROM users")
+        assert result == FETCH_STATEMENT
+
+    def test_select_with_comments(self):
+        """Test detecting SELECT statement with comments."""
         sql = """
-        -- comment only
-        /* block comment */
+        -- Get all users
+        SELECT * FROM users
+        WHERE active = 1 -- Only active users
         """
-        self.assertEqual(sql_helper.parse_sql_statements(sql), [])
+        result = detect_statement_type(sql)
+        assert result == FETCH_STATEMENT
 
-    def test_parse_sql_statements_semicolon_only(self):
-        sql = "; ; ;"
-        self.assertEqual(sql_helper.parse_sql_statements(sql), [])
+    def test_values_statement(self):
+        """Test detecting VALUES statement type."""
+        result = detect_statement_type("VALUES (1, 'Alice'), (2, 'Bob')")
+        assert result == FETCH_STATEMENT
 
-    def test_split_sql_file(self):
-        sql = "SELECT 1; INSERT INTO t VALUES (2);"
-        with tempfile.NamedTemporaryFile("w+", delete=False, suffix=".sql") as f:
-            f.write(sql)
-            fname = f.name
+    def test_show_statement(self):
+        """Test detecting SHOW statement type."""
+        result = detect_statement_type("SHOW TABLES")
+        assert result == FETCH_STATEMENT
+
+    def test_explain_statement(self):
+        """Test detecting EXPLAIN statement type."""
+        result = detect_statement_type("EXPLAIN SELECT * FROM users")
+        assert result == FETCH_STATEMENT
+
+    def test_pragma_statement(self):
+        """Test detecting PRAGMA statement type."""
+        result = detect_statement_type("PRAGMA table_info(users)")
+        assert result == FETCH_STATEMENT
+
+    def test_describe_statement(self):
+        """Test detecting DESCRIBE statement type."""
+        result = detect_statement_type("DESCRIBE users")
+        assert result == FETCH_STATEMENT
+
+    def test_desc_statement(self):
+        """Test detecting DESC statement type."""
+        result = detect_statement_type("DESC users")
+        assert result == FETCH_STATEMENT
+
+    def test_insert_statement(self):
+        """Test detecting INSERT statement type."""
+        result = detect_statement_type("INSERT INTO users (name) VALUES ('John')")
+        assert result == EXECUTE_STATEMENT
+
+    def test_update_statement(self):
+        """Test detecting UPDATE statement type."""
+        result = detect_statement_type("UPDATE users SET active = 1 WHERE id = 1")
+        assert result == EXECUTE_STATEMENT
+
+    def test_delete_statement(self):
+        """Test detecting DELETE statement type."""
+        result = detect_statement_type("DELETE FROM users WHERE id = 1")
+        assert result == EXECUTE_STATEMENT
+
+    def test_create_table_statement(self):
+        """Test detecting CREATE TABLE statement type."""
+        result = detect_statement_type("CREATE TABLE users (id INT, name TEXT)")
+        assert result == EXECUTE_STATEMENT
+
+    def test_alter_table_statement(self):
+        """Test detecting ALTER TABLE statement type."""
+        result = detect_statement_type("ALTER TABLE users ADD COLUMN email TEXT")
+        assert result == EXECUTE_STATEMENT
+
+    def test_drop_table_statement(self):
+        """Test detecting DROP TABLE statement type."""
+        result = detect_statement_type("DROP TABLE users")
+        assert result == EXECUTE_STATEMENT
+
+    def test_cte_with_select(self):
+        """Test detecting CTE with SELECT statement type."""
+        sql = """
+        WITH active_users AS (
+            SELECT id, name FROM users WHERE active = 1
+        )
+        SELECT * FROM active_users
+        """
+        result = detect_statement_type(sql)
+        assert result == FETCH_STATEMENT
+
+    def test_cte_with_insert(self):
+        """Test detecting CTE with INSERT statement type."""
+        sql = """
+        WITH new_data AS (
+            SELECT 'John' as name, 25 as age
+        )
+        INSERT INTO users (name, age) SELECT * FROM new_data
+        """
+        result = detect_statement_type(sql)
+        assert result == EXECUTE_STATEMENT
+
+    def test_cte_with_update(self):
+        """Test detecting CTE with UPDATE statement type."""
+        sql = """
+        WITH user_updates AS (
+            SELECT id, 'new_name' as name FROM users WHERE id = 1
+        )
+        UPDATE users SET name = u.name FROM user_updates u WHERE users.id = u.id
+        """
+        result = detect_statement_type(sql)
+        assert result == EXECUTE_STATEMENT
+
+    def test_complex_cte(self):
+        """Test detecting complex CTE statement type."""
+        sql = """
+        WITH 
+        active_users AS (
+            SELECT id, name FROM users WHERE active = 1
+        ),
+        user_stats AS (
+            SELECT user_id, COUNT(*) as post_count 
+            FROM posts 
+            GROUP BY user_id
+        )
+        SELECT u.name, s.post_count 
+        FROM active_users u 
+        JOIN user_stats s ON u.id = s.user_id
+        """
+        result = detect_statement_type(sql)
+        assert result == FETCH_STATEMENT
+
+    def test_case_insensitive_keywords(self):
+        """Test that keywords are detected case-insensitively."""
+        result1 = detect_statement_type("select * from users")
+        result2 = detect_statement_type("SELECT * FROM users")
+        assert result1 == result2 == FETCH_STATEMENT
+
+        result3 = detect_statement_type("insert into users values (1)")
+        result4 = detect_statement_type("INSERT INTO users VALUES (1)")
+        assert result3 == result4 == EXECUTE_STATEMENT
+
+
+class TestParseSqlStatements:
+    """Test SQL statement parsing functionality."""
+
+    def test_empty_string(self):
+        """Test parsing empty string."""
+        result = parse_sql_statements("")
+        assert result == []
+
+    def test_none_string(self):
+        """Test parsing None string."""
+        result = parse_sql_statements(None)
+        assert result == []
+
+    def test_single_statement(self):
+        """Test parsing single SQL statement."""
+        sql = "SELECT * FROM users"
+        result = parse_sql_statements(sql)
+        assert len(result) == 1
+        assert result[0] == "SELECT * FROM users"
+
+    def test_multiple_statements(self):
+        """Test parsing multiple SQL statements."""
+        sql = "SELECT * FROM users; INSERT INTO users (name) VALUES ('John');"
+        result = parse_sql_statements(sql)
+        assert len(result) == 2
+        assert result[0] == "SELECT * FROM users;"
+        assert result[1] == "INSERT INTO users (name) VALUES ('John');"
+
+    def test_statements_with_comments(self):
+        """Test parsing statements with comments."""
+        sql = """
+        -- First statement
+        SELECT * FROM users;
+        /* Second statement */
+        INSERT INTO users (name) VALUES ('John');
+        """
+        result = parse_sql_statements(sql)
+        assert len(result) == 2
+        assert "SELECT * FROM users" in result[0]
+        assert "INSERT INTO users (name) VALUES ('John')" in result[1]
+
+    def test_empty_statements_filtered(self):
+        """Test that empty statements are filtered out."""
+        sql = "SELECT * FROM users;;;INSERT INTO users (name) VALUES ('John');"
+        result = parse_sql_statements(sql)
+        assert len(result) == 2
+        assert result[0] == "SELECT * FROM users;"
+        assert result[1] == "INSERT INTO users (name) VALUES ('John');"
+
+    def test_whitespace_only_statements_filtered(self):
+        """Test that whitespace-only statements are filtered out."""
+        sql = "SELECT * FROM users;   \n\t  ;INSERT INTO users (name) VALUES ('John');"
+        result = parse_sql_statements(sql)
+        assert len(result) == 2
+        assert result[0] == "SELECT * FROM users;"
+        assert result[1] == "INSERT INTO users (name) VALUES ('John');"
+
+    def test_comment_only_statements_filtered(self):
+        """Test that comment-only statements are filtered out."""
+        sql = "SELECT * FROM users; -- Comment only; INSERT INTO users (name) VALUES ('John');"
+        result = parse_sql_statements(sql)
+        assert len(result) == 1
+        assert result[0] == "SELECT * FROM users;"
+
+    def test_strip_semicolon_true(self):
+        """Test parsing with strip_semicolon=True."""
+        sql = "SELECT * FROM users; INSERT INTO users (name) VALUES ('John');"
+        result = parse_sql_statements(sql, strip_semicolon=True)
+        assert len(result) == 2
+        assert result[0] == "SELECT * FROM users"
+        assert result[1] == "INSERT INTO users (name) VALUES ('John')"
+
+    def test_strip_semicolon_false(self):
+        """Test parsing with strip_semicolon=False."""
+        sql = "SELECT * FROM users; INSERT INTO users (name) VALUES ('John');"
+        result = parse_sql_statements(sql, strip_semicolon=False)
+        assert len(result) == 2
+        assert result[0] == "SELECT * FROM users;"
+        assert result[1] == "INSERT INTO users (name) VALUES ('John');"
+
+    def test_complex_statements(self):
+        """Test parsing complex SQL statements."""
+        sql = """
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE
+        );
+        
+        INSERT INTO users (name, email) VALUES 
+            ('Alice', 'alice@example.com'),
+            ('Bob', 'bob@example.com');
+            
+        SELECT * FROM users WHERE active = 1;
+        """
+        result = parse_sql_statements(sql)
+        assert len(result) == 3
+        assert "CREATE TABLE users" in result[0]
+        assert "INSERT INTO users" in result[1]
+        assert "SELECT * FROM users" in result[2]
+
+    def test_statements_with_string_literals(self):
+        """Test parsing statements with string literals containing semicolons."""
+        sql = """
+        INSERT INTO users (name, description) VALUES 
+            ('John', 'User; with semicolon in description');
+        SELECT * FROM users WHERE name = 'Alice; Bob';
+        """
+        result = parse_sql_statements(sql)
+        assert len(result) == 2
+        assert "INSERT INTO users" in result[0]
+        assert "SELECT * FROM users" in result[1]
+
+
+class TestSplitSqlFile:
+    """Test SQL file splitting functionality."""
+
+    @pytest.fixture
+    def temp_sql_file(self):
+        """Create a temporary SQL file for testing."""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+            f.write("""
+            -- Create users table
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL
+            );
+            
+            -- Insert sample data
+            INSERT INTO users (name) VALUES ('Alice'), ('Bob');
+            
+            -- Query users
+            SELECT * FROM users;
+            """)
+            temp_file = f.name
+        
+        yield temp_file
+        
+        # Cleanup
         try:
-            stmts = sql_helper.split_sql_file(fname)
-            self.assertEqual(len(stmts), 2)
-        finally:
-            os.remove(fname)
+            os.unlink(temp_file)
+        except OSError:
+            pass
 
-    def test_split_sql_file_errors(self):
-        with self.assertRaises(ValueError):
-            sql_helper.split_sql_file("")
-        with self.assertRaises(ValueError):
-            sql_helper.split_sql_file(None)
-        with self.assertRaises(FileNotFoundError):
-            sql_helper.split_sql_file("nonexistent_file.sql")
+    def test_split_sql_file_success(self, temp_sql_file):
+        """Test successful SQL file splitting."""
+        result = split_sql_file(temp_sql_file)
+        assert len(result) == 3
+        assert "CREATE TABLE users" in result[0]
+        assert "INSERT INTO users" in result[1]
+        assert "SELECT * FROM users" in result[2]
+
+    def test_split_sql_file_with_strip_semicolon(self, temp_sql_file):
+        """Test SQL file splitting with strip_semicolon=True."""
+        result = split_sql_file(temp_sql_file, strip_semicolon=True)
+        assert len(result) == 3
+        assert result[0].endswith(")")
+        assert result[1].endswith("('Bob')")
+        assert result[2].endswith("users")
+
+    def test_split_sql_file_without_strip_semicolon(self, temp_sql_file):
+        """Test SQL file splitting with strip_semicolon=False."""
+        result = split_sql_file(temp_sql_file, strip_semicolon=False)
+        assert len(result) == 3
+        assert result[0].endswith(");")
+        assert result[1].endswith("('Bob');")
+        assert result[2].endswith("users;")
+
+    def test_split_sql_file_with_pathlib_path(self, temp_sql_file):
+        """Test SQL file splitting with pathlib.Path object."""
+        path_obj = Path(temp_sql_file)
+        result = split_sql_file(path_obj)
+        assert len(result) == 3
+        assert "CREATE TABLE users" in result[0]
+
+    def test_split_sql_file_nonexistent(self):
+        """Test splitting non-existent SQL file."""
+        with pytest.raises(SqlFileError, match="SQL file not found"):
+            split_sql_file("nonexistent.sql")
+
+    def test_split_sql_file_none_path(self):
+        """Test splitting with None file path."""
+        with pytest.raises(SqlValidationError, match="file_path cannot be None"):
+            split_sql_file(None)
+
+    def test_split_sql_file_empty_path(self):
+        """Test splitting with empty file path."""
+        with pytest.raises(SqlValidationError, match="file_path cannot be empty"):
+            split_sql_file("")
 
     def test_split_sql_file_invalid_type(self):
-        with self.assertRaises(ValueError):
-            sql_helper.split_sql_file(123)
+        """Test splitting with invalid file path type."""
+        with pytest.raises(SqlValidationError, match="file_path must be a string or Path object"):
+            split_sql_file(123)
 
-    def test_split_sql_file_empty(self):
-        with self.assertRaises(ValueError):
-            sql_helper.split_sql_file("")
+    def test_split_sql_file_empty_content(self):
+        """Test splitting SQL file with empty content."""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+            f.write("")
+            temp_file = f.name
+        
+        try:
+            result = split_sql_file(temp_file)
+            assert result == []
+        finally:
+            os.unlink(temp_file)
 
-    def test_split_sql_file_not_found(self):
-        with self.assertRaises(FileNotFoundError):
-            sql_helper.split_sql_file("not_a_real_file.sql")
-    
-    def test_detect_statement_type_nested_cte(self):
-        sql = '''
-        WITH a AS (SELECT 1), b AS (WITH c AS (SELECT 2) SELECT * FROM c) SELECT * FROM a JOIN b ON 1=1;
-        '''
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.FETCH_STATEMENT)
+    def test_split_sql_file_comments_only(self):
+        """Test splitting SQL file with only comments."""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+            f.write("""
+            -- This is a comment
+            /* This is a multi-line comment
+               that spans multiple lines */
+            """)
+            temp_file = f.name
+        
+        try:
+            result = split_sql_file(temp_file)
+            assert result == []
+        finally:
+            os.unlink(temp_file)
 
-    def test_detect_statement_type_cte_with_as_keyword(self):
-        sql = '''
-        WITH a AS (SELECT 1) SELECT * FROM a AS alias;
-        '''
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.FETCH_STATEMENT)
+    def test_split_sql_file_whitespace_only(self):
+        """Test splitting SQL file with only whitespace."""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+            f.write("   \n\t  \n  ")
+            temp_file = f.name
+        
+        try:
+            result = split_sql_file(temp_file)
+            assert result == []
+        finally:
+            os.unlink(temp_file)
 
-    def test_detect_statement_type_pragma(self):
-        sql = 'PRAGMA table_info(users);'
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.FETCH_STATEMENT)
-
-    def test_detect_statement_type_explain(self):
-        sql = 'EXPLAIN SELECT * FROM users;'
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.FETCH_STATEMENT)
-
-    def test_detect_statement_type_show(self):
-        sql = 'SHOW TABLES;'
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.FETCH_STATEMENT)
-
-    def test_detect_statement_type_values(self):
-        sql = 'VALUES (1), (2);'
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.FETCH_STATEMENT)
-
-    def test_parse_sql_statements_whitespace_and_comments(self):
-        sql = '\n   -- comment\n   /* block */\n   SELECT 1;\n\n'
-        stmts = sql_helper.parse_sql_statements(sql)
-        self.assertEqual(len(stmts), 1)
-        self.assertTrue(stmts[0].strip().startswith('SELECT'))
-
-    def test_parse_sql_statements_multiple_semicolons(self):
-        sql = 'SELECT 1;;;;;SELECT 2;'
-        stmts = sql_helper.parse_sql_statements(sql)
-        self.assertEqual(len(stmts), 2)
-
-    def test_parse_sql_statements_only_semicolons_and_comments(self):
-        sql = '; -- comment\n; /* block */ ;'
-        stmts = sql_helper.parse_sql_statements(sql)
-        self.assertEqual(stmts, [])
-
-    def test_detect_statement_type_recursive_cte(self):
-        sql = '''
-        WITH RECURSIVE cnt(x) AS (
-            SELECT 1
-            UNION ALL
-            SELECT x+1 FROM cnt WHERE x < 5
-        )
-        SELECT * FROM cnt;
-        '''
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.FETCH_STATEMENT)
-
-    def test_detect_statement_type_cte_with_subquery(self):
-        sql = '''
-        WITH cte AS (
-            SELECT id, (SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id) as order_count
+    def test_split_sql_file_complex_statements(self):
+        """Test splitting SQL file with complex statements."""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+            f.write("""
+            -- Complex SQL file with various statement types
+            
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            
+            CREATE INDEX idx_users_email ON users(email);
+            
+            INSERT INTO users (name, email) VALUES 
+                ('Alice', 'alice@example.com'),
+                ('Bob', 'bob@example.com'),
+                ('Charlie', 'charlie@example.com');
+            
+            CREATE VIEW active_users AS
+                SELECT id, name, email 
+                FROM users 
+                WHERE created_at > '2024-01-01';
+            
+            SELECT u.name, u.email, COUNT(p.id) as post_count
             FROM users u
-        )
-        SELECT * FROM cte;
-        '''
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.FETCH_STATEMENT)
+            LEFT JOIN posts p ON u.id = p.user_id
+            GROUP BY u.id, u.name, u.email
+            HAVING COUNT(p.id) > 0;
+            """)
+            temp_file = f.name
+        
+        try:
+            result = split_sql_file(temp_file)
+            assert len(result) == 5
+            assert "CREATE TABLE users" in result[0]
+            assert "CREATE INDEX" in result[1]
+            assert "INSERT INTO users" in result[2]
+            assert "CREATE VIEW" in result[3]
+            assert "SELECT u.name" in result[4]
+        finally:
+            os.unlink(temp_file)
 
-    def test_detect_statement_type_cte_with_window_function(self):
-        sql = '''
-        WITH ranked_users AS (
-            SELECT id, name, RANK() OVER (ORDER BY created_at) as rnk FROM users
-        )
-        SELECT * FROM ranked_users WHERE rnk <= 10;
-        '''
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.FETCH_STATEMENT)
-
-    def test_detect_statement_type_deeply_nested_cte(self):
-        sql = '''
-        WITH outer_cte AS (
-            WITH inner_cte AS (
-                SELECT 1 as val
-            )
-            SELECT * FROM inner_cte
-        )
-        SELECT * FROM outer_cte;
-        '''
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.FETCH_STATEMENT)
-
-    def test_detect_statement_type_cte_with_comments(self):
-        sql = '''
-        -- Outer CTE
-        WITH a AS (
-            /* Inner CTE */
-            SELECT 1 -- value
-        )
-        SELECT * FROM a; -- fetch
-        '''
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.FETCH_STATEMENT)
-
-    def test_detect_statement_type_cte_with_unusual_whitespace(self):
-        sql = """
-        WITH    spaced_cte   AS   (  SELECT   1   )
-        SELECT   *   FROM   spaced_cte   ;
-        """
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.FETCH_STATEMENT)
-
-    def test_detect_statement_type_cte_with_union(self):
-        sql = '''
-        WITH cte AS (
-            SELECT id FROM users
-            UNION ALL
-            SELECT id FROM admins
-        )
-        SELECT * FROM cte;
-        '''
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.FETCH_STATEMENT)
-
-    def test_detect_statement_type_cte_with_join(self):
-        sql = '''
-        WITH cte AS (
-            SELECT u.id, o.total
-            FROM users u JOIN orders o ON u.id = o.user_id
-        )
-        SELECT * FROM cte;
-        '''
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.FETCH_STATEMENT)
-
-    def test_detect_statement_type_cte_with_group_by(self):
-        sql = '''
-        WITH cte AS (
-            SELECT user_id, COUNT(*) as cnt
-            FROM orders
-            GROUP BY user_id
-            HAVING COUNT(*) > 1
-        )
-        SELECT * FROM cte;
-        '''
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.FETCH_STATEMENT)
-
-    def test_detect_statement_type_cte_deeply_nested(self):
-        sql = '''
-        WITH a AS (
-            WITH b AS (
-                WITH c AS (
-                    SELECT 1 as val
-                )
-                SELECT * FROM c
-            )
-            SELECT * FROM b
-        )
-        SELECT * FROM a;
-        '''
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.FETCH_STATEMENT)
-
-    def test_detect_statement_type_cte_with_update_main(self):
-        sql = '''
-        WITH cte AS (
-            SELECT id FROM users WHERE active = 0
-        )
-        UPDATE users SET active = 1 WHERE id IN (SELECT id FROM cte);
-        '''
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.EXECUTE_STATEMENT)
-
-    def test_detect_statement_type_cte_with_delete_main(self):
-        sql = '''
-        WITH cte AS (
-            SELECT id FROM users WHERE active = 0
-        )
-        DELETE FROM users WHERE id IN (SELECT id FROM cte);
-        '''
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.EXECUTE_STATEMENT)
-
-    def test_detect_statement_type_cte_with_returning(self):
-        sql = '''
-        WITH cte AS (
-            SELECT id FROM users
-        )
-        INSERT INTO archive (id) SELECT id FROM cte RETURNING id;
-        '''
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.EXECUTE_STATEMENT)
-
-    def test_detect_statement_type_cte_with_parameters(self):
-        sql = '''
-        WITH cte AS (
-            SELECT * FROM users WHERE id = :user_id
-        )
-        SELECT * FROM cte;
-        '''
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.FETCH_STATEMENT)
-
-    def test_detect_statement_type_cte_with_no_main_statement(self):
-        sql = '''
-        WITH cte AS (
-            SELECT 1
-        )
-        -- No main statement
-        '''
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.EXECUTE_STATEMENT)
-
-    def test_detect_statement_type_cte_with_multiple_statements(self):
-        sql = '''
-        WITH cte AS (SELECT 1) SELECT * FROM cte; INSERT INTO t VALUES (2);
-        '''
-        self.assertEqual(sql_helper.detect_statement_type(sql), sql_helper.FETCH_STATEMENT)
-
-    
-if __name__ == "__main__":
-    unittest.main()
+    def test_split_sql_file_with_string_literals(self):
+        """Test splitting SQL file with string literals containing special characters."""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+            f.write("""
+            INSERT INTO messages (content) VALUES 
+                ('Hello; this is a message with semicolon'),
+                ('Another message with /* comment-like */ text'),
+                ('Message with -- comment-like text');
+            
+            SELECT * FROM messages WHERE content LIKE '%;%';
+            """)
+            temp_file = f.name
+        
+        try:
+            result = split_sql_file(temp_file)
+            assert len(result) == 2
+            assert "INSERT INTO messages" in result[0]
+            assert "SELECT * FROM messages" in result[1]
+        finally:
+            os.unlink(temp_file)

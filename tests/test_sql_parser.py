@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 
-from jpy_sql_generator.sql_parser import SqlParser
+from splurge_sql_generator.sql_parser import SqlParser
 
 
 class TestSqlParser(unittest.TestCase):
