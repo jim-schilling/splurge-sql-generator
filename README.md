@@ -300,6 +300,8 @@ MIT License - see LICENSE file for details.
 
 ## Changelog
 
+### [2025.3.1] - 2025-08-19
+
 ### [2025.3.0] - 2025-08-13
 
 #### Changed

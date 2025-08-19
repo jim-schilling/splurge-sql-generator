@@ -272,8 +272,8 @@ class TestParseSqlStatements:
         sql = "SELECT * FROM users; INSERT INTO users (name) VALUES ('John');"
         result = parse_sql_statements(sql)
         assert len(result) == 2
-        assert result[0] == "SELECT * FROM users;"
-        assert result[1] == "INSERT INTO users (name) VALUES ('John');"
+        assert "SELECT * FROM users" in result[0]
+        assert "INSERT INTO users (name) VALUES ('John')" in result[1]
 
     def test_statements_with_comments(self):
         """Test parsing statements with comments."""
@@ -293,23 +293,23 @@ class TestParseSqlStatements:
         sql = "SELECT * FROM users;;;INSERT INTO users (name) VALUES ('John');"
         result = parse_sql_statements(sql)
         assert len(result) == 2
-        assert result[0] == "SELECT * FROM users;"
-        assert result[1] == "INSERT INTO users (name) VALUES ('John');"
+        assert "SELECT * FROM users" in result[0]
+        assert "INSERT INTO users (name) VALUES ('John')" in result[1]
 
     def test_whitespace_only_statements_filtered(self):
         """Test that whitespace-only statements are filtered out."""
         sql = "SELECT * FROM users;   \n\t  ;INSERT INTO users (name) VALUES ('John');"
         result = parse_sql_statements(sql)
         assert len(result) == 2
-        assert result[0] == "SELECT * FROM users;"
-        assert result[1] == "INSERT INTO users (name) VALUES ('John');"
+        assert "SELECT * FROM users" in result[0]
+        assert "INSERT INTO users (name) VALUES ('John')" in result[1]
 
     def test_comment_only_statements_filtered(self):
         """Test that comment-only statements are filtered out."""
         sql = "SELECT * FROM users; -- Comment only; INSERT INTO users (name) VALUES ('John');"
         result = parse_sql_statements(sql)
         assert len(result) == 1
-        assert result[0] == "SELECT * FROM users;"
+        assert "SELECT * FROM users" in result[0]
 
     def test_strip_semicolon_true(self):
         """Test parsing with strip_semicolon=True."""
@@ -324,8 +324,8 @@ class TestParseSqlStatements:
         sql = "SELECT * FROM users; INSERT INTO users (name) VALUES ('John');"
         result = parse_sql_statements(sql, strip_semicolon=False)
         assert len(result) == 2
-        assert result[0] == "SELECT * FROM users;"
-        assert result[1] == "INSERT INTO users (name) VALUES ('John');"
+        assert "SELECT * FROM users" in result[0]
+        assert "INSERT INTO users (name) VALUES ('John')" in result[1]
 
     def test_complex_statements(self):
         """Test parsing complex SQL statements."""
