@@ -11,9 +11,10 @@ WHERE category_id = :category_id
 ORDER BY name;
 
 # search_products
+-- Use LIKE for SQLite compatibility (case-insensitive if the DB is configured accordingly)
 SELECT id, name, description, price, category_id 
 FROM products 
-WHERE name ILIKE :search_term OR description ILIKE :search_term 
+WHERE name LIKE :search_term OR description LIKE :search_term 
 ORDER BY name;
 
 # create_product

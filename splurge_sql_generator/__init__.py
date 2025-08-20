@@ -1,5 +1,5 @@
 """
-jpy_sql_generator - Python code generator for SQLAlchemy classes from SQL templates.
+splurge_sql_generator - Python code generator for SQLAlchemy classes from SQL templates.
 
 Copyright (c) 2025, Jim Schilling
 
@@ -10,10 +10,9 @@ from SQL template files, with sophisticated SQL parsing and statement type detec
 """
 
 from importlib.metadata import version
-from typing import Optional
 
-from jpy_sql_generator.code_generator import PythonCodeGenerator
-from jpy_sql_generator.sql_helper import (
+from splurge_sql_generator.code_generator import PythonCodeGenerator
+from splurge_sql_generator.sql_helper import (
     EXECUTE_STATEMENT,
     FETCH_STATEMENT,
     detect_statement_type,
@@ -21,21 +20,25 @@ from jpy_sql_generator.sql_helper import (
     remove_sql_comments,
     split_sql_file,
 )
-from jpy_sql_generator.sql_parser import SqlParser
+from splurge_sql_generator.sql_parser import SqlParser
 
-__version__ = version("jpy_sql_generator")
+__version__ = version("splurge-sql-generator")
 
 __all__ = [
     # SQL Helper functions
     "detect_statement_type",
-    "FETCH_STATEMENT",
-    "EXECUTE_STATEMENT",
     "remove_sql_comments",
     "parse_sql_statements",
     "split_sql_file",
     # Core classes
     "SqlParser",
     "PythonCodeGenerator",
+    # Convenience functions
+    "generate_class",
+    "generate_multiple_classes",
+    # Statement helpers (kept public for convenience)
+    "is_fetch_statement",
+    "is_execute_statement",
 ]
 
 
@@ -81,7 +84,11 @@ def is_execute_statement(sql: str) -> bool:
     return detect_statement_type(sql) == EXECUTE_STATEMENT
 
 
-def generate_class(sql_file_path: str, output_file_path: Optional[str] = None) -> str:
+def generate_class(
+    sql_file_path: str,
+    *,
+    output_file_path: str | None = None,
+) -> str:
     """
     Convenience function to generate a Python class from a SQL file.
 
@@ -93,10 +100,14 @@ def generate_class(sql_file_path: str, output_file_path: Optional[str] = None) -
         Generated Python code as string
     """
     generator = PythonCodeGenerator()
-    return generator.generate_class(sql_file_path, output_file_path)
+    return generator.generate_class(sql_file_path, output_file_path=output_file_path)
 
 
-def generate_multiple_classes(sql_files: list, output_dir: Optional[str] = None) -> dict:
+def generate_multiple_classes(
+    sql_files: list[str],
+    *,
+    output_dir: str | None = None,
+) -> dict[str, str]:
     """
     Convenience function to generate multiple Python classes from SQL files.
 
@@ -108,4 +119,4 @@ def generate_multiple_classes(sql_files: list, output_dir: Optional[str] = None)
         Dictionary mapping class names to generated code
     """
     generator = PythonCodeGenerator()
-    return generator.generate_multiple_classes(sql_files, output_dir)
+    return generator.generate_multiple_classes(sql_files, output_dir=output_dir)

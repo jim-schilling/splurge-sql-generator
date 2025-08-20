@@ -1,7 +1,7 @@
 import os
 import tempfile
 import unittest
-from jpy_sql_generator import generate_class, generate_multiple_classes
+from splurge_sql_generator import generate_class, generate_multiple_classes
 
 class TestInitAPI(unittest.TestCase):
     def setUp(self):
@@ -25,7 +25,7 @@ class TestInitAPI(unittest.TestCase):
         self.assertIn('class TestClass', code)
         # Test output file
         self.output_file = self.sql_file + '.py'
-        code2 = generate_class(self.sql_file, self.output_file)
+        code2 = generate_class(self.sql_file, output_file_path=self.output_file)
         self.assertTrue(os.path.exists(self.output_file))
         with open(self.output_file) as f:
             self.assertIn('class TestClass', f.read())
@@ -33,7 +33,7 @@ class TestInitAPI(unittest.TestCase):
     def test_generate_multiple_classes(self):
         self.output_dir = self.sql_file + '_outdir'
         os.mkdir(self.output_dir)
-        result = generate_multiple_classes([self.sql_file], self.output_dir)
+        result = generate_multiple_classes([self.sql_file], output_dir=self.output_dir)
         self.assertIn('TestClass', result)
         out_file = os.path.join(self.output_dir, 'TestClass.py')
         self.assertTrue(os.path.exists(out_file))

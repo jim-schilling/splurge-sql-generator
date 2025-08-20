@@ -4,8 +4,8 @@ import os
 import tempfile
 import unittest
 
-from jpy_sql_generator.code_generator import PythonCodeGenerator
-from jpy_sql_generator.sql_parser import SqlParser
+from splurge_sql_generator.code_generator import PythonCodeGenerator
+from splurge_sql_generator.sql_parser import SqlParser
 
 
 class TestPythonCodeGenerator(unittest.TestCase):
@@ -302,7 +302,8 @@ SELECT 2;
         output_dir = tempfile.mkdtemp()
         try:
             result = self.generator.generate_multiple_classes(
-                [fname1, fname2], output_dir
+                [fname1, fname2],
+                output_dir=output_dir,
             )
             self.assertEqual(len(result), 2)
             self.assertIn("ClassA", result)

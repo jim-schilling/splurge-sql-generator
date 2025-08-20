@@ -7,12 +7,12 @@ This script shows how to leverage the sophisticated SQL parsing capabilities
 from sql_helper.py to accurately classify SQL statements.
 """
 
-from jpy_sql_generator.sql_helper import (
+from splurge_sql_generator.sql_helper import (
     EXECUTE_STATEMENT,
     FETCH_STATEMENT,
     detect_statement_type,
 )
-from jpy_sql_generator.sql_parser import SqlParser
+from splurge_sql_generator.sql_parser import SqlParser
 
 
 def demonstrate_statement_detection():

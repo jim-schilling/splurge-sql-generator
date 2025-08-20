@@ -7,27 +7,45 @@ This module is licensed under the MIT License.
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
+from dataclasses import dataclass
 
 from jinja2 import Environment, FileSystemLoader
 
-from jpy_sql_generator.sql_parser import SqlParser
+from splurge_sql_generator.sql_parser import SqlParser
 
 
 class PythonCodeGenerator:
     """Generator for Python classes with SQLAlchemy methods using Jinja2 templates."""
 
     def __init__(self) -> None:
-        self.parser = SqlParser()
+        self._parser = SqlParser()
         # Set up Jinja2 environment with templates directory
         template_dir = Path(__file__).parent / "templates"
-        self.jinja_env = Environment(
+        self._jinja_env = Environment(
             loader=FileSystemLoader(str(template_dir)),
             trim_blocks=True,
             lstrip_blocks=True,
         )
+        # Preload template once for reuse
+        self._template = self._jinja_env.get_template("python_class.j2")
 
-    def generate_class(self, sql_file_path: str, output_file_path: Optional[str] = None) -> str:
+    @property
+    def parser(self) -> SqlParser:
+        """Public read-only access to the SQL parser instance."""
+        return self._parser
+
+    @property
+    def jinja_env(self) -> Environment:
+        """Public read-only access to the Jinja environment."""
+        return self._jinja_env
+
+    def generate_class(
+        self,
+        sql_file_path: str,
+        *,
+        output_file_path: str | None = None,
+    ) -> str:
         """
         Generate a Python class from a SQL file.
 
@@ -47,8 +65,7 @@ class PythonCodeGenerator:
         # Save to file if output path provided
         if output_file_path:
             try:
-                with open(output_file_path, "w", encoding="utf-8") as f:
-                    f.write(python_code)
+                Path(output_file_path).write_text(python_code, encoding="utf-8")
             except OSError as e:
                 raise OSError(
                     f"Error writing Python file {output_file_path}: {e}"
@@ -57,7 +74,9 @@ class PythonCodeGenerator:
         return python_code
 
     def _generate_python_code(
-        self, class_name: str, method_queries: Dict[str, str]
+        self,
+        class_name: str,
+        method_queries: dict[str, str],
     ) -> str:
         """
         Generate Python class code from method queries using Jinja2 template.
@@ -70,19 +89,33 @@ class PythonCodeGenerator:
             Generated Python code
         """
         # Prepare methods data for template
-        methods = []
+        methods: list[dict[str, Any]] = []
         for method_name, sql_query in method_queries.items():
             method_info = self.parser.get_method_info(sql_query)
             method_data = self._prepare_method_data(method_name, sql_query, method_info)
             methods.append(method_data)
 
-        # Render template
-        template = self.jinja_env.get_template("python_class.j2")
-        return template.render(class_name=class_name, methods=methods)
+        # Render template (preloaded)
+        return self._template.render(class_name=class_name, methods=methods)
+
+    @dataclass
+    class _MethodData:
+        name: str
+        parameters: str
+        parameters_list: list[str]
+        param_mapping: dict[str, str]
+        return_type: str
+        type: str
+        statement_type: str
+        is_fetch: bool
+        sql_lines: list[str]
 
     def _prepare_method_data(
-        self, method_name: str, sql_query: str, method_info: Dict
-    ) -> Dict[str, Any]:
+        self,
+        method_name: str,
+        sql_query: str,
+        method_info: dict[str, Any],
+    ) -> dict[str, Any]:
         """
         Prepare method data for template rendering.
 
@@ -101,8 +134,8 @@ class PythonCodeGenerator:
         sql_lines = sql_query.split("\n")
 
         # Prepare parameter mapping
-        param_mapping = {}
-        parameters_list = []
+        param_mapping: dict[str, str] = {}
+        parameters_list: list[str] = []
         if method_info["parameters"]:
             for param in method_info["parameters"]:
                 python_param = param  # Preserve original parameter name
@@ -110,19 +143,32 @@ class PythonCodeGenerator:
                 if python_param not in parameters_list:
                     parameters_list.append(python_param)
 
+        data = self._MethodData(
+            name=method_name,
+            parameters=parameters,
+            parameters_list=parameters_list,
+            param_mapping=param_mapping,
+            return_type="List[Row]" if method_info["is_fetch"] else "Result",
+            type=method_info["type"],
+            statement_type=method_info["statement_type"],
+            is_fetch=method_info["is_fetch"],
+            sql_lines=sql_lines,
+        )
+
+        # Jinja template expects a dict-like object; dataclass is easily serializable
         return {
-            "name": method_name,
-            "parameters": parameters,
-            "parameters_list": parameters_list,
-            "param_mapping": param_mapping,
-            "return_type": "List[Row]" if method_info["is_fetch"] else "Result",
-            "type": method_info["type"],
-            "statement_type": method_info["statement_type"],
-            "is_fetch": method_info["is_fetch"],
-            "sql_lines": sql_lines,
+            "name": data.name,
+            "parameters": data.parameters,
+            "parameters_list": data.parameters_list,
+            "param_mapping": data.param_mapping,
+            "return_type": data.return_type,
+            "type": data.type,
+            "statement_type": data.statement_type,
+            "is_fetch": data.is_fetch,
+            "sql_lines": data.sql_lines,
         }
 
-    def _generate_method_signature(self, parameters: List[str]) -> str:
+    def _generate_method_signature(self, parameters: list[str]) -> str:
         """
         Generate method signature with parameters.
 
@@ -136,8 +182,8 @@ class PythonCodeGenerator:
             return ""
 
         # Convert SQL parameters to Python parameters and remove duplicates
-        python_params = []
-        seen_params = set()
+        python_params: list[str] = []
+        seen_params: set[str] = set()
         for param in parameters:
             # Use original parameter name (preserve underscores)
             python_param = param
@@ -148,8 +194,11 @@ class PythonCodeGenerator:
         return ", ".join(python_params)
 
     def generate_multiple_classes(
-        self, sql_files: List[str], output_dir: Optional[str] = None
-    ) -> Dict[str, str]:
+        self,
+        sql_files: list[str],
+        *,
+        output_dir: str | None = None,
+    ) -> dict[str, str]:
         """
         Generate multiple Python classes from SQL files.
 
@@ -160,19 +209,21 @@ class PythonCodeGenerator:
         Returns:
             Dictionary mapping class names to generated code
         """
-        generated_classes = {}
+        generated_classes: dict[str, str] = {}
 
         for sql_file in sql_files:
-            class_name, _ = self.parser.parse_file(sql_file)
-            python_code = self.generate_class(sql_file)
+            # Parse once per file and render directly to avoid duplicate parsing
+            class_name, method_queries = self.parser.parse_file(sql_file)
+            python_code = self._generate_python_code(class_name, method_queries)
             generated_classes[class_name] = python_code
 
             # Save to file if output directory provided
             if output_dir:
+                # Ensure output directory exists
+                Path(output_dir).mkdir(parents=True, exist_ok=True)
                 output_path = Path(output_dir) / f"{class_name}.py"
                 try:
-                    with open(output_path, "w", encoding="utf-8") as f:
-                        f.write(python_code)
+                    output_path.write_text(python_code, encoding="utf-8")
                 except OSError as e:
                     raise OSError(
                         f"Error writing Python file {output_path}: {e}"

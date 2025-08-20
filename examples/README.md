@@ -1,6 +1,6 @@
-# jpy-sql-generator Examples
+# splurge-sql-generator Examples
 
-This directory contains examples demonstrating how to use jpy-sql-generator with the simplified logger approach introduced in version 0.2.2.
+This directory contains examples demonstrating how to use splurge-sql-generator with the simplified logger approach.
 
 ## Files
 
@@ -22,7 +22,11 @@ This directory contains examples demonstrating how to use jpy-sql-generator with
 
 1. **Generate the Python classes** (already done):
    ```bash
-   python -m jpy_sql_generator.cli *.sql --output output/
+   # Using console script
+   splurge-sql-gen *.sql --output output/
+
+   # Or using module path
+   python -m splurge_sql_generator.cli *.sql --output output/
    ```
 
 2. **Run the comprehensive example**:
@@ -90,9 +94,9 @@ When you run the examples, you'll see:
 
 Example log output:
 ```
-2025-01-XX XX:XX:XX,XXX - jpy_sql_generator.output.User.User - DEBUG - Executing get_user_by_id operation
-2025-01-XX XX:XX:XX,XXX - jpy_sql_generator.output.User.User - DEBUG - Parameters: {'user_id': 1}
-2025-01-XX XX:XX:XX,XXX - jpy_sql_generator.output.User.User - DEBUG - Fetched 1 rows
+2025-01-XX XX:XX:XX,XXX - output.User.User - DEBUG - Executing get_user_by_id operation
+2025-01-XX XX:XX:XX,XXX - output.User.User - DEBUG - Parameters: {'user_id': 1}
+2025-01-XX XX:XX:XX,XXX - output.User.User - DEBUG - Fetched 1 rows
 ```
 
 ## Database Setup

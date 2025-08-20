@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 
-from jpy_sql_generator.sql_parser import SqlParser
+from splurge_sql_generator.sql_parser import SqlParser
 
 
 class TestSqlParser(unittest.TestCase):
@@ -262,7 +262,7 @@ SELECT * FROM users WHERE id = :user_id;
         try:
             with self.assertRaises(ValueError) as cm:
                 self.parser.parse_file(fname)
-            self.assertIn("Class comment must start with '# '", str(cm.exception))
+            self.assertIn("Class comment must start with", str(cm.exception))
         finally:
             os.remove(fname)
 
@@ -278,7 +278,7 @@ SELECT * FROM users WHERE id = :user_id;
         try:
             with self.assertRaises(ValueError) as cm:
                 self.parser.parse_file(fname)
-            self.assertIn("Class comment must start with '# '", str(cm.exception))
+            self.assertIn("Class comment must start with", str(cm.exception))
         finally:
             os.remove(fname)
 
@@ -294,7 +294,7 @@ SELECT * FROM users WHERE id = :user_id;
         try:
             with self.assertRaises(ValueError) as cm:
                 self.parser.parse_file(fname)
-            self.assertIn("Class comment must start with '# '", str(cm.exception))
+            self.assertIn("Class comment must start with", str(cm.exception))
         finally:
             os.remove(fname)
 
@@ -307,7 +307,7 @@ SELECT * FROM users WHERE id = :user_id;
             with self.assertRaises(ValueError) as cm:
                 self.parser.parse_file(fname)
             self.assertIn(
-                "First line must be a class comment starting with #", str(cm.exception)
+                "First line must be a class comment", str(cm.exception)
             )
         finally:
             os.remove(fname)

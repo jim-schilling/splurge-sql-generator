@@ -3,8 +3,8 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jpy-sql-generator"
-version = "0.2.4"
+name = "splurge-sql-generator"
+version = "2025.3.1"
 description = "A Python tool for generating Python classes from SQL files"
 authors = [
     {name = "Jim Schilling"}
@@ -54,21 +54,21 @@ docs = [
 ]
 
 [project.scripts]
-jpy-sql-gen = "jpy_sql_generator.cli:main"
+splurge-sql-gen = "splurge_sql_generator.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/jim-schilling/jpy_sql_generator"
-Repository = "https://github.com/jim-schilling/jpy_sql_generator"
-Documentation = "https://github.com/jim-schilling/jpy_sql_generator#readme"
-Issues = "https://github.com/jim-schilling/jpy_sql_generator/issues"
-Changelog = "https://github.com/jim-schilling/jpy_sql_generator/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/jim-schilling/splurge-sql-generator"
+Repository = "https://github.com/jim-schilling/splurge-sql-generator"
+Documentation = "https://github.com/jim-schilling/splurge-sql-generator#readme"
+Issues = "https://github.com/jim-schilling/splurge-sql-generator/issues"
+Changelog = "https://github.com/jim-schilling/splurge-sql-generator/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
-include = ["jpy_sql_generator*"]
+include = ["splurge_sql_generator*"]
 exclude = ["tests*", "examples*", "output*"]
 
 [tool.setuptools.package-data]
-jpy_sql_generator = ["templates/*.j2"]
+splurge_sql_generator = ["templates/*.j2"]
 
 # Development tools configuration
 [tool.black]
@@ -92,8 +92,8 @@ extend-exclude = '''
 [tool.isort]
 profile = "black"
 multi_line_output = 3
-line_length = 88
-known_first_party = ["jpy_sql_generator"]
+line_length = 120
+known_first_party = ["splurge_sql_generator"]
 
 [tool.mypy]
 python_version = "3.10"
@@ -118,7 +118,7 @@ python_functions = ["test_*"]
 addopts = [
     "--strict-markers",
     "--strict-config",
-    "--cov=jpy_sql_generator",
+    "--cov=splurge_sql_generator",
     "--cov-report=term-missing",
     "--cov-report=html",
 ]

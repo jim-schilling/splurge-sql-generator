@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Usage Example for jpy-sql-generator
+Usage Example for splurge-sql-generator
 
 This example demonstrates how to use the generated classes with the simplified logger approach.
 """
@@ -12,19 +12,46 @@ import sys
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection
 
-# Add the parent directory to the path to import from output
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# Add the project root to the path so we can import from 'output' and the package
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, PROJECT_ROOT)
 
-from output.OrderService import OrderService
-from output.ProductRepository import ProductRepository
 
-# Import the generated classes
-from output.User import User
+def _ensure_generated_classes() -> None:
+    """Generate all example classes into project-root 'output' if missing.
+
+    Ensures 'output' is a package and generates modules if not present.
+    """
+    output_dir = os.path.join(PROJECT_ROOT, "output")
+    os.makedirs(output_dir, exist_ok=True)
+
+    init_file = os.path.join(output_dir, "__init__.py")
+    if not os.path.exists(init_file):
+        with open(init_file, "w", encoding="utf-8") as f:
+            f.write("")
+
+    # Generate each required module if missing
+    from splurge_sql_generator import generate_class
+
+    mapping = {
+        "User": os.path.join(PROJECT_ROOT, "examples", "User.sql"),
+        "ProductRepository": os.path.join(PROJECT_ROOT, "examples", "ProductRepository.sql"),
+        "OrderService": os.path.join(PROJECT_ROOT, "examples", "OrderService.sql"),
+    }
+
+    for module_name, sql_path in mapping.items():
+        py_path = os.path.join(output_dir, f"{module_name}.py")
+        if not os.path.exists(py_path):
+            generate_class(sql_path, output_file_path=py_path)
 
 
 def setup_database():
-    """Create a test database and tables."""
-    engine = create_engine("sqlite:///example.db")
+    """Create a test database and tables. Resets DB file each run for repeatability."""
+    db_path = os.path.join(PROJECT_ROOT, "example.db")
+    if os.path.exists(db_path):
+        os.remove(db_path)
+
+    engine = create_engine(f"sqlite:///{db_path}")
 
     with engine.connect() as conn:
         # Create tables
@@ -109,6 +136,7 @@ def setup_logging():
 def demonstrate_user_operations(connection: Connection):
     """Demonstrate User class operations with simplified logger."""
     print("\n=== User Operations ===")
+    from output.User import User  # local import after generation
 
     # Create users
     with connection.begin():
@@ -146,6 +174,7 @@ def demonstrate_user_operations(connection: Connection):
 def demonstrate_product_operations(connection: Connection):
     """Demonstrate ProductRepository class operations."""
     print("\n=== Product Operations ===")
+    from output.ProductRepository import ProductRepository  # local import after generation
 
     # Create products
     with connection.begin():
@@ -189,6 +218,7 @@ def demonstrate_product_operations(connection: Connection):
 def demonstrate_order_operations(connection: Connection):
     """Demonstrate OrderService class operations."""
     print("\n=== Order Operations ===")
+    from output.OrderService import OrderService  # local import after generation
 
     # Create an order
     with connection.begin():
@@ -216,32 +246,40 @@ def demonstrate_logger_behavior():
     """Demonstrate the simplified logger approach."""
     print("\n=== Logger Behavior ===")
     print("Notice that all operations use the same class-level logger:")
-    print("- User.logger: jpy_sql_generator.output.User.User")
-    print(
-        "- ProductRepository.logger: jpy_sql_generator.output.ProductRepository.ProductRepository"
-    )
-    print("- OrderService.logger: jpy_sql_generator.output.OrderService.OrderService")
+    print("- User.logger: output.User.User")
+    print("- ProductRepository.logger: output.ProductRepository.ProductRepository")
+    print("- OrderService.logger: output.OrderService.OrderService")
     print("\nNo need to pass logger parameters - it's handled automatically!")
 
 
 def main():
     """Main example function."""
-    print("jpy-sql-generator Usage Example")
+    print("splurge-sql-generator Usage Example")
     print("=" * 50)
 
     # Setup logging to see the class-level loggers in action
     setup_logging()
 
+    # Ensure generated classes and import
+    _ensure_generated_classes()
+    from output.User import User
+    from output.ProductRepository import ProductRepository
+    from output.OrderService import OrderService
+
     # Create database and tables
     engine = setup_database()
 
-    with engine.connect() as connection:
-        # Demonstrate the simplified logger approach
-        demonstrate_logger_behavior()
+    # Demonstrate the simplified logger approach
+    demonstrate_logger_behavior()
 
-        # Demonstrate operations with each generated class
+    # Use separate connections to avoid nested/implicit transaction conflicts
+    with engine.connect() as connection:
         demonstrate_user_operations(connection)
+
+    with engine.connect() as connection:
         demonstrate_product_operations(connection)
+
+    with engine.connect() as connection:
         demonstrate_order_operations(connection)
 
     print("\n" + "=" * 50)
