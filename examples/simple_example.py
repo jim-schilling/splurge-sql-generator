@@ -96,7 +96,7 @@ def demonstrate_simplified_logger():
 
     # Ensure generated classes and import
     _ensure_generated_classes()
-    from output.User import User
+    from output.user import User
 
     # Create database
     engine = create_test_database()

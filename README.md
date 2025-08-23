@@ -91,7 +91,7 @@ code2 = generate_class(
 
 ```python
 from sqlalchemy import create_engine
-from generated.UserRepository import UserRepository
+from generated.user_repository import UserRepository
 
 # Create database connection
 engine = create_engine('sqlite:///example.db')
@@ -299,6 +299,8 @@ MIT License - see LICENSE file for details.
 ---
 
 ## Changelog
+
+### [2025.4.0] - 2025-08-23
 
 ### [2025.3.1] - 2025-08-19
 

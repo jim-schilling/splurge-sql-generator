@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "splurge-sql-generator"
-version = "2025.3.1"
+version = "2025.4.0"
 description = "A Python tool for generating Python classes from SQL files"
 authors = [
     {name = "Jim Schilling"}
@@ -43,6 +43,7 @@ dev = [
     "isort>=5.12.0",
     "flake8>=6.0.0",
     "mypy>=1.0.0",
+    "ruff>=0.12.10",
 ]
 test = [
     "pytest>=7.0.0",

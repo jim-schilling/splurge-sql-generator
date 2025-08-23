@@ -136,7 +136,7 @@ def setup_logging():
 def demonstrate_user_operations(connection: Connection):
     """Demonstrate User class operations with simplified logger."""
     print("\n=== User Operations ===")
-    from output.User import User  # local import after generation
+    from output.user import User  # local import after generation
 
     # Create users
     with connection.begin():
@@ -174,7 +174,7 @@ def demonstrate_user_operations(connection: Connection):
 def demonstrate_product_operations(connection: Connection):
     """Demonstrate ProductRepository class operations."""
     print("\n=== Product Operations ===")
-    from output.ProductRepository import ProductRepository  # local import after generation
+    from output.product_repository import ProductRepository  # local import after generation
 
     # Create products
     with connection.begin():
@@ -218,7 +218,7 @@ def demonstrate_product_operations(connection: Connection):
 def demonstrate_order_operations(connection: Connection):
     """Demonstrate OrderService class operations."""
     print("\n=== Order Operations ===")
-    from output.OrderService import OrderService  # local import after generation
+    from output.order_service import OrderService  # local import after generation
 
     # Create an order
     with connection.begin():
@@ -262,9 +262,9 @@ def main():
 
     # Ensure generated classes and import
     _ensure_generated_classes()
-    from output.User import User
-    from output.ProductRepository import ProductRepository
-    from output.OrderService import OrderService
+    from output.user import User
+    from output.product_repository import ProductRepository
+    from output.order_service import OrderService
 
     # Create database and tables
     engine = setup_database()

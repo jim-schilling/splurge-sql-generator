@@ -83,7 +83,7 @@ def test_cli_non_sql_extension(tmp_path):
     assert 'Warning' in result.stderr
     assert result.returncode == 0
     # Should report generated file
-    assert 'TestClass.py' in result.stdout
+    assert 'test_class.py' in result.stdout
 
 
 def test_cli_output_dir(tmp_path):
@@ -94,7 +94,7 @@ def test_cli_output_dir(tmp_path):
     result = run_cli([str(sql_file), '-o', str(outdir)])
     assert result.returncode == 0
     assert outdir.exists()
-    py_file = outdir / 'TestClass.py'
+    py_file = outdir / 'test_class.py'
     assert py_file.exists()
     assert 'class TestClass' in py_file.read_text()
 
@@ -107,7 +107,7 @@ def test_cli_report_generated_classes(tmp_path):
     result = run_cli([str(sql_file), '-o', str(outdir)])
     assert result.returncode == 0
     assert re.search(r'Generated \d+ Python classes?', result.stdout)
-    assert 'TestClass.py' in result.stdout
+    assert 'test_class.py' in result.stdout
 
 
 def test_cli_multiple_files(tmp_path):
@@ -124,12 +124,12 @@ def test_cli_multiple_files(tmp_path):
     
     assert result.returncode == 0
     assert re.search(r'Generated \d+ Python classes?', result.stdout)
-    assert 'ClassOne.py' in result.stdout
-    assert 'ClassTwo.py' in result.stdout
+    assert 'class_one.py' in result.stdout
+    assert 'class_two.py' in result.stdout
     
     # Check files were created
-    assert (outdir / 'ClassOne.py').exists()
-    assert (outdir / 'ClassTwo.py').exists()
+    assert (outdir / 'class_one.py').exists()
+    assert (outdir / 'class_two.py').exists()
 
 
 def test_cli_directory_processing(tmp_path):
@@ -153,8 +153,8 @@ def test_cli_directory_processing(tmp_path):
     
     assert result.returncode == 0
     assert re.search(r'Generated \d+ Python classes?', result.stdout)
-    assert 'ClassOne.py' in result.stdout
-    assert 'ClassTwo.py' in result.stdout
+    assert 'class_one.py' in result.stdout
+    assert 'class_two.py' in result.stdout
 
 
 def test_cli_empty_directory(tmp_path):
@@ -227,16 +227,16 @@ RETURNING id;
     
     assert result.returncode == 0
     assert re.search(r'Generated \d+ Python classes?', result.stdout)
-    assert 'ComplexClass.py' in result.stdout
+    assert 'complex_class.py' in result.stdout
     
     # Check generated file contains expected content
-    py_file = outdir / 'ComplexClass.py'
+    py_file = outdir / 'complex_class.py'
     content = py_file.read_text()
     assert 'class ComplexClass:' in content
     assert 'def get_user_by_id(' in content
     assert 'def create_user(' in content
-    assert 'user_id: Any,' in content
-    assert 'status: Any,' in content
+    assert 'user_id: int,' in content
+    assert 'status: str,' in content
 
 
 def test_cli_dry_run_multiple_files(tmp_path):
@@ -267,7 +267,7 @@ def test_cli_output_dir_creation(tmp_path):
     
     assert result.returncode == 0
     assert outdir.exists()
-    assert (outdir / 'CreateDir.py').exists()
+    assert (outdir / 'create_dir.py').exists()
 
 
 def test_cli_file_permission_error(tmp_path):
@@ -344,10 +344,10 @@ WHERE name LIKE :name_pattern;
     assert re.search(r'Generated \d+ Python classes?', result.stdout)
     
     # Check generated file
-    py_file = outdir / 'UnicodeClass.py'
+    py_file = outdir / 'unicode_class.py'
     content = py_file.read_text(encoding='utf-8')
     assert 'class UnicodeClass:' in content
-    assert 'name_pattern: Any,' in content
+    assert 'name_pattern: str,' in content
 
 
 def test_cli_large_sql_file(tmp_path):
@@ -369,7 +369,7 @@ def test_cli_large_sql_file(tmp_path):
     assert re.search(r'Generated \d+ Python classes?', result.stdout)
     
     # Check generated file
-    py_file = outdir / 'LargeClass.py'
+    py_file = outdir / 'large_class.py'
     content = py_file.read_text()
     assert 'class LargeClass:' in content
     # Should have many methods

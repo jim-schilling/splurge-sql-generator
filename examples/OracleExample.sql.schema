@@ -1,0 +1,40 @@
+-- OracleExample.sql.schema
+-- Example Oracle schema demonstrating various Oracle-specific types
+
+CREATE TABLE employees (
+    id NUMBER(10) PRIMARY KEY,
+    employee_code VARCHAR2(50) UNIQUE,
+    first_name VARCHAR2(100) NOT NULL,
+    last_name VARCHAR2(100) NOT NULL,
+    email VARCHAR2(255) UNIQUE,
+    salary NUMBER(10,2) NOT NULL,
+    hire_date DATE DEFAULT SYSDATE,
+    is_active NUMBER(1) DEFAULT 1,
+    manager_id NUMBER(10),
+    department_id NUMBER(5),
+    profile_image RAW(2000),
+    resume CLOB,
+    metadata XMLTYPE,
+    row_id ROWID,
+    created_at TIMESTAMP DEFAULT SYSTIMESTAMP
+);
+
+CREATE TABLE departments (
+    id NUMBER(5) PRIMARY KEY,
+    name VARCHAR2(100) NOT NULL,
+    budget NUMBER(15,2),
+    location_id NUMBER(10),
+    is_active NUMBER(1) DEFAULT 1,
+    description NCLOB
+);
+
+CREATE TABLE projects (
+    id NUMBER(10) PRIMARY KEY,
+    name VARCHAR2(200) NOT NULL,
+    description LONG,
+    start_date DATE,
+    end_date DATE,
+    budget NUMBER(15,2),
+    status VARCHAR2(20) DEFAULT 'active',
+    project_data NVARCHAR2(4000)
+);

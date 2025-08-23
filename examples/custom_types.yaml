@@ -1,0 +1,17 @@
+# Custom SQL Type to Python Type Mapping
+# This file demonstrates how to use custom type mappings with the CLI
+
+# Custom application-specific types
+CUSTOM_ID: int
+CUSTOM_NAME: str
+CUSTOM_AMOUNT: float
+CUSTOM_FLAG: bool
+CUSTOM_DATA: dict
+CUSTOM_BLOB: bytes
+
+# Override some standard types for this project
+VARCHAR: str  # Override default VARCHAR mapping
+INTEGER: int  # Override default INTEGER mapping
+
+# Fallback for unknown types
+DEFAULT: Any

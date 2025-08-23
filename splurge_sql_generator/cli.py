@@ -28,6 +28,9 @@ Examples:
   
   # Print generated code to stdout
   python -m splurge_sql_generator.cli examples/ProductRepository.sql
+  
+  # Use custom SQL type mapping file
+  python -m splurge_sql_generator.cli examples/User.sql -o generated/ --sql-types custom_types.yaml
         """,
     )
 
@@ -47,6 +50,11 @@ Examples:
         "--strict",
         action="store_true",
         help="Treat warnings (e.g., non-.sql inputs, empty directory) as errors",
+    )
+
+    parser.add_argument(
+        "-st", "--sql-types",
+        help="Path to custom SQL type mapping YAML file (default: sql-types.yaml)",
     )
 
     args = parser.parse_args()
@@ -81,12 +89,13 @@ Examples:
             sql_files.append(str(path))
 
     # Create output directory if specified
+    output_dir: Path | None = None
     if args.output and not args.dry_run:
         output_dir = Path(args.output)
         output_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate classes
-    generator = PythonCodeGenerator()
+    generator = PythonCodeGenerator(sql_type_mapping_file=args.sql_types)
 
     try:
         if len(sql_files) == 1 and args.dry_run:
@@ -103,7 +112,8 @@ Examples:
             if args.dry_run:
                 # Print all generated code
                 for class_name, code in generated_classes.items():
-                    print(f"# Generated class: {class_name}")
+                    snake_case_name = generator._to_snake_case(class_name)
+                    print(f"# Generated class: {class_name}: {snake_case_name}.py")
                     print("=" * 50)
                     print(code)
                     print("\n" + "=" * 50 + "\n")
@@ -111,7 +121,11 @@ Examples:
                 # Report what was generated
                 print(f"Generated {len(generated_classes)} Python classes:")
                 for class_name in generated_classes.keys():
-                    print(f"  - {class_name}.py")
+                    snake_case_name = generator._to_snake_case(class_name)
+                    if output_dir:
+                        print(f"    - {class_name}: {output_dir / f'{snake_case_name}.py'}")
+                    else:
+                        print(f"    - {class_name}: {snake_case_name}.py")
 
     except Exception as e:
         print(f"Error generating classes: {e}", file=sys.stderr)

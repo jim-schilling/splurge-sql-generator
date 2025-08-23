@@ -34,7 +34,7 @@ class {{ class_name }}:
         *,
         connection: Connection,
 {% for param in method.parameters_list %}
-        {{ param }}: Any,
+        {{ param }}: {{ method.param_types[param] }},
 {% endfor %}
     ) -> {{ method.return_type }}:
         """

@@ -13,13 +13,15 @@ from dataclasses import dataclass
 from jinja2 import Environment, FileSystemLoader
 
 from splurge_sql_generator.sql_parser import SqlParser
+from splurge_sql_generator.schema_parser import SchemaParser
 
 
 class PythonCodeGenerator:
     """Generator for Python classes with SQLAlchemy methods using Jinja2 templates."""
 
-    def __init__(self) -> None:
+    def __init__(self, sql_type_mapping_file: str | None = None) -> None:
         self._parser = SqlParser()
+        self._schema_parser = SchemaParser(sql_type_mapping_file or "sql-types.yaml")
         # Set up Jinja2 environment with templates directory
         template_dir = Path(__file__).parent / "templates"
         self._jinja_env = Environment(
@@ -56,6 +58,9 @@ class PythonCodeGenerator:
         Returns:
             Generated Python code as string
         """
+        # Load schema for type inference
+        self._schema_parser.load_schema_for_sql_file(sql_file_path)
+        
         # Parse the SQL file
         class_name, method_queries = self.parser.parse_file(sql_file_path)
 
@@ -104,6 +109,7 @@ class PythonCodeGenerator:
         parameters: str
         parameters_list: list[str]
         param_mapping: dict[str, str]
+        param_types: dict[str, str]
         return_type: str
         type: str
         statement_type: str
@@ -133,13 +139,19 @@ class PythonCodeGenerator:
         # Prepare SQL lines for template
         sql_lines = sql_query.split("\n")
 
-        # Prepare parameter mapping
+        # Prepare parameter mapping and types
         param_mapping: dict[str, str] = {}
+        param_types: dict[str, str] = {}
         parameters_list: list[str] = []
         if method_info["parameters"]:
             for param in method_info["parameters"]:
                 python_param = param  # Preserve original parameter name
                 param_mapping[param] = python_param
+                
+                # Infer type from schema or pattern
+                table_name = self._infer_table_name_from_sql(sql_query)
+                param_types[param] = self._schema_parser.infer_parameter_type(param, table_name)
+                
                 if python_param not in parameters_list:
                     parameters_list.append(python_param)
 
@@ -148,6 +160,7 @@ class PythonCodeGenerator:
             parameters=parameters,
             parameters_list=parameters_list,
             param_mapping=param_mapping,
+            param_types=param_types,
             return_type="List[Row]" if method_info["is_fetch"] else "Result",
             type=method_info["type"],
             statement_type=method_info["statement_type"],
@@ -161,6 +174,7 @@ class PythonCodeGenerator:
             "parameters": data.parameters,
             "parameters_list": data.parameters_list,
             "param_mapping": data.param_mapping,
+            "param_types": data.param_types,
             "return_type": data.return_type,
             "type": data.type,
             "statement_type": data.statement_type,
@@ -193,6 +207,56 @@ class PythonCodeGenerator:
 
         return ", ".join(python_params)
 
+    def _infer_table_name_from_sql(self, sql_query: str) -> str:
+        """
+        Infer table name from SQL query for type inference.
+        
+        Args:
+            sql_query: SQL query string
+            
+        Returns:
+            Inferred table name or empty string if not found
+        """
+        import re
+        
+        # Look for FROM clause
+        from_match = re.search(r'\bFROM\s+(\w+)', sql_query, re.IGNORECASE)
+        if from_match:
+            return from_match.group(1)
+        
+        # Look for INSERT INTO
+        insert_match = re.search(r'\bINSERT\s+INTO\s+(\w+)', sql_query, re.IGNORECASE)
+        if insert_match:
+            return insert_match.group(1)
+        
+        # Look for UPDATE
+        update_match = re.search(r'\bUPDATE\s+(\w+)', sql_query, re.IGNORECASE)
+        if update_match:
+            return update_match.group(1)
+        
+        # Look for DELETE FROM
+        delete_match = re.search(r'\bDELETE\s+FROM\s+(\w+)', sql_query, re.IGNORECASE)
+        if delete_match:
+            return delete_match.group(1)
+        
+        return ""
+
+    def _to_snake_case(self, class_name: str) -> str:
+        """
+        Convert PascalCase class name to snake_case filename.
+        
+        Args:
+            class_name: PascalCase class name (e.g., 'UserRepository')
+            
+        Returns:
+            Snake case filename (e.g., 'user_repository')
+        """
+        import re
+        
+        # Insert underscore before capital letters, then convert to lowercase
+        snake_case = re.sub(r'(?<!^)(?=[A-Z])', '_', class_name).lower()
+        return snake_case
+
     def generate_multiple_classes(
         self,
         sql_files: list[str],
@@ -209,6 +273,9 @@ class PythonCodeGenerator:
         Returns:
             Dictionary mapping class names to generated code
         """
+        # Load all schema files first
+        self._load_all_schemas(sql_files)
+        
         generated_classes: dict[str, str] = {}
 
         for sql_file in sql_files:
@@ -221,7 +288,9 @@ class PythonCodeGenerator:
             if output_dir:
                 # Ensure output directory exists
                 Path(output_dir).mkdir(parents=True, exist_ok=True)
-                output_path = Path(output_dir) / f"{class_name}.py"
+                # Convert class name to snake_case for filename
+                snake_case_name = self._to_snake_case(class_name)
+                output_path = Path(output_dir) / f"{snake_case_name}.py"
                 try:
                     output_path.write_text(python_code, encoding="utf-8")
                 except OSError as e:
@@ -230,3 +299,23 @@ class PythonCodeGenerator:
                     ) from e
 
         return generated_classes
+
+    def _load_all_schemas(self, sql_files: list[str]) -> None:
+        """
+        Load all schema files for the given SQL files.
+        
+        Args:
+            sql_files: List of SQL file paths
+        """
+        all_schemas: dict[str, dict[str, str]] = {}
+        
+        for sql_file in sql_files:
+            sql_path = Path(sql_file)
+            schema_path = sql_path.with_suffix('.sql.schema')
+            
+            if schema_path.exists():
+                schema_tables = self._schema_parser.parse_schema_file(str(schema_path))
+                all_schemas.update(schema_tables)
+        
+        # Update the schema parser with all loaded schemas
+        self._schema_parser._table_schemas = all_schemas

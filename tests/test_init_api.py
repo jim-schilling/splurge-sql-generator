@@ -35,7 +35,7 @@ class TestInitAPI(unittest.TestCase):
         os.mkdir(self.output_dir)
         result = generate_multiple_classes([self.sql_file], output_dir=self.output_dir)
         self.assertIn('TestClass', result)
-        out_file = os.path.join(self.output_dir, 'TestClass.py')
+        out_file = os.path.join(self.output_dir, 'test_class.py')
         self.assertTrue(os.path.exists(out_file))
         with open(out_file) as f:
             self.assertIn('class TestClass', f.read())
