@@ -5,10 +5,13 @@ A Python library for generating SQLAlchemy classes from SQL template files with 
 ## Features
 
 - **SQL Template Parsing**: Parse SQL files with method name comments to extract queries
+- **Schema-Based Type Inference**: Automatically infer Python types from SQL schema files (`.sql.schema`) for accurate type annotations
+- **Custom SQL Type Mapping**: Support for custom SQL-to-Python type mappings via configurable YAML files
 - **Statement Type Detection**: Automatically detect if SQL statements return rows (fetch) or perform operations (execute)
-- **Code Generation**: Generate Python classes with SQLAlchemy methods
-- **Parameter Extraction**: Extract and map SQL parameters to Python method signatures
-- **CLI Interface**: Command-line tool for batch processing
+- **Code Generation**: Generate Python classes with SQLAlchemy methods and precise type hints
+- **Parameter Extraction**: Extract and map SQL parameters to Python method signatures with inferred types
+- **Multi-Database Support**: Built-in support for SQLite, PostgreSQL, MySQL, MSSQL, and Oracle SQL types
+- **CLI Interface**: Command-line tool for batch processing with flexible configuration options
 - **Comprehensive Error Handling**: Robust error handling for file operations and SQL parsing
 
 ## SQL File Format Requirement
@@ -137,6 +140,89 @@ with connection.begin():
 
 > **Note:** All generated methods are class methods. You must always pass the connection and parameters as named arguments. **For data modification operations (INSERT, UPDATE, DELETE), use `with connection.begin():` blocks to manage transactions explicitly.** This gives you full control over transaction boundaries and ensures data consistency.
 
+## Schema-Based Type Inference
+
+Starting with version 2025.4.0, splurge-sql-generator supports schema-based type inference for accurate Python type annotations. This feature automatically infers parameter types from SQL schema definitions.
+
+### How It Works
+
+1. **Create a schema file** alongside your SQL file with the `.sql.schema` extension
+2. **Define your table schemas** using standard SQL `CREATE TABLE` statements
+3. **The generator automatically maps** SQL column types to Python types based on the schema
+
+### Example
+
+**UserRepository.sql.schema**:
+```sql
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY,
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    age INTEGER,
+    salary DECIMAL(10,2),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**UserRepository.sql**:
+```sql
+# UserRepository
+
+#get_user_by_id
+SELECT id, username, email, age, salary, is_active, created_at
+FROM users 
+WHERE id = :id;
+
+#create_user
+INSERT INTO users (username, email, age, salary, is_active)
+VALUES (:username, :email, :age, :salary, :is_active)
+RETURNING id;
+```
+
+**Generated method signatures**:
+```python
+@classmethod
+def get_user_by_id(
+    cls,
+    *,
+    connection: Connection,
+    id: int,  # Inferred from INTEGER in schema
+) -> List[Row]:
+
+@classmethod
+def create_user(
+    cls,
+    *,
+    connection: Connection,
+    username: str,     # Inferred from VARCHAR in schema
+    email: str,        # Inferred from VARCHAR in schema
+    age: int,          # Inferred from INTEGER in schema
+    salary: float,     # Inferred from DECIMAL in schema
+    is_active: bool,   # Inferred from BOOLEAN in schema
+) -> Result:
+```
+
+### Custom SQL Type Mappings
+
+You can customize the SQL-to-Python type mappings using a custom YAML file:
+
+**custom_types.yaml**:
+```yaml
+# Custom SQL Type to Python Type Mapping
+CUSTOM_ID: int
+CUSTOM_NAME: str
+CUSTOM_AMOUNT: float
+CUSTOM_FLAG: bool
+CUSTOM_DATA: dict
+DEFAULT: Any
+```
+
+Use it with the CLI:
+```bash
+python -m splurge_sql_generator.cli UserRepository.sql --sql-types custom_types.yaml
+```
+
 ## Usage Examples
 
 ### Statement Type Detection
@@ -197,6 +283,12 @@ splurge-sql-gen path/to/sqls/ --output generated/ --strict
 
 # Generate to specific output directory
 splurge-sql-gen UserRepository.sql -o src/repositories/
+
+# Use custom SQL type mapping file
+splurge-sql-gen UserRepository.sql --output generated/ --sql-types custom_types.yaml
+
+# Use custom SQL type mapping file (short form)
+splurge-sql-gen UserRepository.sql --output generated/ -st custom_types.yaml
 ```
 
 ## API Reference
@@ -207,10 +299,19 @@ splurge-sql-gen UserRepository.sql -o src/repositories/
 Main class for generating Python code from SQL templates.
 
 ```python
+# Use default sql-types.yaml
 generator = PythonCodeGenerator()
+
+# Use custom SQL type mapping file
+generator = PythonCodeGenerator(sql_type_mapping_file="custom_types.yaml")
+
+# Generate code
 code = generator.generate_class(sql_file_path, output_file_path=None)
 classes = generator.generate_multiple_classes(sql_files, output_dir=None)
 ```
+
+**Parameters:**
+- `sql_type_mapping_file` (optional): Path to custom SQL type mapping YAML file. Defaults to `sql-types.yaml`.
 
 #### `SqlParser`
 Parser for SQL template files.
@@ -252,10 +353,12 @@ Read a SQL file and split it into individual statements.
 
 ## Generated Code Features
 
-- **Type Hints**: Full type annotations for parameters and return values
+- **Accurate Type Hints**: Schema-based type inference for precise parameter and return value annotations
+- **Custom Type Support**: Configurable SQL-to-Python type mappings for project-specific needs
+- **Multi-Database Types**: Built-in support for SQLite, PostgreSQL, MySQL, MSSQL, and Oracle types
 - **Docstrings**: Comprehensive documentation for each method
 - **Error Handling**: Proper SQLAlchemy result handling
-- **Parameter Mapping**: Automatic mapping of SQL parameters to Python arguments
+- **Parameter Mapping**: Automatic mapping of SQL parameters to Python arguments with inferred types
 - **Statement Type Detection**: Correct return types based on SQL statement type
 - **Auto-Generated Headers**: Clear identification of generated files
 
@@ -275,12 +378,17 @@ splurge-sql-generator/
 │   ├── __init__.py          # Main package exports
 │   ├── sql_helper.py        # SQL parsing utilities
 │   ├── sql_parser.py        # SQL template parser
+│   ├── schema_parser.py     # SQL schema parser for type inference
 │   ├── code_generator.py    # Python code generator
 │   ├── cli.py               # Command-line interface
 │   └── templates/           # Jinja2 templates (python_class.j2)
 ├── tests/                   # Test suite
-├── examples/                # Example SQL templates
-└── output/                  # Generated code examples
+├── examples/                # Example SQL templates and schemas
+│   ├── *.sql                # SQL template files
+│   ├── *.sql.schema         # SQL schema files for type inference
+│   └── custom_types.yaml    # Example custom type mapping
+├── output/                  # Generated code examples
+└── sql-types.yaml           # Default SQL type mappings
 ```
 
 ## License
@@ -301,6 +409,49 @@ MIT License - see LICENSE file for details.
 ## Changelog
 
 ### [2025.4.0] - 2025-08-23
+
+#### Added
+- **Custom SQL Type Mapping**: New CLI option `--sql-types` / `-st` to specify custom SQL type mapping YAML files
+- **Schema-Based Type Inference**: Enhanced type inference system using dedicated schema files (`.sql.schema`) for accurate Python type annotations
+- **Comprehensive Database Support**: Added support for MSSQL and Oracle-specific SQL types in addition to existing SQLite, PostgreSQL, and MySQL support
+- **Case-Insensitive Type Lookups**: SQL type matching now works regardless of case (e.g., `INTEGER`, `integer`, `Integer` all work)
+
+#### Enhanced
+- **CLI Flexibility**: Users can now specify custom type mappings per project using `--sql-types custom_types.yaml`
+- **Type Mapping Configuration**: Sortable and maintainable `sql-types.yaml` file with alphabetical ordering and `DEFAULT` fallback
+- **Schema Parser Improvements**: Enhanced schema parsing with better error handling and fallback mechanisms
+- **Test Coverage**: Added comprehensive tests for custom type mapping functionality
+
+#### Technical Improvements
+- **PythonCodeGenerator**: Updated to accept `sql_type_mapping_file` parameter for custom type mappings
+- **SchemaParser**: Enhanced with Oracle types in default mapping for better fallback support
+- **CLI Integration**: Seamless integration of custom type mapping files with existing CLI workflow
+- **Backward Compatibility**: Default behavior unchanged when custom types not specified
+
+#### Usage Examples
+```bash
+# Use default sql-types.yaml
+python -m splurge_sql_generator.cli examples/User.sql --dry-run
+
+# Use custom type mapping file (long form)
+python -m splurge_sql_generator.cli examples/User.sql --dry-run --sql-types custom_types.yaml
+
+# Use custom type mapping file (short form)
+python -m splurge_sql_generator.cli examples/User.sql --dry-run -st custom_types.yaml
+```
+
+#### Database Type Support
+- **SQLite**: INTEGER, TEXT, REAL, BLOB, etc.
+- **PostgreSQL**: JSON, JSONB, UUID, SERIAL, BIGSERIAL, etc.
+- **MySQL**: TINYINT, MEDIUMINT, LONGTEXT, ENUM, etc.
+- **MSSQL**: BIT, MONEY, NVARCHAR, UNIQUEIDENTIFIER, XML, SQL_VARIANT, etc.
+- **Oracle**: NUMBER, VARCHAR2, CLOB, RAW, ROWID, INTERVAL, etc.
+
+#### Development Experience
+- **Custom Type Definitions**: Projects can define application-specific SQL types and their Python mappings
+- **Type Consistency**: Ensures consistent type inference across different database dialects
+- **Project Flexibility**: Different projects can use different type mapping strategies
+- **Maintainable Configuration**: YAML-based configuration for easy type mapping management
 
 ### [2025.3.1] - 2025-08-19
 
