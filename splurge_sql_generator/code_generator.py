@@ -6,6 +6,7 @@ Copyright (c) 2025, Jim Schilling
 This module is licensed under the MIT License.
 """
 
+import re
 from pathlib import Path
 from typing import Any
 from dataclasses import dataclass
@@ -239,8 +240,6 @@ class PythonCodeGenerator:
         Returns:
             Inferred table name or empty string if not found
         """
-        import re
-        
         # Look for FROM clause
         from_match = re.search(r'\bFROM\s+(\w+)', sql_query, re.IGNORECASE)
         if from_match:
@@ -273,8 +272,6 @@ class PythonCodeGenerator:
         Returns:
             Snake case filename (e.g., 'user_repository')
         """
-        import re
-        
         # Insert underscore before capital letters, then convert to lowercase
         snake_case = re.sub(r'(?<!^)(?=[A-Z])', '_', class_name).lower()
         return snake_case
