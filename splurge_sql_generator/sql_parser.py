@@ -49,6 +49,11 @@ class SqlParser:
     _KW_RETURNING = "RETURNING"
 
     def __init__(self) -> None:
+        """
+        Initialize the SQL parser.
+        
+        No initialization required as patterns are compiled at module level.
+        """
         pass  # No need to compile pattern in __init__
 
     def parse_file(self, file_path: str | Path) -> tuple[str, dict[str, str]]:

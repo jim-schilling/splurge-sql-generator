@@ -14,7 +14,19 @@ from splurge_sql_generator.code_generator import PythonCodeGenerator
 
 
 def main() -> None:
-    """Main CLI entry point."""
+    """
+    Main CLI entry point for the SQL code generator.
+    
+    Parses command line arguments and generates Python SQLAlchemy classes from SQL template files.
+    Supports single file generation, multiple file processing, and custom output directories.
+    
+    Command line options:
+        sql_files: One or more SQL template files to process
+        -o, --output: Output directory for generated Python files
+        --dry-run: Print generated code to stdout without saving files
+        --strict: Treat warnings as errors
+        -st, --sql-types: Path to custom SQL type mapping YAML file
+    """
     parser = argparse.ArgumentParser(
         description="Generate Python SQLAlchemy classes from SQL template files",
         formatter_class=argparse.RawDescriptionHelpFormatter,

@@ -20,6 +20,13 @@ class PythonCodeGenerator:
     """Generator for Python classes with SQLAlchemy methods using Jinja2 templates."""
 
     def __init__(self, sql_type_mapping_file: str | None = None) -> None:
+        """
+        Initialize the Python code generator.
+        
+        Args:
+            sql_type_mapping_file: Optional path to custom SQL type mapping YAML file.
+                If None, uses default "sql-types.yaml"
+        """
         self._parser = SqlParser()
         self._schema_parser = SchemaParser(sql_type_mapping_file or "sql-types.yaml")
         # Set up Jinja2 environment with templates directory
@@ -105,6 +112,21 @@ class PythonCodeGenerator:
 
     @dataclass
     class _MethodData:
+        """
+        Internal dataclass for organizing method data for template rendering.
+        
+        Attributes:
+            name: Method name
+            parameters: Formatted parameter string for method signature
+            parameters_list: List of parameter names
+            param_mapping: Dictionary mapping SQL parameters to Python parameters
+            param_types: Dictionary mapping parameter names to Python types
+            return_type: Python return type annotation
+            type: SQL query type (select, insert, update, delete, etc.)
+            statement_type: Statement type (fetch or execute)
+            is_fetch: Whether the statement returns rows
+            sql_lines: SQL query split into lines for template rendering
+        """
         name: str
         parameters: str
         parameters_list: list[str]

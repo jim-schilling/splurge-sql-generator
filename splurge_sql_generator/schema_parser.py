@@ -3,6 +3,10 @@ Schema parser for SQL table definitions.
 
 This module parses SQL schema files to extract column type information
 for accurate Python type inference in generated code.
+
+Copyright (c) 2025 Jim Schilling
+
+This module is licensed under the MIT License.
 """
 
 import re
@@ -15,7 +19,7 @@ import yaml
 class SchemaParser:
     """Parser for SQL schema files to extract column type information."""
 
-    def __init__(self, sql_type_mapping_file: str = "sql_type.yaml") -> None:
+    def __init__(self, sql_type_mapping_file: str = "sql-types.yaml") -> None:
         """
         Initialize the schema parser.
         
