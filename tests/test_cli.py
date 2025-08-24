@@ -403,7 +403,7 @@ def test_cli_invalid_option():
         text=True,
     )
     assert result.returncode != 0
-    assert 'arguments are required' in result.stderr
+    assert 'unrecognized arguments' in result.stderr
 
 
 if __name__ == "__main__":

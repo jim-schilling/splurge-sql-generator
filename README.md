@@ -7,6 +7,8 @@ A Python library for generating SQLAlchemy classes from SQL template files with 
 - **SQL Template Parsing**: Parse SQL files with method name comments to extract queries
 - **Schema-Based Type Inference**: Automatically infer Python types from SQL schema files (`.schema`) for accurate type annotations
 - **Custom SQL Type Mapping**: Support for custom SQL-to-Python type mappings via configurable YAML files
+- **Type File Generation**: Generate default SQL type mapping files with `--generate-types` option
+- **Parameter Validation**: Optional validation of SQL parameters against schema definitions
 - **Statement Type Detection**: Automatically detect if SQL statements return rows (fetch) or perform operations (execute)
 - **Code Generation**: Generate Python classes with SQLAlchemy methods and precise type hints
 - **Parameter Extraction**: Extract and map SQL parameters to Python method signatures with inferred types
@@ -247,6 +249,31 @@ Use it with the CLI:
 python -m splurge_sql_generator.cli UserRepository.sql --types custom_types.yaml
 ```
 
+### Generating Type Mapping Files
+
+You can generate the default SQL type mapping file to use as a starting point:
+
+```bash
+# Generate default types.yaml in current directory
+python -m splurge_sql_generator.cli --generate-types
+
+# Generate custom types file
+python -m splurge_sql_generator.cli --generate-types my_custom_types.yaml
+```
+
+Or programmatically:
+```python
+from splurge_sql_generator import generate_types_file
+
+# Generate default types.yaml
+generate_types_file()
+
+# Generate custom types file
+generate_types_file('my_custom_types.yaml')
+```
+
+The generated file includes comprehensive mappings for SQLite, PostgreSQL, MySQL, MSSQL, and Oracle types, organized by database with helpful comments.
+
 ## Usage Examples
 
 ### Statement Type Detection
@@ -322,6 +349,12 @@ splurge-sql-gen *.sql --output generated/ --schema database.schema --types custo
 
 # Automatic schema discovery (no --schema needed)
 splurge-sql-gen *.sql --output generated/  # Automatically finds *.schema files
+
+# Generate default SQL type mapping file
+splurge-sql-gen --generate-types
+
+# Generate custom SQL type mapping file
+splurge-sql-gen --generate-types my_types.yaml
 ```
 
 ## API Reference
@@ -338,6 +371,9 @@ generator = PythonCodeGenerator()
 # Use custom SQL type mapping file
 generator = PythonCodeGenerator(sql_type_mapping_file="custom_types.yaml")
 
+# Use with parameter validation enabled
+generator = PythonCodeGenerator(validate_parameters=True)
+
 # Generate code
 code = generator.generate_class(sql_file_path, output_file_path=None, schema_file_path=None)
 classes = generator.generate_multiple_classes(sql_files, output_dir=None, schema_file_path=None)
@@ -345,6 +381,7 @@ classes = generator.generate_multiple_classes(sql_files, output_dir=None, schema
 
 **Parameters:**
 - `sql_type_mapping_file` (optional): Path to custom SQL type mapping YAML file. Defaults to `types.yaml`.
+- `validate_parameters` (optional): Whether to validate SQL parameters against schema. Defaults to `False`.
 
 **Methods:**
 - `generate_class(sql_file_path, *, output_file_path=None, schema_file_path=None)`: Generate a single Python class
@@ -356,7 +393,17 @@ Parser for SQL template files.
 ```python
 parser = SqlParser()
 class_name, method_queries = parser.parse_file(sql_file_path)
+class_name, method_queries = parser.parse_string(sql_content, file_path=None)
 method_info = parser.get_method_info(sql_query)
+```
+
+#### `SchemaParser`
+Parser for SQL schema files and type mapping.
+
+```python
+schema_parser = SchemaParser()
+schema_parser.load_schema(schema_file_path)
+schema_parser.generate_types_file(output_path=None)
 ```
 
 ### SQL Helper Functions
@@ -379,6 +426,9 @@ Parse a SQL string containing multiple statements into individual statements.
 #### `split_sql_file(file_path: str, strip_semicolon: bool = False) -> List[str]`
 Read a SQL file and split it into individual statements.
 
+#### `generate_types_file(output_path: str | None = None) -> str`
+Generate the default SQL type mapping YAML file.
+
 ## Supported SQL Features
 
 - **Basic DML**: SELECT, INSERT, UPDATE, DELETE
@@ -392,6 +442,7 @@ Read a SQL file and split it into individual statements.
 
 - **Accurate Type Hints**: Schema-based type inference for precise parameter and return value annotations
 - **Custom Type Support**: Configurable SQL-to-Python type mappings for project-specific needs
+- **Parameter Validation**: Optional validation of SQL parameters against schema definitions
 - **Multi-Database Types**: Built-in support for SQLite, PostgreSQL, MySQL, MSSQL, and Oracle types
 - **Docstrings**: Comprehensive documentation for each method
 - **Error Handling**: Proper SQLAlchemy result handling
@@ -444,6 +495,55 @@ MIT License - see LICENSE file for details.
 ---
 
 ## Changelog
+
+### [2025.4.2] - 2025-08-24
+
+#### Added
+- **Type File Generation**: New `--generate-types` CLI option to generate default SQL type mapping files
+- **Parameter Validation**: Optional validation of SQL parameters against schema definitions with `validate_parameters=True`
+- **Programmatic Type Generation**: `generate_types_file()` function for generating type mapping files programmatically
+- **Enhanced Error Messages**: Clear error reporting when parameters don't match schema definitions
+- **Comprehensive Type Coverage**: Generated type files include SQLite, PostgreSQL, MySQL, MSSQL, and Oracle types
+
+#### Changed
+- **CLI Enhancement**: Added `--generate-types [TYPES_FILE]` option for generating default type mapping files
+- **Code Generator**: Added `validate_parameters` parameter to `PythonCodeGenerator` constructor
+- **Schema Parser**: Added `generate_types_file()` method for creating type mapping files
+- **API Exports**: Added `SchemaParser` and `generate_types_file` to public API exports
+
+#### Enhanced
+- **User Experience**: Users can now generate starter type mapping files for customization
+- **Parameter Safety**: Optional validation ensures SQL parameters exist in referenced tables
+- **Type Organization**: Generated type files are organized by database with helpful comments
+- **Backward Compatibility**: All existing functionality continues to work unchanged
+
+#### Technical Improvements
+- **Parameter Validation Logic**: Added `_extract_table_names()` and `_validate_parameters_against_schema()` methods
+- **Error Context**: Enhanced error messages include file paths, referenced tables, and available columns
+- **Type File Structure**: Generated files include comprehensive type mappings organized by database
+- **Test Coverage**: Added comprehensive tests for type generation and parameter validation functionality
+
+#### Usage Examples
+```bash
+# Generate default types.yaml in current directory
+python -m splurge_sql_generator.cli --generate-types
+
+# Generate custom types file
+python -m splurge_sql_generator.cli --generate-types my_types.yaml
+
+# Use parameter validation
+python -c "
+from splurge_sql_generator import PythonCodeGenerator
+generator = PythonCodeGenerator(validate_parameters=True)
+# ... generate code with validation
+"
+```
+
+#### Parameter Validation Features
+- **Table Extraction**: Automatically extracts table names from FROM, UPDATE, INSERT INTO, and JOIN clauses
+- **Schema Validation**: Validates that SQL parameters exist as columns in referenced tables
+- **Clear Error Messages**: Reports invalid parameters with context about available columns
+- **Optional Feature**: Validation is disabled by default to maintain backward compatibility
 
 ### [2025.4.1] - 2025-08-24
 
