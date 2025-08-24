@@ -252,8 +252,8 @@ RETURNING id;
     assert 'def get_user_by_id(' in content
     assert 'def create_user(' in content
     # Check that parameters have type annotations (may be Any, int, str, etc.)
-    assert re.search(r'user_id:\s*\w+,', content), "user_id parameter with type annotation not found"
-    assert re.search(r'status:\s*\w+,', content), "status parameter with type annotation not found"
+    assert re.search(r'user_id:\s*[^\s,]+,', content), "user_id parameter with type annotation not found"
+    assert re.search(r'status:\s*[^\s,]+,', content), "status parameter with type annotation not found"
 
 
 def test_cli_dry_run_multiple_files(tmp_path):

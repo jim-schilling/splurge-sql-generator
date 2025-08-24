@@ -243,5 +243,5 @@ def assert_method_parameters(code: str, method_name: str, expected_params: list[
     # Check for expected parameters with any valid type annotation
     for param in expected_params:
         # Look for parameter with any type annotation (int, str, float, bool, Any, etc.)
-        pattern = rf"{re.escape(param)}:\s*\w+"
+        pattern = rf"{re.escape(param)}:\s*[^\s,]+"
         assert re.search(pattern, code), f"Parameter {param} with type annotation not found for method {method_name}"

@@ -43,8 +43,8 @@ SELECT * FROM test_table WHERE id = :id;
             sys.stdout = StringIO()
             
             try:
-                # Simulate CLI call
-                sys.argv = ['cli.py', sql_file, '--dry-run']
+                # Simulate CLI call with explicit schema file
+                sys.argv = ['cli.py', sql_file, '--dry-run', '--schema', str(schema_file)]
                 cli_main()
                 
                 output = sys.stdout.getvalue()
