@@ -496,6 +496,8 @@ MIT License - see LICENSE file for details.
 
 ## Changelog
 
+### [2025.4.3] - 2025-08-24
+
 ### [2025.4.2] - 2025-08-24
 
 #### Added

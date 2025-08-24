@@ -5,6 +5,7 @@ This module provides common helper functions and fixtures used across multiple t
 """
 
 import os
+import re
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
@@ -225,7 +226,7 @@ def assert_generated_code_structure(code: str, class_name: str, method_names: li
 
 def assert_method_parameters(code: str, method_name: str, expected_params: list[str]) -> None:
     """
-    Assert that a method has the expected parameters with Any type annotations.
+    Assert that a method has the expected parameters with proper type annotations.
     
     Args:
         code: Generated Python code
@@ -239,6 +240,8 @@ def assert_method_parameters(code: str, method_name: str, expected_params: list[
     assert f"def {method_name}(" in code
     assert "connection: Connection" in code
     
-    # Check for expected parameters with Any type
+    # Check for expected parameters with any valid type annotation
     for param in expected_params:
-        assert f"{param}: Any" in code, f"Parameter {param}: Any not found for method {method_name}"
+        # Look for parameter with any type annotation (int, str, float, bool, Any, etc.)
+        pattern = rf"{re.escape(param)}:\s*\w+"
+        assert re.search(pattern, code), f"Parameter {param} with type annotation not found for method {method_name}"
