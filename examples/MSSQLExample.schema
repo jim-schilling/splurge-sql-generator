@@ -1,0 +1,38 @@
+-- MSSQLExample.sql.schema
+-- Example MSSQL schema demonstrating various MSSQL-specific types
+
+CREATE TABLE employees (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    employee_code UNIQUEIDENTIFIER DEFAULT NEWID(),
+    first_name NVARCHAR(50) NOT NULL,
+    last_name NVARCHAR(50) NOT NULL,
+    email VARCHAR(255) UNIQUE,
+    salary MONEY NOT NULL,
+    hire_date DATETIME2 DEFAULT GETDATE(),
+    is_active BIT DEFAULT 1,
+    manager_id INT,
+    department_id SMALLINT,
+    profile_image VARBINARY(MAX),
+    metadata XML,
+    row_version ROWVERSION,
+    created_at DATETIMEOFFSET DEFAULT SYSDATETIMEOFFSET()
+);
+
+CREATE TABLE departments (
+    id SMALLINT IDENTITY(1,1) PRIMARY KEY,
+    name NVARCHAR(100) NOT NULL,
+    budget MONEY,
+    location_id INT,
+    is_active BIT DEFAULT 1
+);
+
+CREATE TABLE projects (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    name NVARCHAR(200) NOT NULL,
+    description NTEXT,
+    start_date DATE,
+    end_date DATE,
+    budget NUMERIC(15,2),
+    status VARCHAR(20) DEFAULT 'active',
+    project_data SQL_VARIANT
+);

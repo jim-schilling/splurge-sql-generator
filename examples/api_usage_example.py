@@ -16,6 +16,10 @@ from sqlalchemy.engine import Connection
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, PROJECT_ROOT)
 
+# Import splurge_sql_generator modules
+from splurge_sql_generator import generate_class
+from splurge_sql_generator.code_generator import PythonCodeGenerator
+
 
 def _ensure_generated_classes() -> None:
     """Generate all example classes into project-root 'output' if missing.
@@ -31,16 +35,18 @@ def _ensure_generated_classes() -> None:
             f.write("")
 
     # Generate each required module if missing
-    from splurge_sql_generator import generate_class
-
     mapping = {
         "User": os.path.join(PROJECT_ROOT, "examples", "User.sql"),
         "ProductRepository": os.path.join(PROJECT_ROOT, "examples", "ProductRepository.sql"),
         "OrderService": os.path.join(PROJECT_ROOT, "examples", "OrderService.sql"),
     }
 
+    # Create generator instance to access the snake_case conversion method
+    generator = PythonCodeGenerator()
+
     for module_name, sql_path in mapping.items():
-        py_path = os.path.join(output_dir, f"{module_name}.py")
+        snake_case_name = generator._to_snake_case(module_name)
+        py_path = os.path.join(output_dir, f"{snake_case_name}.py")
         if not os.path.exists(py_path):
             generate_class(sql_path, output_file_path=py_path)
 
@@ -136,7 +142,7 @@ def setup_logging():
 def demonstrate_user_operations(connection: Connection):
     """Demonstrate User class operations with simplified logger."""
     print("\n=== User Operations ===")
-    from output.User import User  # local import after generation
+    from output.user import User  # local import after generation
 
     # Create users
     with connection.begin():
@@ -174,7 +180,7 @@ def demonstrate_user_operations(connection: Connection):
 def demonstrate_product_operations(connection: Connection):
     """Demonstrate ProductRepository class operations."""
     print("\n=== Product Operations ===")
-    from output.ProductRepository import ProductRepository  # local import after generation
+    from output.product_repository import ProductRepository  # local import after generation
 
     # Create products
     with connection.begin():
@@ -218,7 +224,7 @@ def demonstrate_product_operations(connection: Connection):
 def demonstrate_order_operations(connection: Connection):
     """Demonstrate OrderService class operations."""
     print("\n=== Order Operations ===")
-    from output.OrderService import OrderService  # local import after generation
+    from output.order_service import OrderService  # local import after generation
 
     # Create an order
     with connection.begin():
@@ -262,9 +268,9 @@ def main():
 
     # Ensure generated classes and import
     _ensure_generated_classes()
-    from output.User import User
-    from output.ProductRepository import ProductRepository
-    from output.OrderService import OrderService
+    from output.user import User
+    from output.product_repository import ProductRepository
+    from output.order_service import OrderService
 
     # Create database and tables
     engine = setup_database()

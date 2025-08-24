@@ -14,7 +14,19 @@ from splurge_sql_generator.code_generator import PythonCodeGenerator
 
 
 def main() -> None:
-    """Main CLI entry point."""
+    """
+    Main CLI entry point for the SQL code generator.
+    
+    Parses command line arguments and generates Python SQLAlchemy classes from SQL template files.
+    Supports single file generation, multiple file processing, and custom output directories.
+    
+    Command line options:
+        sql_files: One or more SQL template files to process
+        -o, --output: Output directory for generated Python files
+        --dry-run: Print generated code to stdout without saving files
+        --strict: Treat warnings as errors
+        -t, --types: Path to custom SQL type mapping YAML file
+    """
     parser = argparse.ArgumentParser(
         description="Generate Python SQLAlchemy classes from SQL template files",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -28,6 +40,9 @@ Examples:
   
   # Print generated code to stdout
   python -m splurge_sql_generator.cli examples/ProductRepository.sql
+  
+  # Use custom SQL type mapping file
+  python -m splurge_sql_generator.cli examples/User.sql -o generated/ --types custom_types.yaml
         """,
     )
 
@@ -47,6 +62,16 @@ Examples:
         "--strict",
         action="store_true",
         help="Treat warnings (e.g., non-.sql inputs, empty directory) as errors",
+    )
+
+    parser.add_argument(
+        "-t", "--types",
+        help="Path to custom SQL type mapping YAML file (default: types.yaml)",
+    )
+
+    parser.add_argument(
+        "--schema",
+        help="Path to schema file to use for all SQL files (default: look for .schema files with same stem as each SQL file)",
     )
 
     args = parser.parse_args()
@@ -81,29 +106,32 @@ Examples:
             sql_files.append(str(path))
 
     # Create output directory if specified
+    output_dir: Path | None = None
     if args.output and not args.dry_run:
         output_dir = Path(args.output)
         output_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate classes
-    generator = PythonCodeGenerator()
+    generator = PythonCodeGenerator(sql_type_mapping_file=args.types)
 
     try:
         if len(sql_files) == 1 and args.dry_run:
             # Single file, print to stdout
-            code = generator.generate_class(sql_files[0])
+            code = generator.generate_class(sql_files[0], schema_file_path=args.schema)
             print(code)
         else:
             # Multiple files or save to directory
             generated_classes = generator.generate_multiple_classes(
                 sql_files,
                 output_dir=args.output if not args.dry_run else None,
+                schema_file_path=args.schema,
             )
 
             if args.dry_run:
                 # Print all generated code
                 for class_name, code in generated_classes.items():
-                    print(f"# Generated class: {class_name}")
+                    snake_case_name = generator._to_snake_case(class_name)
+                    print(f"# Generated class: {class_name}: {snake_case_name}.py")
                     print("=" * 50)
                     print(code)
                     print("\n" + "=" * 50 + "\n")
@@ -111,10 +139,20 @@ Examples:
                 # Report what was generated
                 print(f"Generated {len(generated_classes)} Python classes:")
                 for class_name in generated_classes.keys():
-                    print(f"  - {class_name}.py")
+                    snake_case_name = generator._to_snake_case(class_name)
+                    if output_dir:
+                        print(f"    - {class_name}: {output_dir / f'{snake_case_name}.py'}")
+                    else:
+                        print(f"    - {class_name}: {snake_case_name}.py")
 
+    except (OSError, IOError, FileNotFoundError) as e:
+        print(f"Error accessing files: {e}", file=sys.stderr)
+        sys.exit(1)
+    except ValueError as e:
+        print(f"Error in SQL file format: {e}", file=sys.stderr)
+        sys.exit(1)
     except Exception as e:
-        print(f"Error generating classes: {e}", file=sys.stderr)
+        print(f"Unexpected error generating classes: {e}", file=sys.stderr)
         sys.exit(1)
 
 

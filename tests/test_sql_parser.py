@@ -3,6 +3,7 @@ import tempfile
 import unittest
 
 from splurge_sql_generator.sql_parser import SqlParser
+from test_utils import temp_sql_files
 
 
 class TestSqlParser(unittest.TestCase):
@@ -17,17 +18,12 @@ SELECT * FROM users WHERE id = :user_id;
 #create_user
 INSERT INTO users (name, email) VALUES (:name, :email);
         """
-        with tempfile.NamedTemporaryFile("w+", delete=False, suffix=".sql") as f:
-            f.write(sql)
-            fname = f.name
-        try:
-            class_name, methods = self.parser.parse_file(fname)
+        with temp_sql_files(sql) as (sql_file, _):
+            class_name, methods = self.parser.parse_file(sql_file)
             self.assertEqual(class_name, "TestClass")
             self.assertIn("get_user", methods)
             self.assertIn("create_user", methods)
             self.assertTrue(methods["get_user"].startswith("SELECT"))
-        finally:
-            os.remove(fname)
 
     def test_extract_methods_and_queries(self):
         sql = """

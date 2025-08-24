@@ -1,0 +1,11 @@
+-- CustomExample.sql.schema
+-- Example schema using custom SQL types
+
+CREATE TABLE custom_items (
+    id CUSTOM_ID PRIMARY KEY,
+    name CUSTOM_NAME NOT NULL,
+    amount CUSTOM_AMOUNT,
+    is_active CUSTOM_FLAG DEFAULT TRUE,
+    metadata CUSTOM_DATA,
+    binary_data CUSTOM_BLOB
+);
