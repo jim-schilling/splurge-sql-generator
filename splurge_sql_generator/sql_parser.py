@@ -12,7 +12,12 @@ from pathlib import Path
 from typing import Any
 
 from splurge_sql_generator.errors import SqlValidationError
-from splurge_sql_generator.sql_helper import FETCH_STATEMENT, detect_statement_type
+from splurge_sql_generator.sql_helper import (
+    FETCH_STATEMENT,
+    detect_statement_type,
+    remove_sql_comments,
+    extract_table_names,
+)
 
 
 class SqlParser:
@@ -198,33 +203,46 @@ class SqlParser:
             }
 
         # Use sql_helper to determine if this is a fetch or execute statement
+        # This leverages the sophisticated sqlparse-based analysis in sql_helper
         statement_type = detect_statement_type(sql_query)
         is_fetch = statement_type == FETCH_STATEMENT
 
-        # Determine query type based on first keyword
-        sql_upper = sql_query.upper().strip()
-        if sql_upper.startswith(self._KW_SELECT):
-            query_type = self._TYPE_SELECT
-        elif sql_upper.startswith(self._KW_INSERT):
-            query_type = self._TYPE_INSERT
-        elif sql_upper.startswith(self._KW_UPDATE):
-            query_type = self._TYPE_UPDATE
-        elif sql_upper.startswith(self._KW_DELETE):
-            query_type = self._TYPE_DELETE
-        elif sql_upper.startswith(self._KW_WITH):
-            query_type = self._TYPE_CTE
-        elif sql_upper.startswith(self._KW_VALUES):
-            query_type = self._TYPE_VALUES
-        elif sql_upper.startswith(self._KW_SHOW):
-            query_type = self._TYPE_SHOW
-        elif sql_upper.startswith(self._KW_EXPLAIN):
-            query_type = self._TYPE_EXPLAIN
-        elif sql_upper.startswith(self._KW_DESC) or sql_upper.startswith(self._KW_DESCRIBE):
-            query_type = self._TYPE_DESCRIBE
+        # Determine query type based on statement type and SQL content
+        # Remove comments first for more accurate analysis
+        clean_sql = remove_sql_comments(sql_query)
+        sql_upper = clean_sql.upper().strip()
+        
+        # Use statement_type to determine query type more accurately
+        if statement_type == FETCH_STATEMENT:
+            if sql_upper.startswith(self._KW_SELECT):
+                query_type = self._TYPE_SELECT
+            elif sql_upper.startswith(self._KW_VALUES):
+                query_type = self._TYPE_VALUES
+            elif sql_upper.startswith(self._KW_SHOW):
+                query_type = self._TYPE_SHOW
+            elif sql_upper.startswith(self._KW_EXPLAIN):
+                query_type = self._TYPE_EXPLAIN
+            elif sql_upper.startswith(self._KW_DESC) or sql_upper.startswith(self._KW_DESCRIBE):
+                query_type = self._TYPE_DESCRIBE
+            elif sql_upper.startswith(self._KW_WITH):
+                query_type = self._TYPE_CTE
+            else:
+                query_type = self._TYPE_OTHER
         else:
-            query_type = self._TYPE_OTHER
+            # Execute statements
+            if sql_upper.startswith(self._KW_INSERT):
+                query_type = self._TYPE_INSERT
+            elif sql_upper.startswith(self._KW_UPDATE):
+                query_type = self._TYPE_UPDATE
+            elif sql_upper.startswith(self._KW_DELETE):
+                query_type = self._TYPE_DELETE
+            elif sql_upper.startswith(self._KW_WITH):
+                query_type = self._TYPE_CTE
+            else:
+                query_type = self._TYPE_OTHER
 
         # Extract parameters (named parameters like :param_name, valid Python identifiers only)
+        # Use the original sql_query to preserve parameter placeholders
         parameters = self._PARAM_PATTERN.findall(sql_query)
         # Deduplicate while preserving order
         parameters = list(dict.fromkeys(parameters))
@@ -239,7 +257,19 @@ class SqlParser:
         return {
             "type": query_type,
             "is_fetch": is_fetch,
-            "statement_type": statement_type,  # Add the detected statement type
+            "statement_type": statement_type,
             "parameters": parameters,
             "has_returning": self._KW_RETURNING in sql_upper,
         }
+
+    def get_table_names(self, sql_query: str) -> list[str]:
+        """
+        Extract table names from SQL query using sql_helper.
+        
+        Args:
+            sql_query: SQL query string
+            
+        Returns:
+            List of table names referenced in the query
+        """
+        return extract_table_names(sql_query)

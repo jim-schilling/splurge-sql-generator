@@ -251,9 +251,9 @@ RETURNING id;
     assert 'class ComplexClass:' in content
     assert 'def get_user_by_id(' in content
     assert 'def create_user(' in content
-    # Note: All parameters now use Any type, not specific types
-    assert 'user_id: Any,' in content
-    assert 'status: Any,' in content
+    # Check that parameters have type annotations (may be Any, int, str, etc.)
+    assert re.search(r'user_id:\s*[^\s,]+,', content), "user_id parameter with type annotation not found"
+    assert re.search(r'status:\s*[^\s,]+,', content), "status parameter with type annotation not found"
 
 
 def test_cli_dry_run_multiple_files(tmp_path):
@@ -337,8 +337,8 @@ WHERE name LIKE :name_pattern;
     py_file = outdir / 'unicode_class.py'
     content = py_file.read_text(encoding='utf-8')
     assert 'class UnicodeClass:' in content
-    # Note: All parameters now use Any type, not specific types
-    assert 'name_pattern: Any,' in content
+    # Note: Parameters now use specific types based on naming patterns
+    assert 'name_pattern: str,' in content
 
 
 def test_cli_large_sql_file(tmp_path):

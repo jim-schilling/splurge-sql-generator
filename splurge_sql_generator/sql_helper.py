@@ -550,3 +550,146 @@ def split_sql_file(
         raise SqlFileError(f"SQL file not found: {file_path}") from None
     except OSError as e:
         raise SqlFileError(f"Error reading SQL file {file_path}: {e}") from e
+
+
+def extract_table_names(sql_query: str) -> list[str]:
+    """
+    Extract table names from a SQL query using sqlparse for accurate parsing.
+    
+    This function uses sqlparse to intelligently extract table names from various
+    SQL clauses including FROM, JOIN, UPDATE, INSERT INTO, etc. It handles complex
+    SQL constructs like CTEs, subqueries, and aliases.
+    
+    Args:
+        sql_query: SQL query string to analyze
+        
+    Returns:
+        List of table names referenced in the query (in lowercase, deduplicated)
+    """
+    if not sql_query or not sql_query.strip():
+        return []
+    
+    # Remove comments for cleaner parsing
+    clean_sql = remove_sql_comments(sql_query)
+    if not clean_sql.strip():
+        return []
+    
+    table_names = []
+    
+    try:
+        # Parse the SQL using sqlparse
+        parsed = sqlparse.parse(clean_sql.strip())
+        if not parsed:
+            return []
+        
+        # Extract table names from the parsed statement
+        for statement in parsed:
+            table_names.extend(_extract_tables_from_statement(statement))
+        
+        # Remove duplicates while preserving order
+        return list(dict.fromkeys(table_names))
+        
+    except Exception:
+        # Fallback to basic regex extraction if sqlparse fails
+        return _extract_table_names_fallback(clean_sql)
+
+
+def _extract_tables_from_statement(statement) -> list[str]:
+    """
+    Extract table names from a parsed sqlparse statement.
+    
+    Args:
+        statement: Parsed sqlparse statement
+        
+    Returns:
+        List of table names found in the statement
+    """
+    table_names = []
+    
+    # Flatten the statement to get all tokens
+    tokens = list(statement.flatten())
+    
+    i = 0
+    while i < len(tokens):
+        token = tokens[i]
+        token_value = str(token.value).upper().strip()
+        
+        # Look for FROM, JOIN, UPDATE, INSERT INTO keywords
+        if token_value in ('FROM', 'JOIN', 'UPDATE', 'INTO'):
+            # Get the next significant token (should be the table name)
+            next_token = _get_next_significant_token(tokens, i + 1)
+            if next_token:
+                table_name = str(next_token.value).strip()
+                # Remove any alias (everything after AS or space)
+                if ' AS ' in table_name.upper():
+                    table_name = table_name.split(' AS ')[0].strip()
+                elif ' ' in table_name and not table_name.startswith('('):
+                    # Handle simple aliases like "table alias"
+                    parts = table_name.split()
+                    if len(parts) >= 2 and not parts[1].startswith('('):
+                        table_name = parts[0]
+                
+                # Only add if it looks like a valid table name (not a subquery)
+                if table_name and not table_name.startswith('(') and table_name.isalnum():
+                    table_names.append(table_name.lower())
+        
+        i += 1
+    
+    return table_names
+
+
+def _get_next_significant_token(tokens: list, start_index: int):
+    """
+    Get the next non-whitespace, non-comment token.
+    
+    Args:
+        tokens: List of tokens
+        start_index: Starting index to search from
+        
+    Returns:
+        Next significant token or None
+    """
+    for i in range(start_index, len(tokens)):
+        token = tokens[i]
+        if not token.is_whitespace and token.ttype not in Comment:
+            return token
+    return None
+
+
+def _extract_table_names_fallback(sql_query: str) -> list[str]:
+    """
+    Fallback method using regex patterns for table name extraction.
+    
+    Args:
+        sql_query: SQL query string
+        
+    Returns:
+        List of table names
+    """
+    import re
+    
+    table_names = []
+    
+    # Extract table names from different SQL clauses
+    # FROM clause
+    from_pattern = r'\bFROM\s+(\w+)'
+    from_matches = re.findall(from_pattern, sql_query, re.IGNORECASE)
+    table_names.extend([match.lower() for match in from_matches])
+    
+    # UPDATE clause
+    update_pattern = r'\bUPDATE\s+(\w+)'
+    update_matches = re.findall(update_pattern, sql_query, re.IGNORECASE)
+    table_names.extend([match.lower() for match in update_matches])
+    
+    # INSERT INTO clause
+    insert_pattern = r'\bINSERT\s+INTO\s+(\w+)'
+    insert_matches = re.findall(insert_pattern, sql_query, re.IGNORECASE)
+    table_names.extend([match.lower() for match in insert_matches])
+    
+    # JOIN clauses
+    join_pattern = r'\bJOIN\s+(\w+)'
+    join_matches = re.findall(join_pattern, sql_query, re.IGNORECASE)
+    table_names.extend([match.lower() for match in join_matches])
+    
+    # Remove duplicates while preserving order
+    return list(dict.fromkeys(table_names))

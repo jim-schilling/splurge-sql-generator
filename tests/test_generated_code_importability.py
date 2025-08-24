@@ -119,10 +119,10 @@ SELECT * FROM users WHERE id = :user_id AND status = :status;
         assert 'user_id' in params
         assert 'status' in params
         
-        # Validate parameter types (all use Any)
+        # Validate parameter types (now use specific types based on schema)
         annotations = TestRepo.get_user.__annotations__
-        assert annotations['user_id'] == Any
-        assert annotations['status'] == Any
+        assert annotations['user_id'] == int  # Based on schema INTEGER type
+        assert annotations['status'] == str   # Based on schema TEXT type
 
     def test_generated_code_follows_python_conventions(self) -> None:
         """Test that generated code follows Python conventions."""
