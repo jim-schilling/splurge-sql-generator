@@ -216,7 +216,7 @@ SELECT * FROM test_table WHERE id = :id;
         sql_file.write_text(valid_sql)
         
         # Should fail without schema file (schema files are required)
-        with pytest.raises(ValueError, match="No schema file provided"):
+        with pytest.raises(TypeError, match="argument should be a str or an os.PathLike object"):
             self.generator.generate_class(str(sql_file), schema_file_path=None)
 
     def test_schema_required_validation(self) -> None:

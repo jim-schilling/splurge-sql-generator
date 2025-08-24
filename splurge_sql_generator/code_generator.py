@@ -267,8 +267,6 @@ class PythonCodeGenerator:
 
         return ", ".join(python_params)
 
-
-
     def _extract_table_names(self, sql_query: str) -> list[str]:
         """
         Extract table names from SQL query.
@@ -437,9 +435,9 @@ class PythonCodeGenerator:
                 output_path = Path(output_dir) / f"{snake_case_name}.py"
                 try:
                     output_path.write_text(
-                    python_code,
-                    encoding="utf-8",
-                )
+                        python_code,
+                        encoding="utf-8",
+                    )
                 except OSError as e:
                     raise OSError(
                         f"Error writing Python file {output_path}: {e}"

@@ -278,8 +278,6 @@ class SchemaParser:
         
         return 'Any'
 
-
-
     def load_schema(self, schema_file_path: str) -> None:
         """
         Load a schema file and populate the internal table schemas.
