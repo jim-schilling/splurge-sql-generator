@@ -12,8 +12,9 @@ This module is licensed under the MIT License.
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-
+from typing import Any
+from splurge_sql_generator.sql_helper import remove_sql_comments, extract_create_table_statements, parse_table_columns
+from splurge_sql_generator.errors import SqlValidationError
 import yaml
 
 
@@ -29,14 +30,14 @@ class SchemaParser:
         """
         self._logger = logging.getLogger(__name__)
         self._sql_type_mapping = self._load_sql_type_mapping(sql_type_mapping_file)
-        self._table_schemas: Dict[str, Dict[str, str]] = {}
+        self._table_schemas: dict[str, dict[str, str]] = {}
 
     @property
-    def table_schemas(self) -> Dict[str, Dict[str, str]]:
+    def table_schemas(self) -> dict[str, dict[str, str]]:
         """Public read-only access to the table schemas."""
         return self._table_schemas
 
-    def _load_sql_type_mapping(self, mapping_file: str) -> Dict[str, str]:
+    def _load_sql_type_mapping(self, mapping_file: str) -> dict[str, str]:
         """
         Load SQL type to Python type mapping from YAML file.
         
@@ -45,21 +46,63 @@ class SchemaParser:
             
         Returns:
             Dictionary mapping SQL types to Python types
+            
+        Raises:
+            ValueError: If the loaded YAML is not a dictionary or is missing required keys
         """
         try:
             mapping_path = Path(mapping_file)
             if mapping_path.exists():
                 with open(mapping_path, 'r', encoding='utf-8') as f:
-                    return yaml.safe_load(f)
+                    loaded_mapping = yaml.safe_load(f)
+                
+                # Validate the loaded mapping
+                if not isinstance(loaded_mapping, dict):
+                    raise ValueError(f"YAML file '{mapping_file}' must contain a dictionary, got {type(loaded_mapping).__name__}")
+                
+                # Validate that all values are strings
+                invalid_entries: list[str] = []
+                for key, value in loaded_mapping.items():
+                    if not isinstance(value, str):
+                        invalid_entries.append(f"{key}: {type(value).__name__}")
+                
+                if invalid_entries:
+                    self._logger.warning(
+                        f"YAML file '{mapping_file}' contains non-string values: {', '.join(invalid_entries)}. "
+                        "These entries will be ignored."
+                    )
+                    # Filter out non-string values
+                    loaded_mapping = {k: v for k, v in loaded_mapping.items() if isinstance(v, str)}
+                
+                # Ensure DEFAULT key exists
+                if 'DEFAULT' not in loaded_mapping:
+                    self._logger.warning(
+                        f"YAML file '{mapping_file}' is missing 'DEFAULT' key. "
+                        "Adding 'DEFAULT: Any' as fallback for unknown types."
+                    )
+                    loaded_mapping['DEFAULT'] = 'Any'
+                
+                self._logger.info(f"Successfully loaded {len(loaded_mapping)} type mappings from '{mapping_file}'")
+                return loaded_mapping
             else:
                 # Return default mapping if file doesn't exist
+                self._logger.info(f"Type mapping file '{mapping_file}' not found, using default mappings")
                 return self._get_default_mapping()
-        except (OSError, IOError, ValueError, yaml.YAMLError) as e:
-            self._logger.warning(f"Failed to load SQL type mapping file '{mapping_file}': {e}")
-            # Fallback to default mapping on any error
+                
+        except (OSError, IOError) as e:
+            self._logger.warning(f"Failed to read SQL type mapping file '{mapping_file}': {e}")
+            # Fallback to default mapping on file I/O errors
+            return self._get_default_mapping()
+        except yaml.YAMLError as e:
+            self._logger.error(f"Invalid YAML syntax in type mapping file '{mapping_file}': {e}")
+            # Fallback to default mapping on YAML parsing errors
+            return self._get_default_mapping()
+        except ValueError as e:
+            self._logger.error(f"Invalid content in type mapping file '{mapping_file}': {e}")
+            # Fallback to default mapping on validation errors
             return self._get_default_mapping()
 
-    def _get_default_mapping(self) -> Dict[str, str]:
+    def _get_default_mapping(self) -> dict[str, str]:
         """
         Get default SQL type to Python type mapping.
         
@@ -133,7 +176,7 @@ class SchemaParser:
             'DEFAULT': 'Any'
         }
 
-    def parse_schema_file(self, schema_file_path: str) -> Dict[str, Dict[str, str]]:
+    def parse_schema_file(self, schema_file_path: str) -> dict[str, dict[str, str]]:
         """
         Parse a SQL schema file and extract column type information.
         
@@ -142,6 +185,14 @@ class SchemaParser:
             
         Returns:
             Dictionary mapping table names to column type mappings
+            
+        Raises:
+            PermissionError: If the schema file cannot be read due to permissions
+            UnicodeDecodeError: If the schema file contains invalid UTF-8 encoding
+            SqlValidationError: If the SQL content is malformed and cannot be parsed
+            
+        Note:
+            If the schema file does not exist, an empty dictionary is returned.
         """
         try:
             with open(schema_file_path, 'r', encoding='utf-8') as f:
@@ -149,13 +200,22 @@ class SchemaParser:
             
             return self._parse_schema_content(schema_content)
         except FileNotFoundError:
+            self._logger.warning(f"Schema file not found: '{schema_file_path}'. Returning empty schema.")
             return {}
-        except (OSError, IOError, ValueError, yaml.YAMLError) as e:
-            self._logger.warning(f"Failed to parse schema file '{schema_file_path}': {e}")
-            # Return empty dict on parsing errors
-            return {}
+        except PermissionError as e:
+            self._logger.error(f"Permission denied reading schema file '{schema_file_path}': {e}. Please check file permissions.")
+            raise PermissionError(f"Permission denied reading schema file '{schema_file_path}'. Please check file permissions.") from e
+        except UnicodeDecodeError as e:
+            self._logger.error(f"Invalid UTF-8 encoding in schema file '{schema_file_path}': {e}. Please ensure the file is saved with UTF-8 encoding.")
+            raise UnicodeDecodeError(f"Invalid UTF-8 encoding in schema file '{schema_file_path}'. Please ensure the file is saved with UTF-8 encoding.", e.object, e.start, e.end) from e
+        except OSError as e:
+            self._logger.error(f"OS error reading schema file '{schema_file_path}': {e}. Please check if the file is accessible.")
+            raise OSError(f"OS error reading schema file '{schema_file_path}': {e}. Please check if the file is accessible.") from e
+        except SqlValidationError as e:
+            self._logger.error(f"SQL validation error in schema file '{schema_file_path}': {e}. Please check the SQL syntax in your schema file.")
+            raise SqlValidationError(f"SQL validation error in schema file '{schema_file_path}': {e}. Please check the SQL syntax in your schema file.") from e
 
-    def _parse_schema_content(self, content: str) -> Dict[str, Dict[str, str]]:
+    def _parse_schema_content(self, content: str) -> dict[str, dict[str, str]]:
         """
         Parse schema content and extract table column information.
         
@@ -164,47 +224,25 @@ class SchemaParser:
             
         Returns:
             Dictionary mapping table names to column type mappings
-        """
-        tables: Dict[str, Dict[str, str]] = {}
-        
-        # Remove comments and normalize whitespace
-        content = self._remove_sql_comments(content)
-        
-        # Find all CREATE TABLE statements
-        create_table_pattern = r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s*\((.*?)\);'
-        matches = re.finditer(create_table_pattern, content, re.IGNORECASE | re.DOTALL)
-        
-        for match in matches:
-            table_name = match.group(1)
-            table_body = match.group(2)
             
+        Raises:
+            SqlValidationError: If sqlparse fails to parse CREATE TABLE statements
+        """
+        tables: dict[str, dict[str, str]] = {}
+        
+        # Use sqlparse to extract CREATE TABLE statements
+        create_tables = extract_create_table_statements(content)
+        
+        for table_name, table_body in create_tables:
             # Parse column definitions
             columns = self._parse_table_columns(table_body)
             tables[table_name] = columns
         
-        return tables
+        return tables    
 
-    def _remove_sql_comments(self, content: str) -> str:
+    def _parse_table_columns(self, table_body: str) -> dict[str, str]:
         """
-        Remove SQL comments from content.
-        
-        Args:
-            content: SQL content with comments
-            
-        Returns:
-            Content with comments removed
-        """
-        # Remove single-line comments (--)
-        content = re.sub(r'--.*$', '', content, flags=re.MULTILINE)
-        
-        # Remove multi-line comments (/* */)
-        content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
-        
-        return content
-
-    def _parse_table_columns(self, table_body: str) -> Dict[str, str]:
-        """
-        Parse column definitions from table body.
+        Parse column definitions from table body using sqlparse.
         
         Args:
             table_body: Table body content between parentheses
@@ -212,28 +250,8 @@ class SchemaParser:
         Returns:
             Dictionary mapping column names to SQL types
         """
-        columns: Dict[str, str] = {}
-        
-        # Split by commas, but be careful about commas in constraints
-        # This is a simplified approach - for complex schemas, a proper SQL parser would be better
-        lines = [line.strip() for line in table_body.split('\n')]
-        
-        for line in lines:
-            line = line.strip()
-            if not line or line.startswith('PRIMARY KEY') or line.startswith('FOREIGN KEY') or line.startswith('UNIQUE') or line.startswith('CHECK'):
-                continue
-            
-            # Extract column name and type
-            column_match = re.match(r'(\w+)\s+([A-Za-z]+(?:\s*\(\s*\d+(?:\s*,\s*\d+)?\s*\))?)', line)
-            if column_match:
-                column_name = column_match.group(1)
-                sql_type = column_match.group(2).upper()
-                
-                # Clean up type (remove size specifications)
-                clean_type = re.sub(r'\(\s*\d+(?:\s*,\s*\d+)?\s*\)', '', sql_type).strip()
-                columns[column_name] = clean_type
-        
-        return columns
+        # Use the sqlparse-based column parsing function
+        return parse_table_columns(table_body)
 
     def get_python_type(self, sql_type: str) -> str:
         """
@@ -258,7 +276,13 @@ class SchemaParser:
                 return value
         
         # Fallback to default
-        return self._sql_type_mapping.get('DEFAULT', 'Any')
+        default_type = self._sql_type_mapping.get('DEFAULT', 'Any')
+        if default_type == 'Any':
+            self._logger.debug(f"Unknown SQL type '{sql_type}' (cleaned: '{clean_type}'), using 'Any'")
+        else:
+            self._logger.debug(f"Unknown SQL type '{sql_type}' (cleaned: '{clean_type}'), using default: '{default_type}'")
+        
+        return default_type
 
     def get_column_type(self, table_name: str, column_name: str) -> str:
         """
@@ -271,10 +295,18 @@ class SchemaParser:
         Returns:
             Python type annotation
         """
-        if table_name in self._table_schemas:
-            sql_type = self._table_schemas[table_name].get(column_name)
+        # Normalize table and column names to lowercase for consistent lookup
+        table_name_lower = table_name.lower()
+        column_name_lower = column_name.lower()
+        
+        if table_name_lower in self._table_schemas:
+            sql_type = self._table_schemas[table_name_lower].get(column_name_lower)
             if sql_type:
                 return self.get_python_type(sql_type)
+            else:
+                self._logger.debug(f"Column '{column_name}' not found in table '{table_name}' (available columns: {list(self._table_schemas[table_name_lower].keys())})")
+        else:
+            self._logger.debug(f"Table '{table_name}' not found in schema (available tables: {list(self._table_schemas.keys())})")
         
         return 'Any'
 
@@ -284,12 +316,25 @@ class SchemaParser:
         
         Args:
             schema_file_path: Path to the schema file to load
+            
+        Raises:
+            PermissionError: If the schema file cannot be read due to permissions
+            UnicodeDecodeError: If the schema file contains invalid UTF-8 encoding
+            SqlValidationError: If the SQL content is malformed and cannot be parsed
+            
+        Note:
+            If the schema file does not exist, an empty schema will be loaded.
         """
         schema_path = Path(schema_file_path)
         if not schema_path.exists():
-            raise FileNotFoundError(f"Schema file not found: {schema_path}")
+            raise FileNotFoundError(f"Schema file not found: '{schema_path}'. Please ensure the file exists and the path is correct.")
         
-        self._table_schemas = self.parse_schema_file(str(schema_path))
+        try:
+            self._table_schemas = self.parse_schema_file(str(schema_path))
+            self._logger.info(f"Successfully loaded schema from '{schema_file_path}' with {len(self._table_schemas)} tables")
+        except Exception as e:
+            self._logger.error(f"Failed to load schema from '{schema_file_path}': {e}")
+            raise
 
     def generate_types_file(self, *, output_path: str | None = None) -> str:
         """
@@ -384,8 +429,15 @@ class SchemaParser:
         try:
             with open(output_path, 'w', encoding='utf-8') as f:
                 f.write(yaml_content)
+            self._logger.info(f"Successfully generated types file: '{output_path}'")
+        except PermissionError as e:
+            error_msg = f"Permission denied writing types file to '{output_path}': {e}. Please check directory permissions."
+            self._logger.error(error_msg)
+            raise PermissionError(error_msg) from e
         except OSError as e:
-            raise OSError(f"Failed to write types file to {output_path}: {e}") from e
+            error_msg = f"Failed to write types file to '{output_path}': {e}. Please check if the directory exists and is writable."
+            self._logger.error(error_msg)
+            raise OSError(error_msg) from e
         
         return str(output_path)
 
@@ -397,15 +449,31 @@ class SchemaParser:
             sql_file_path: Path to the SQL file
             schema_file_path: Optional path to the schema file. If None, looks for a .schema file
                              with the same stem as the SQL file.
+                             
+        Raises:
+            FileNotFoundError: If the schema file does not exist
+            PermissionError: If the schema file cannot be read due to permissions
+            UnicodeDecodeError: If the schema file contains invalid UTF-8 encoding
+            SqlValidationError: If the SQL content is malformed and cannot be parsed
         """
         if schema_file_path is None:
             # Default behavior: look for .schema file with same stem
             sql_path = Path(sql_file_path)
             schema_path = sql_path.with_suffix('.schema')
+            self._logger.info(f"Looking for schema file: '{schema_path}' (derived from SQL file: '{sql_file_path}')")
         else:
             schema_path = Path(schema_file_path)
+            self._logger.info(f"Using specified schema file: '{schema_path}' for SQL file: '{sql_file_path}'")
         
-        # Schema files are mandatory, so this should always exist
-        self._table_schemas = self.parse_schema_file(str(schema_path))
+        # Load schema file (may be empty if file doesn't exist)
+        try:
+            self._table_schemas = self.parse_schema_file(str(schema_path))
+            if len(self._table_schemas) > 0:
+                self._logger.info(f"Successfully loaded schema from '{schema_path}' with {len(self._table_schemas)} tables for SQL file '{sql_file_path}'")
+            else:
+                self._logger.warning(f"No schema found for SQL file '{sql_file_path}'. Schema file '{schema_path}' is empty or missing.")
+        except Exception as e:
+            self._logger.error(f"Failed to load schema from '{schema_path}' for SQL file '{sql_file_path}': {e}")
+            raise
 
 
