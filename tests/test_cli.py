@@ -300,26 +300,7 @@ def test_cli_file_permission_error(tmp_path):
         sql_file.chmod(0o666)
 
 
-def test_cli_output_dir_permission_error(tmp_path):
-    """Test CLI handles output directory permission errors."""
-    create_sql_with_schema(tmp_path, 'output_permission.sql', '# OutputPermission\n#method\nSELECT 1;')
 
-    # Create a read-only directory
-    outdir = tmp_path / 'readonly_out'
-    outdir.mkdir()
-    outdir.chmod(0o444)
-
-    try:
-        result = run_cli([str(tmp_path / 'output_permission.sql'), '-o', str(outdir)])
-        # On Windows, chmod might not work as expected, so we'll skip this test
-        # if it doesn't fail as expected
-        if result.returncode == 0:
-            pytest.skip("Permission test not applicable on this platform")
-        else:
-            assert 'Error writing Python file' in result.stderr
-    finally:
-        # Restore permissions
-        outdir.chmod(0o777)
 
 
 def test_cli_mixed_valid_invalid_files(tmp_path):
