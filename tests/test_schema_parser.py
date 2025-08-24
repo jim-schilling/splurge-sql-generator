@@ -6,6 +6,7 @@ focusing on real file operations and SQL parsing.
 """
 
 import os
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -31,7 +32,6 @@ class TestSchemaParser(unittest.TestCase):
                 if os.path.isfile(file_path):
                     os.remove(file_path)
                 elif os.path.isdir(file_path):
-                    import shutil
                     shutil.rmtree(file_path)
             os.rmdir(self.temp_dir)
         except (OSError, PermissionError):

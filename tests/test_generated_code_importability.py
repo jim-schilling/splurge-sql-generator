@@ -121,7 +121,6 @@ SELECT * FROM users WHERE id = :user_id AND status = :status;
         
         # Validate parameter types (all use Any)
         annotations = TestRepo.get_user.__annotations__
-        from typing import Any
         assert annotations['user_id'] == Any
         assert annotations['status'] == Any
 

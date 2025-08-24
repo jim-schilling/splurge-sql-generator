@@ -1,4 +1,5 @@
 import os
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -22,7 +23,6 @@ class TestInitAPI(unittest.TestCase):
 
     def tearDown(self):
         # Clean up the entire temp directory
-        import shutil
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_generate_class(self):

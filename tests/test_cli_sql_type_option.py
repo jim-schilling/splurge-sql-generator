@@ -3,11 +3,13 @@ Tests for the CLI --types option functionality.
 """
 
 import os
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
 
 from splurge_sql_generator.cli import main
+from splurge_sql_generator.code_generator import PythonCodeGenerator
 from splurge_sql_generator.schema_parser import SchemaParser
 from test_utils import (
     temp_sql_files,
@@ -26,7 +28,6 @@ class TestCLISqlTypeOption(unittest.TestCase):
 
     def tearDown(self):
         """Clean up test fixtures."""
-        import shutil
         try:
             shutil.rmtree(self.temp_dir)
         except (OSError, PermissionError):
@@ -128,8 +129,6 @@ SELECT id, name FROM test_table WHERE id = :custom_int;
         
         with temp_sql_files(sql_content, schema_content) as (sql_file, _):
             # Test code generator with custom mapping
-            from splurge_sql_generator.code_generator import PythonCodeGenerator
-            
             generator = PythonCodeGenerator(sql_type_mapping_file=custom_yaml_file)
             
             # Generate code
