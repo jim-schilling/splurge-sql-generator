@@ -5,7 +5,8 @@ A Python library for generating SQLAlchemy classes from SQL template files with 
 ## Features
 
 - **SQL Template Parsing**: Parse SQL files with method name comments to extract queries
-- **Schema-Based Type Inference**: Automatically infer Python types from SQL schema files (`.schema`) for accurate type annotations
+- **Intelligent Type Inference**: Advanced parameter type detection using schema analysis, naming patterns, and SQL context
+- **Schema-Based Type Mapping**: Automatically infer Python types from SQL schema files (`.schema`) for accurate type annotations
 - **Custom SQL Type Mapping**: Support for custom SQL-to-Python type mappings via configurable YAML files
 - **Type File Generation**: Generate default SQL type mapping files with `--generate-types` option
 - **Parameter Validation**: Optional validation of SQL parameters against schema definitions
@@ -206,7 +207,7 @@ VALUES (:username, :email, :age, :salary, :is_active)
 RETURNING id;
 ```
 
-**Generated method signatures**:
+**Generated method signatures** (with intelligent type inference):
 ```python
 @classmethod
 def get_user_by_id(
@@ -227,6 +228,37 @@ def create_user(
     salary: float,     # Inferred from DECIMAL in schema
     is_active: bool,   # Inferred from BOOLEAN in schema
 ) -> Result:
+```
+
+### Advanced Type Inference Examples
+
+The type inference system uses multiple strategies to determine parameter types:
+
+**Schema-based inference** (highest priority):
+```python
+# Parameter matches schema column exactly
+def get_user_by_id(self, user_id: int) -> dict[str, Any] | None:
+    # user_id matches 'id INTEGER' in schema → int
+```
+
+**Pattern-based inference** (fallback):
+```python
+# Common naming patterns
+def search_products(self, search_term: str) -> list[dict[str, Any]]:
+    # '_term' suffix → str
+    
+def update_stock(self, product_id: int, new_quantity: int) -> None:
+    # '_id' suffix → int, '_quantity' suffix → int
+    
+def set_price(self, item_price: float) -> None:
+    # '_price' suffix → float
+```
+
+**Context-based inference** (SQL analysis):
+```python
+# SQL context analysis
+def find_active_users(self, is_active: bool) -> list[dict[str, Any]]:
+    # WHERE is_active = :is_active → boolean comparison
 ```
 
 ### Custom SQL Type Mappings
@@ -497,6 +529,52 @@ MIT License - see LICENSE file for details.
 ## Changelog
 
 ### [2025.4.3] - 2025-08-24
+
+#### Added
+- **Intelligent Type Inference**: Automatic parameter type detection based on SQL schema, parameter naming patterns, and SQL context
+- **Enhanced SQL Parsing**: Consolidated SQL parsing logic using `sqlparse` library for more accurate table name extraction
+- **Advanced Table Name Extraction**: Sophisticated table name extraction from complex SQL constructs including CTEs, subqueries, and aliases
+- **Pattern-Based Type Inference**: Smart type detection based on parameter naming conventions (e.g., `_id` → `int`, `_price` → `float`, `_term` → `str`)
+
+#### Changed
+- **Parameter Types**: Generated parameters now use specific Python types instead of `Any` based on intelligent inference
+- **SQL Parser Architecture**: Refactored to leverage `sql_helper` functionality for better code organization
+- **Type Inference Logic**: Replaced hardcoded `Any` types with sophisticated type inference system
+- **Code Generator**: Enhanced to use schema information and SQL context for accurate type determination
+
+#### Enhanced
+- **Code Quality**: Generated code now has proper type annotations for better IDE support and static analysis
+- **SQL Parsing Accuracy**: More reliable table name extraction from complex SQL queries
+- **Developer Experience**: Better type hints in generated code improve development workflow
+- **Schema Integration**: Deeper integration between SQL queries and schema definitions for type inference
+
+#### Technical Improvements
+- **Type Inference Algorithm**: Multi-layered approach combining schema lookup, pattern matching, and SQL context analysis
+- **Table Name Extraction**: Uses `sqlparse` for parsing FROM, JOIN, UPDATE, INSERT INTO clauses with fallback to regex
+- **Schema-Based Inference**: Matches parameter names against schema column names for exact type mapping
+- **Pattern-Based Fallback**: Intelligent fallback using common parameter naming conventions
+- **SQL Context Analysis**: Analyzes SQL query structure to infer types from WHERE clauses and comparisons
+
+#### Usage Examples
+```python
+# Generated code now has proper type annotations
+class ProductRepository:
+    def get_product_by_id(self, product_id: int) -> dict[str, Any] | None:
+        """Retrieves a product by its ID."""
+        query = "SELECT * FROM products WHERE id = :product_id"
+        return self.connection.fetch_one(query, {"product_id": product_id})
+    
+    def search_products(self, search_term: str) -> list[dict[str, Any]]:
+        """Searches for products by name or description."""
+        query = "SELECT * FROM products WHERE name LIKE :search_term"
+        return self.connection.fetch_all(query, {"search_term": f"%{search_term}%"})
+```
+
+#### Type Inference Features
+- **Schema-Based**: Uses schema column types (INTEGER → `int`, TEXT → `str`, DECIMAL → `float`)
+- **Pattern-Based**: Recognizes common patterns (`_id` → `int`, `_price` → `float`, `_term` → `str`)
+- **Context-Based**: Analyzes SQL WHERE clauses and comparisons for type hints
+- **Fallback Strategy**: Gracefully falls back to `Any` when type cannot be determined
 
 ### [2025.4.2] - 2025-08-24
 
