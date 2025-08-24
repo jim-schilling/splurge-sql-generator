@@ -7,21 +7,26 @@ This module is licensed under the MIT License.
 """
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from dataclasses import dataclass
 
 from jinja2 import Environment, FileSystemLoader
 
-from splurge_sql_generator.sql_parser import SqlParser
-from splurge_sql_generator.schema_parser import SchemaParser
 from splurge_sql_generator.errors import SqlValidationError
+from splurge_sql_generator.schema_parser import SchemaParser
+from splurge_sql_generator.sql_parser import SqlParser
 
 
 class PythonCodeGenerator:
     """Generator for Python classes with SQLAlchemy methods using Jinja2 templates."""
 
-    def __init__(self, sql_type_mapping_file: str | None = None, validate_parameters: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        sql_type_mapping_file: str | None = None,
+        validate_parameters: bool = False,
+    ) -> None:
         """
         Initialize the Python code generator.
         
@@ -31,7 +36,7 @@ class PythonCodeGenerator:
             validate_parameters: Whether to validate SQL parameters against schema (default: False)
         """
         self._parser = SqlParser()
-        self._schema_parser = SchemaParser(sql_type_mapping_file or "types.yaml")
+        self._schema_parser = SchemaParser(sql_type_mapping_file=sql_type_mapping_file or "types.yaml")
         self._validate_parameters = validate_parameters
         # Set up Jinja2 environment with templates directory
         template_dir = Path(__file__).parent / "templates"
@@ -103,7 +108,10 @@ class PythonCodeGenerator:
         # Save to file if output path provided
         if output_file_path:
             try:
-                Path(output_file_path).write_text(python_code, encoding="utf-8")
+                Path(output_file_path).write_text(
+                    python_code,
+                    encoding="utf-8",
+                )
             except OSError as e:
                 raise OSError(
                     f"Error writing Python file {output_file_path}: {e}"
@@ -336,8 +344,8 @@ class PythonCodeGenerator:
         for param in parameters:
             param_found = False
             for table_name in table_names:
-                if (table_name in self._schema_parser._table_schemas and 
-                    param in self._schema_parser._table_schemas[table_name]):
+                if (table_name in self._schema_parser.table_schemas and 
+                    param in self._schema_parser.table_schemas[table_name]):
                     param_found = True
                     break
                     
@@ -366,8 +374,8 @@ class PythonCodeGenerator:
         """
         available_columns = []
         for table_name in table_names:
-            if table_name in self._schema_parser._table_schemas:
-                columns = list(self._schema_parser._table_schemas[table_name].keys())
+            if table_name in self._schema_parser.table_schemas:
+                columns = list(self._schema_parser.table_schemas[table_name].keys())
                 available_columns.append(f"{table_name}({', '.join(columns)})")
         
         return "; ".join(available_columns) if available_columns else "none"
@@ -443,7 +451,10 @@ class PythonCodeGenerator:
                 snake_case_name = self._to_snake_case(class_name)
                 output_path = Path(output_dir) / f"{snake_case_name}.py"
                 try:
-                    output_path.write_text(python_code, encoding="utf-8")
+                    output_path.write_text(
+                    python_code,
+                    encoding="utf-8",
+                )
                 except OSError as e:
                     raise OSError(
                         f"Error writing Python file {output_path}: {e}"

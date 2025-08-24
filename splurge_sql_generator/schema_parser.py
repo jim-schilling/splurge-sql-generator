@@ -20,7 +20,7 @@ import yaml
 class SchemaParser:
     """Parser for SQL schema files to extract column type information."""
 
-    def __init__(self, sql_type_mapping_file: str = "types.yaml") -> None:
+    def __init__(self, *, sql_type_mapping_file: str = "types.yaml") -> None:
         """
         Initialize the schema parser.
         
@@ -30,6 +30,11 @@ class SchemaParser:
         self._logger = logging.getLogger(__name__)
         self._sql_type_mapping = self._load_sql_type_mapping(sql_type_mapping_file)
         self._table_schemas: Dict[str, Dict[str, str]] = {}
+
+    @property
+    def table_schemas(self) -> Dict[str, Dict[str, str]]:
+        """Public read-only access to the table schemas."""
+        return self._table_schemas
 
     def _load_sql_type_mapping(self, mapping_file: str) -> Dict[str, str]:
         """
@@ -288,7 +293,7 @@ class SchemaParser:
         
         self._table_schemas = self.parse_schema_file(str(schema_path))
 
-    def generate_types_file(self, output_path: str | None = None) -> str:
+    def generate_types_file(self, *, output_path: str | None = None) -> str:
         """
         Generate the default SQL type mapping YAML file.
         
@@ -386,7 +391,7 @@ class SchemaParser:
         
         return str(output_path)
 
-    def load_schema_for_sql_file(self, sql_file_path: str, schema_file_path: str | None = None) -> None:
+    def load_schema_for_sql_file(self, sql_file_path: str, *, schema_file_path: str | None = None) -> None:
         """
         Load schema file for a given SQL file.
         

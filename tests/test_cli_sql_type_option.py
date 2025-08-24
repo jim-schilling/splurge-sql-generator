@@ -71,7 +71,7 @@ CREATE TABLE test_table (
             f.write(schema_content)
 
         # Test that the custom mapping is used
-        parser = SchemaParser(custom_yaml_file)
+        parser = SchemaParser(sql_type_mapping_file=custom_yaml_file)
         
         # Verify custom types are loaded
         self.assertEqual(parser.get_python_type("CUSTOM_INT"), "int")

@@ -131,7 +131,7 @@ def generate_multiple_classes(
     return generator.generate_multiple_classes(sql_files, output_dir=output_dir, schema_file_path=schema_file_path)
 
 
-def generate_types_file(output_path: str | None = None) -> str:
+def generate_types_file(*, output_path: str | None = None) -> str:
     """
     Convenience function to generate the default SQL type mapping YAML file.
 
@@ -148,4 +148,4 @@ def generate_types_file(output_path: str | None = None) -> str:
         'custom_types.yaml'
     """
     schema_parser = SchemaParser()
-    return schema_parser.generate_types_file(output_path)
+    return schema_parser.generate_types_file(output_path=output_path)

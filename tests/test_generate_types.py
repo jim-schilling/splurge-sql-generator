@@ -49,7 +49,7 @@ class TestGenerateTypesFile(unittest.TestCase):
         
         try:
             # Generate types file
-            output_path = generate_types_file(temp_path)
+            output_path = generate_types_file(output_path=temp_path)
             
             # Check that file was created
             self.assertEqual(output_path, temp_path)
@@ -74,7 +74,7 @@ class TestGenerateTypesFile(unittest.TestCase):
         try:
             # Generate types file using SchemaParser
             schema_parser = SchemaParser()
-            output_path = schema_parser.generate_types_file(temp_path)
+            output_path = schema_parser.generate_types_file(output_path=temp_path)
             
             # Check that file was created
             self.assertEqual(output_path, temp_path)
@@ -98,7 +98,7 @@ class TestGenerateTypesFile(unittest.TestCase):
         
         try:
             # Generate types file
-            generate_types_file(temp_path)
+            generate_types_file(output_path=temp_path)
             
             # Read content
             content = Path(temp_path).read_text()
@@ -140,7 +140,7 @@ class TestGenerateTypesFile(unittest.TestCase):
             output_path = sub_dir / "types.yaml"
             
             # Generate types file
-            result_path = generate_types_file(str(output_path))
+            result_path = generate_types_file(output_path=str(output_path))
             
             # Check that directory was created and file exists
             self.assertEqual(result_path, str(output_path))
@@ -156,7 +156,7 @@ class TestGenerateTypesFile(unittest.TestCase):
         # Try to write to a directory (which should fail)
         with tempfile.TemporaryDirectory() as temp_dir:
             with self.assertRaises(OSError):
-                generate_types_file(temp_dir)
+                generate_types_file(output_path=temp_dir)
 
 
 if __name__ == "__main__":

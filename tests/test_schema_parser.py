@@ -44,7 +44,7 @@ DEFAULT: Any
         with open(yaml_file, "w", encoding="utf-8") as f:
             f.write(yaml_content)
 
-        parser = SchemaParser(yaml_file)
+        parser = SchemaParser(sql_type_mapping_file=yaml_file)
         mapping = parser._sql_type_mapping
 
         self.assertEqual(mapping["INTEGER"], "int")
@@ -57,7 +57,7 @@ DEFAULT: Any
     def test_load_sql_type_mapping_missing_file(self):
         """Test behavior when SQL type mapping file is missing."""
         # Should not raise an exception, should use default mapping
-        parser = SchemaParser("nonexistent_file.yaml")
+        parser = SchemaParser(sql_type_mapping_file="nonexistent_file.yaml")
         
         # Should have some default mappings
         self.assertIn("INTEGER", parser._sql_type_mapping)
@@ -80,7 +80,7 @@ Default: Any
         with open(yaml_file, "w", encoding="utf-8") as f:
             f.write(yaml_content)
 
-        parser = SchemaParser(yaml_file)
+        parser = SchemaParser(sql_type_mapping_file=yaml_file)
         
         # Test case insensitive lookups
         self.assertEqual(parser.get_python_type("INTEGER"), "int")

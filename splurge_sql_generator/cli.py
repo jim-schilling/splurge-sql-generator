@@ -41,7 +41,7 @@ def _find_schema_files(sql_files: list[str]) -> Optional[str]:
     return None
 
 
-def _expand_and_validate_inputs(input_paths: list[str], strict: bool = False) -> list[str]:
+def _expand_and_validate_inputs(input_paths: list[str], *, strict: bool = False) -> list[str]:
     """
     Expand directories and validate SQL files.
     
@@ -133,7 +133,7 @@ def _to_snake_case(class_name: str) -> str:
     return snake_case
 
 
-def _report_generated_classes(generated_classes: dict[str, str], output_dir: Optional[Path], dry_run: bool = False) -> None:
+def _report_generated_classes(generated_classes: dict[str, str], output_dir: Optional[Path], *, dry_run: bool = False) -> None:
     """
     Report generated classes to the user.
     
@@ -243,7 +243,7 @@ Examples:
         try:
             from splurge_sql_generator.schema_parser import SchemaParser
             schema_parser = SchemaParser()
-            output_path = schema_parser.generate_types_file(args.generate_types)
+            output_path = schema_parser.generate_types_file(output_path=args.generate_types)
             print(f"Generated SQL type mapping file: {output_path}")
             print("You can now customize this file for your specific database requirements.")
             return
@@ -256,7 +256,7 @@ Examples:
         parser.error("the following arguments are required: sql_files (unless using --generate-types)")
 
     # Expand and validate input files
-    sql_files = _expand_and_validate_inputs(args.sql_files, args.strict)
+    sql_files = _expand_and_validate_inputs(args.sql_files, strict=args.strict)
 
     # Create output directory if specified
     output_dir: Path | None = None
@@ -288,7 +288,7 @@ Examples:
             )
             
             # Report generated classes
-            _report_generated_classes(generated_classes, output_dir, args.dry_run)
+            _report_generated_classes(generated_classes, output_dir, dry_run=args.dry_run)
 
     except (OSError, IOError, FileNotFoundError) as e:
         print(f"Error accessing files: {e}", file=sys.stderr)

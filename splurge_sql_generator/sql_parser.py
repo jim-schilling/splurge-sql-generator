@@ -6,13 +6,13 @@ Copyright (c) 2025, Jim Schilling
 This module is licensed under the MIT License.
 """
 
+import keyword
 import re
-import keyword  # Added for reserved keyword check
 from pathlib import Path
 from typing import Any
 
-from splurge_sql_generator.sql_helper import FETCH_STATEMENT, detect_statement_type
 from splurge_sql_generator.errors import SqlValidationError
+from splurge_sql_generator.sql_helper import FETCH_STATEMENT, detect_statement_type
 
 
 class SqlParser:
