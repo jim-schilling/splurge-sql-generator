@@ -287,8 +287,10 @@ def demonstrate_integration_with_generated_code():
                 
             except ImportError as e:
                 print(f"Failed to import generated class: {e}")
+            except (OSError, IOError) as e:
+                print(f"Error accessing files: {e}")
             except Exception as e:
-                print(f"Error using generated class: {e}")
+                print(f"Unexpected error using generated class: {e}")
         else:
             print("Failed to generate code using CLI")
             print(stderr)

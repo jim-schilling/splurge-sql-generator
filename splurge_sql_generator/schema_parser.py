@@ -9,6 +9,7 @@ Copyright (c) 2025 Jim Schilling
 This module is licensed under the MIT License.
 """
 
+import logging
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -26,6 +27,7 @@ class SchemaParser:
         Args:
             sql_type_mapping_file: Path to the SQL type mapping YAML file
         """
+        self._logger = logging.getLogger(__name__)
         self._sql_type_mapping = self._load_sql_type_mapping(sql_type_mapping_file)
         self._table_schemas: Dict[str, Dict[str, str]] = {}
 
@@ -47,7 +49,8 @@ class SchemaParser:
             else:
                 # Return default mapping if file doesn't exist
                 return self._get_default_mapping()
-        except Exception as e:
+        except (OSError, IOError, ValueError, yaml.YAMLError) as e:
+            self._logger.warning(f"Failed to load SQL type mapping file '{mapping_file}': {e}")
             # Fallback to default mapping on any error
             return self._get_default_mapping()
 
@@ -142,7 +145,8 @@ class SchemaParser:
             return self._parse_schema_content(schema_content)
         except FileNotFoundError:
             return {}
-        except Exception as e:
+        except (OSError, IOError, ValueError, yaml.YAMLError) as e:
+            self._logger.warning(f"Failed to parse schema file '{schema_file_path}': {e}")
             # Return empty dict on parsing errors
             return {}
 

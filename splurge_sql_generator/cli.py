@@ -145,8 +145,14 @@ Examples:
                     else:
                         print(f"    - {class_name}: {snake_case_name}.py")
 
+    except (OSError, IOError, FileNotFoundError) as e:
+        print(f"Error accessing files: {e}", file=sys.stderr)
+        sys.exit(1)
+    except ValueError as e:
+        print(f"Error in SQL file format: {e}", file=sys.stderr)
+        sys.exit(1)
     except Exception as e:
-        print(f"Error generating classes: {e}", file=sys.stderr)
+        print(f"Unexpected error generating classes: {e}", file=sys.stderr)
         sys.exit(1)
 
 
