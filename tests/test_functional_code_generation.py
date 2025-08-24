@@ -242,6 +242,6 @@ SELECT * FROM test_table WHERE id = :id AND name = :name;
         with temp_sql_files(sql_content, schema_content) as (sql_file, schema_file):
             generated_code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
             
-            # Validate that all parameters use Any type (no type inference)
-            assert "id: Any" in generated_code
-            assert "name: Any" in generated_code
+            # Validate that parameters use proper types inferred from schema
+            assert "id: int" in generated_code
+            assert "name: str" in generated_code
