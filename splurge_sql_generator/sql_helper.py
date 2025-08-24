@@ -483,7 +483,7 @@ def parse_table_columns(table_body: str) -> dict[str, str]:
         Dictionary mapping column names (lowercase) to normalized SQL types
         
     Raises:
-        SqlValidationError: If the table body cannot be parsed with sqlparse
+        SqlValidationError: If the table body cannot be parsed with sqlparse or if no valid columns are found
         
     Examples:
         >>> parse_table_columns("id INTEGER PRIMARY KEY, name VARCHAR(255) NOT NULL")
@@ -493,7 +493,7 @@ def parse_table_columns(table_body: str) -> dict[str, str]:
         {'user_id': 'INTEGER', 'email': 'VARCHAR'}
     """
     if not table_body or not table_body.strip():
-        return {}
+        raise SqlValidationError("No valid column definitions found in table body")
     
     columns: dict[str, str] = {}
     

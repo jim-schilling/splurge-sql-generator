@@ -477,8 +477,8 @@ class TestSqlHelperPublicAPI:
 
     def test_parse_table_columns_empty_body(self):
         """Test parse_table_columns with empty table body."""
-        columns = parse_table_columns("")
-        assert columns == {}
+        with pytest.raises(SqlValidationError):
+            parse_table_columns("")
 
     def test_parse_table_columns_single_column(self):
         """Test parse_table_columns with single column."""

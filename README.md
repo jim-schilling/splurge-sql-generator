@@ -518,6 +518,12 @@ try:
     tables = extract_table_names("SELECT 1 as value")
 except SqlValidationError as e:
     print(f"SQL validation failed: {e}")
+
+try:
+    # This will raise SqlValidationError for empty input
+    columns = parse_table_columns("")
+except SqlValidationError as e:
+    print(f"SQL validation failed: {e}")
 ```
 
 ## Development
