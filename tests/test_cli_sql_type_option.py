@@ -1,5 +1,5 @@
 """
-Tests for the CLI --sql-types option functionality.
+Tests for the CLI --types option functionality.
 """
 
 import os
@@ -9,10 +9,16 @@ from pathlib import Path
 
 from splurge_sql_generator.cli import main
 from splurge_sql_generator.schema_parser import SchemaParser
+from test_utils import (
+    temp_sql_files,
+    create_basic_schema,
+    assert_generated_code_structure,
+    assert_method_parameters
+)
 
 
 class TestCLISqlTypeOption(unittest.TestCase):
-    """Test cases for CLI --sql-types option."""
+    """Test cases for CLI --types option."""
 
     def setUp(self):
         """Set up test fixtures."""
@@ -59,7 +65,7 @@ CREATE TABLE test_table (
     value CUSTOM_FLOAT
 );
 """
-        schema_file = os.path.join(self.temp_dir, "test.sql.schema")
+        schema_file = os.path.join(self.temp_dir, "test.schema")
         with open(schema_file, "w", encoding="utf-8") as f:
             f.write(schema_content)
 
@@ -88,7 +94,7 @@ SELECT id, name FROM test_table WHERE id = :id;
             f.write(sql_content)
 
         # Test that default mapping is used
-        parser = SchemaParser()  # Should use default sql-types.yaml
+        parser = SchemaParser()  # Should use default types.yaml
         
         # Verify default types are loaded
         self.assertEqual(parser.get_python_type("INTEGER"), "int")
@@ -96,7 +102,7 @@ SELECT id, name FROM test_table WHERE id = :id;
         self.assertEqual(parser.get_python_type("DECIMAL"), "float")
 
     def test_custom_sql_type_mapping_in_code_generator(self):
-        """Test that custom SQL type mapping is used in code generator."""
+        """Test that custom SQL type mapping is loaded but all parameters use Any type."""
         # Create a custom SQL type mapping file
         custom_yaml_content = """
 # Custom SQL Type to Python Type Mapping
@@ -108,41 +114,36 @@ DEFAULT: Any
         with open(custom_yaml_file, "w", encoding="utf-8") as f:
             f.write(custom_yaml_content)
 
-        # Create a test SQL file
-        sql_content = """
-# TestClass
-
+        # Create test SQL and schema content
+        sql_content = """# TestClass
 #test_method
 SELECT id, name FROM test_table WHERE id = :custom_int;
 """
-        sql_file = os.path.join(self.temp_dir, "test.sql")
-        with open(sql_file, "w", encoding="utf-8") as f:
-            f.write(sql_content)
-
-        # Create a schema file
-        schema_content = """
-CREATE TABLE test_table (
+        
+        schema_content = """CREATE TABLE test_table (
     id CUSTOM_INT PRIMARY KEY,
     name CUSTOM_STRING NOT NULL
 );
 """
-        schema_file = os.path.join(self.temp_dir, "test.sql.schema")
-        with open(schema_file, "w", encoding="utf-8") as f:
-            f.write(schema_content)
-
-        # Test code generator with custom mapping
-        from splurge_sql_generator.code_generator import PythonCodeGenerator
         
-        generator = PythonCodeGenerator(sql_type_mapping_file=custom_yaml_file)
-        
-        # Load schema and test type inference
-        generator._schema_parser.load_schema_for_sql_file(sql_file)
-        
-        # Verify custom types are used for inference
-        self.assertEqual(
-            generator._schema_parser.infer_parameter_type("id", "test_table"), 
-            "int"
-        )
+        with temp_sql_files(sql_content, schema_content) as (sql_file, _):
+            # Test code generator with custom mapping
+            from splurge_sql_generator.code_generator import PythonCodeGenerator
+            
+            generator = PythonCodeGenerator(sql_type_mapping_file=custom_yaml_file)
+            
+            # Generate code
+            generated_code = generator.generate_class(sql_file)
+            
+            # Verify code structure
+            assert_generated_code_structure(generated_code, "TestClass", ["test_method"])
+            
+            # Verify all parameters use Any type (no type inference)
+            assert_method_parameters(generated_code, "test_method", ["custom_int"])
+            
+            # Verify the custom mapping file was loaded by checking schema parser
+            self.assertEqual(generator._schema_parser.get_python_type("CUSTOM_INT"), "int")
+            self.assertEqual(generator._schema_parser.get_python_type("CUSTOM_STRING"), "str")
 
 
 if __name__ == "__main__":

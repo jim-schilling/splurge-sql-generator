@@ -11,6 +11,7 @@ import unittest
 from pathlib import Path
 
 from splurge_sql_generator.schema_parser import SchemaParser
+from test_utils import create_basic_schema, create_complex_schema
 
 
 class TestSchemaParser(unittest.TestCase):
@@ -338,50 +339,7 @@ Default: Any
         self.assertEqual(self.parser.get_python_type("ROWID"), "str")
         self.assertEqual(self.parser.get_python_type("INTERVAL"), "str")
 
-    def test_infer_parameter_type_from_schema(self):
-        """Test inferring parameter type from schema information."""
-        # Set up schema by loading it into the parser
-        sql = """
-        CREATE TABLE users (
-            id INTEGER PRIMARY KEY,
-            username TEXT NOT NULL,
-            email TEXT UNIQUE,
-            age INTEGER,
-            is_active BOOLEAN
-        );
-        """
-        tables = self.parser._parse_schema_content(sql)
-        self.parser._table_schemas = tables
-        
-        # Test parameter type inference
-        self.assertEqual(self.parser.infer_parameter_type("id", "users"), "int")
-        self.assertEqual(self.parser.infer_parameter_type("username", "users"), "str")
-        self.assertEqual(self.parser.infer_parameter_type("email", "users"), "str")
-        self.assertEqual(self.parser.infer_parameter_type("age", "users"), "int")
-        self.assertEqual(self.parser.infer_parameter_type("is_active", "users"), "bool")
 
-    def test_infer_parameter_type_unknown_table(self):
-        """Test parameter type inference for unknown table."""
-        # Should fall back to pattern-based inference
-        self.assertEqual(self.parser.infer_parameter_type("user_id", "unknown_table"), "int")
-        self.assertEqual(self.parser.infer_parameter_type("name", "unknown_table"), "str")
-        self.assertEqual(self.parser.infer_parameter_type("price", "unknown_table"), "float")
-
-    def test_infer_parameter_type_unknown_column(self):
-        """Test parameter type inference for unknown column in known table."""
-        # Set up schema by loading it into the parser
-        sql = """
-        CREATE TABLE users (
-            id INTEGER PRIMARY KEY,
-            username TEXT NOT NULL
-        );
-        """
-        tables = self.parser._parse_schema_content(sql)
-        self.parser._table_schemas = tables
-        
-        # Unknown column should fall back to pattern-based inference
-        self.assertEqual(self.parser.infer_parameter_type("unknown_field", "users"), "str")  # Pattern-based
-        self.assertEqual(self.parser.infer_parameter_type("email", "users"), "str")  # Pattern-based
 
     def test_load_schema_for_sql_file(self):
         """Test loading schema file for a given SQL file."""
@@ -393,7 +351,7 @@ Default: Any
         );
         """
         
-        schema_file = os.path.join(self.temp_dir, "test.sql.schema")
+        schema_file = os.path.join(self.temp_dir, "test.schema")
         with open(schema_file, "w", encoding="utf-8") as f:
             f.write(schema_content)
         

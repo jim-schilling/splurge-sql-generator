@@ -25,7 +25,7 @@ def main() -> None:
         -o, --output: Output directory for generated Python files
         --dry-run: Print generated code to stdout without saving files
         --strict: Treat warnings as errors
-        -st, --sql-types: Path to custom SQL type mapping YAML file
+        -t, --types: Path to custom SQL type mapping YAML file
     """
     parser = argparse.ArgumentParser(
         description="Generate Python SQLAlchemy classes from SQL template files",
@@ -42,7 +42,7 @@ Examples:
   python -m splurge_sql_generator.cli examples/ProductRepository.sql
   
   # Use custom SQL type mapping file
-  python -m splurge_sql_generator.cli examples/User.sql -o generated/ --sql-types custom_types.yaml
+  python -m splurge_sql_generator.cli examples/User.sql -o generated/ --types custom_types.yaml
         """,
     )
 
@@ -65,8 +65,13 @@ Examples:
     )
 
     parser.add_argument(
-        "-st", "--sql-types",
-        help="Path to custom SQL type mapping YAML file (default: sql-types.yaml)",
+        "-t", "--types",
+        help="Path to custom SQL type mapping YAML file (default: types.yaml)",
+    )
+
+    parser.add_argument(
+        "--schema",
+        help="Path to schema file to use for all SQL files (default: look for .schema files with same stem as each SQL file)",
     )
 
     args = parser.parse_args()
@@ -107,18 +112,19 @@ Examples:
         output_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate classes
-    generator = PythonCodeGenerator(sql_type_mapping_file=args.sql_types)
+    generator = PythonCodeGenerator(sql_type_mapping_file=args.types)
 
     try:
         if len(sql_files) == 1 and args.dry_run:
             # Single file, print to stdout
-            code = generator.generate_class(sql_files[0])
+            code = generator.generate_class(sql_files[0], schema_file_path=args.schema)
             print(code)
         else:
             # Multiple files or save to directory
             generated_classes = generator.generate_multiple_classes(
                 sql_files,
                 output_dir=args.output if not args.dry_run else None,
+                schema_file_path=args.schema,
             )
 
             if args.dry_run:

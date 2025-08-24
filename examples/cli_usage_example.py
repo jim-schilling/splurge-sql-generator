@@ -170,7 +170,7 @@ SELECT id, name, is_active, data FROM custom_table WHERE type = :type;
             return_code, stdout, stderr = run_cli_command([
                 sql_file, 
                 "-o", temp_dir, 
-                "--sql-types", custom_types_file
+                "--types", custom_types_file
             ])
             
             print(f"Return code: {return_code}")

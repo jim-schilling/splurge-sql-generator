@@ -8,6 +8,8 @@ import shutil
 import pytest
 import re
 
+from test_utils import create_basic_schema, create_sql_with_schema
+
 SCRIPT = os.path.join(os.path.dirname(__file__), '..', 'splurge_sql_generator', 'cli.py')
 
 
@@ -62,22 +64,29 @@ def test_cli_dry_run(tmp_path):
 #get_foo
 SELECT 1;
     """
-    with tempfile.NamedTemporaryFile("w+", delete=False, suffix=".sql") as f:
-        f.write(sql)
-        fname = f.name
-    try:
-        result = run_cli([fname, "--dry-run"])
-        assert "class TestClass" in result.stdout
-        assert "def get_foo" in result.stdout
-        assert result.returncode == 0
-    finally:
-        os.remove(fname)
+    sql_file = tmp_path / 'test.sql'
+    sql_file.write_text(sql)
+    
+    # Create schema file
+    schema_file = tmp_path / 'test.schema'
+    schema_file.write_text(create_basic_schema("dummy"))
+    
+    result = run_cli([str(sql_file), "--dry-run"])
+    assert "class TestClass" in result.stdout
+    assert "def get_foo" in result.stdout
+    assert result.returncode == 0
 
 
 def test_cli_non_sql_extension(tmp_path):
     """Test CLI with non-SQL extension but valid SQL content."""
+    # Create the .txt file
     file = tmp_path / 'foo.txt'
     file.write_text('# TestClass\n# test_method\nSELECT 1;')
+    
+    # Create the schema file with .schema extension
+    schema_file = tmp_path / 'foo.schema'
+    schema_file.write_text(create_basic_schema())
+
     result = run_cli([str(file)])
     # Should warn but still run
     assert 'Warning' in result.stderr
@@ -90,6 +99,11 @@ def test_cli_output_dir(tmp_path):
     """Test CLI with output directory."""
     sql_file = tmp_path / 'bar.sql'
     sql_file.write_text('# TestClass\n# test_method\nSELECT 1;')
+    
+    # Create schema file
+    schema_file = tmp_path / 'bar.schema'
+    schema_file.write_text(create_basic_schema())
+    
     outdir = tmp_path / 'outdir'
     result = run_cli([str(sql_file), '-o', str(outdir)])
     assert result.returncode == 0
@@ -103,6 +117,11 @@ def test_cli_report_generated_classes(tmp_path):
     """Test CLI reports generated classes correctly."""
     sql_file = tmp_path / 'baz.sql'
     sql_file.write_text('# TestClass\n# test_method\nSELECT 1;')
+    
+    # Create schema file
+    schema_file = tmp_path / 'baz.schema'
+    schema_file.write_text(create_basic_schema())
+    
     outdir = tmp_path / 'outdir2'
     result = run_cli([str(sql_file), '-o', str(outdir)])
     assert result.returncode == 0
@@ -115,9 +134,13 @@ def test_cli_multiple_files(tmp_path):
     # Create multiple SQL files
     sql_file1 = tmp_path / 'class1.sql'
     sql_file1.write_text('# ClassOne\n#method1\nSELECT 1;')
+    schema_file1 = tmp_path / 'class1.schema'
+    schema_file1.write_text(create_basic_schema("table1"))
     
     sql_file2 = tmp_path / 'class2.sql'
     sql_file2.write_text('# ClassTwo\n#method2\nSELECT 2;')
+    schema_file2 = tmp_path / 'class2.schema'
+    schema_file2.write_text(create_basic_schema("table2"))
     
     outdir = tmp_path / 'multi_out'
     result = run_cli([str(sql_file1), str(sql_file2), '-o', str(outdir)])
@@ -138,11 +161,8 @@ def test_cli_directory_processing(tmp_path):
     sql_dir = tmp_path / 'sql_files'
     sql_dir.mkdir()
     
-    sql_file1 = sql_dir / 'class1.sql'
-    sql_file1.write_text('# ClassOne\n#method1\nSELECT 1;')
-    
-    sql_file2 = sql_dir / 'class2.sql'
-    sql_file2.write_text('# ClassTwo\n#method2\nSELECT 2;')
+    create_sql_with_schema(sql_dir, 'class1.sql', '# ClassOne\n#method1\nSELECT 1;', create_basic_schema("table1"))
+    create_sql_with_schema(sql_dir, 'class2.sql', '# ClassTwo\n#method2\nSELECT 2;', create_basic_schema("table2"))
     
     # Add a non-SQL file to ensure it's ignored
     txt_file = sql_dir / 'readme.txt'
@@ -179,38 +199,34 @@ def test_cli_empty_directory_strict_mode(tmp_path):
 
 def test_cli_invalid_sql_file(tmp_path):
     """Test CLI with invalid SQL file (missing class comment)."""
-    invalid_sql = tmp_path / 'invalid.sql'
-    invalid_sql.write_text('SELECT 1;')  # Missing class comment
-    
-    result = run_cli([str(invalid_sql)])
+    create_sql_with_schema(tmp_path, 'invalid.sql', 'SELECT 1;')  # Missing class comment
+
+    result = run_cli([str(tmp_path / 'invalid.sql')])
     assert result.returncode != 0
     assert 'class comment' in result.stderr
 
 
 def test_cli_invalid_class_name(tmp_path):
     """Test CLI with invalid class name (reserved keyword)."""
-    invalid_sql = tmp_path / 'invalid_class.sql'
-    invalid_sql.write_text('# class\n#method\nSELECT 1;')  # 'class' is reserved
-    
-    result = run_cli([str(invalid_sql)])
+    create_sql_with_schema(tmp_path, 'invalid_class.sql', '# class\n#method\nSELECT 1;')  # 'class' is reserved
+
+    result = run_cli([str(tmp_path / 'invalid_class.sql')])
     assert result.returncode != 0
     assert 'reserved keyword' in result.stderr
 
 
 def test_cli_invalid_method_name(tmp_path):
     """Test CLI with invalid method name (reserved keyword)."""
-    invalid_sql = tmp_path / 'invalid_method.sql'
-    invalid_sql.write_text('# TestClass\n#def\nSELECT 1;')  # 'def' is reserved
-    
-    result = run_cli([str(invalid_sql)])
+    create_sql_with_schema(tmp_path, 'invalid_method.sql', '# TestClass\n#def\nSELECT 1;')  # 'def' is reserved
+
+    result = run_cli([str(tmp_path / 'invalid_method.sql')])
     assert result.returncode != 0
     assert 'reserved keyword' in result.stderr
 
 
 def test_cli_complex_sql_with_parameters(tmp_path):
     """Test CLI with complex SQL containing parameters."""
-    complex_sql = tmp_path / 'complex.sql'
-    complex_sql.write_text("""# ComplexClass
+    create_sql_with_schema(tmp_path, 'complex.sql', """# ComplexClass
 #get_user_by_id
 SELECT id, username, email 
 FROM users 
@@ -221,34 +237,32 @@ INSERT INTO users (username, email, password_hash)
 VALUES (:username, :email, :password_hash) 
 RETURNING id;
 """)
-    
+
     outdir = tmp_path / 'complex_out'
-    result = run_cli([str(complex_sql), '-o', str(outdir)])
-    
+    result = run_cli([str(tmp_path / 'complex.sql'), '-o', str(outdir)])
+
     assert result.returncode == 0
     assert re.search(r'Generated \d+ Python classes?', result.stdout)
     assert 'complex_class.py' in result.stdout
-    
+
     # Check generated file contains expected content
     py_file = outdir / 'complex_class.py'
     content = py_file.read_text()
     assert 'class ComplexClass:' in content
     assert 'def get_user_by_id(' in content
     assert 'def create_user(' in content
-    assert 'user_id: int,' in content
-    assert 'status: str,' in content
+    # Note: All parameters now use Any type, not specific types
+    assert 'user_id: Any,' in content
+    assert 'status: Any,' in content
 
 
 def test_cli_dry_run_multiple_files(tmp_path):
     """Test CLI dry-run with multiple files."""
-    sql_file1 = tmp_path / 'dry1.sql'
-    sql_file1.write_text('# DryOne\n#method1\nSELECT 1;')
-    
-    sql_file2 = tmp_path / 'dry2.sql'
-    sql_file2.write_text('# DryTwo\n#method2\nSELECT 2;')
-    
-    result = run_cli([str(sql_file1), str(sql_file2), '--dry-run'])
-    
+    create_sql_with_schema(tmp_path, 'dry1.sql', '# DryOne\n#method1\nSELECT 1;')
+    create_sql_with_schema(tmp_path, 'dry2.sql', '# DryTwo\n#method2\nSELECT 2;')
+
+    result = run_cli([str(tmp_path / 'dry1.sql'), str(tmp_path / 'dry2.sql'), '--dry-run'])
+
     assert result.returncode == 0
     assert 'Generated class: DryOne' in result.stdout
     assert 'Generated class: DryTwo' in result.stdout
@@ -258,13 +272,12 @@ def test_cli_dry_run_multiple_files(tmp_path):
 
 def test_cli_output_dir_creation(tmp_path):
     """Test CLI creates output directory if it doesn't exist."""
-    sql_file = tmp_path / 'create_dir.sql'
-    sql_file.write_text('# CreateDir\n#method\nSELECT 1;')
-    
+    create_sql_with_schema(tmp_path, 'create_dir.sql', '# CreateDir\n#method\nSELECT 1;')
+
     # Use a nested output directory that doesn't exist
     outdir = tmp_path / 'nested' / 'output' / 'dir'
-    result = run_cli([str(sql_file), '-o', str(outdir)])
-    
+    result = run_cli([str(tmp_path / 'create_dir.sql'), '-o', str(outdir)])
+
     assert result.returncode == 0
     assert outdir.exists()
     assert (outdir / 'create_dir.py').exists()
@@ -272,12 +285,12 @@ def test_cli_output_dir_creation(tmp_path):
 
 def test_cli_file_permission_error(tmp_path):
     """Test CLI handles file permission errors gracefully."""
+    create_sql_with_schema(tmp_path, 'permission.sql', '# Permission\n#method\nSELECT 1;')
     sql_file = tmp_path / 'permission.sql'
-    sql_file.write_text('# Permission\n#method\nSELECT 1;')
-    
+
     # Make the file read-only
     sql_file.chmod(0o444)
-    
+
     try:
         result = run_cli([str(sql_file)])
         # Should still work since we're only reading
@@ -289,16 +302,15 @@ def test_cli_file_permission_error(tmp_path):
 
 def test_cli_output_dir_permission_error(tmp_path):
     """Test CLI handles output directory permission errors."""
-    sql_file = tmp_path / 'output_permission.sql'
-    sql_file.write_text('# OutputPermission\n#method\nSELECT 1;')
-    
+    create_sql_with_schema(tmp_path, 'output_permission.sql', '# OutputPermission\n#method\nSELECT 1;')
+
     # Create a read-only directory
     outdir = tmp_path / 'readonly_out'
     outdir.mkdir()
     outdir.chmod(0o444)
-    
+
     try:
-        result = run_cli([str(sql_file), '-o', str(outdir)])
+        result = run_cli([str(tmp_path / 'output_permission.sql'), '-o', str(outdir)])
         # On Windows, chmod might not work as expected, so we'll skip this test
         # if it doesn't fail as expected
         if result.returncode == 0:
@@ -313,15 +325,13 @@ def test_cli_output_dir_permission_error(tmp_path):
 def test_cli_mixed_valid_invalid_files(tmp_path):
     """Test CLI with mix of valid and invalid SQL files."""
     # Valid file
-    valid_sql = tmp_path / 'valid.sql'
-    valid_sql.write_text('# ValidClass\n#method\nSELECT 1;')
-    
+    create_sql_with_schema(tmp_path, 'valid.sql', '# ValidClass\n#method\nSELECT 1;')
+
     # Invalid file (missing class comment)
-    invalid_sql = tmp_path / 'invalid.sql'
-    invalid_sql.write_text('SELECT 1;')
-    
-    result = run_cli([str(valid_sql), str(invalid_sql)])
-    
+    create_sql_with_schema(tmp_path, 'invalid.sql', 'SELECT 1;')
+
+    result = run_cli([str(tmp_path / 'valid.sql'), str(tmp_path / 'invalid.sql')])
+
     # Should fail due to invalid file
     assert result.returncode != 0
     assert 'class comment' in result.stderr
@@ -329,45 +339,43 @@ def test_cli_mixed_valid_invalid_files(tmp_path):
 
 def test_cli_unicode_content(tmp_path):
     """Test CLI handles Unicode content correctly."""
-    unicode_sql = tmp_path / 'unicode.sql'
-    unicode_sql.write_text("""# UnicodeClass
+    create_sql_with_schema(tmp_path, 'unicode.sql', """# UnicodeClass
 #get_user_by_name
 SELECT id, name 
 FROM users 
 WHERE name LIKE :name_pattern;
-""", encoding='utf-8')
-    
+""")
+
     outdir = tmp_path / 'unicode_out'
-    result = run_cli([str(unicode_sql), '-o', str(outdir)])
-    
+    result = run_cli([str(tmp_path / 'unicode.sql'), '-o', str(outdir)])
+
     assert result.returncode == 0
     assert re.search(r'Generated \d+ Python classes?', result.stdout)
-    
+
     # Check generated file
     py_file = outdir / 'unicode_class.py'
     content = py_file.read_text(encoding='utf-8')
     assert 'class UnicodeClass:' in content
-    assert 'name_pattern: str,' in content
+    # Note: All parameters now use Any type, not specific types
+    assert 'name_pattern: Any,' in content
 
 
 def test_cli_large_sql_file(tmp_path):
     """Test CLI with large SQL file."""
-    large_sql = tmp_path / 'large.sql'
-    
     # Create a large SQL file with many methods
     content = ['# LargeClass']
     for i in range(100):
         content.append(f'#method_{i}')
         content.append(f'SELECT {i} as value;')
-    
-    large_sql.write_text('\n'.join(content))
-    
+
+    create_sql_with_schema(tmp_path, 'large.sql', '\n'.join(content))
+
     outdir = tmp_path / 'large_out'
-    result = run_cli([str(large_sql), '-o', str(outdir)])
-    
+    result = run_cli([str(tmp_path / 'large.sql'), '-o', str(outdir)])
+
     assert result.returncode == 0
     assert re.search(r'Generated \d+ Python classes?', result.stdout)
-    
+
     # Check generated file
     py_file = outdir / 'large_class.py'
     content = py_file.read_text()

@@ -26,10 +26,10 @@ class PythonCodeGenerator:
         
         Args:
             sql_type_mapping_file: Optional path to custom SQL type mapping YAML file.
-                If None, uses default "sql-types.yaml"
+                If None, uses default "types.yaml"
         """
         self._parser = SqlParser()
-        self._schema_parser = SchemaParser(sql_type_mapping_file or "sql-types.yaml")
+        self._schema_parser = SchemaParser(sql_type_mapping_file or "types.yaml")
         # Set up Jinja2 environment with templates directory
         template_dir = Path(__file__).parent / "templates"
         self._jinja_env = Environment(
@@ -55,6 +55,7 @@ class PythonCodeGenerator:
         sql_file_path: str,
         *,
         output_file_path: str | None = None,
+        schema_file_path: str | None = None,
     ) -> str:
         """
         Generate a Python class from a SQL file.
@@ -62,15 +63,35 @@ class PythonCodeGenerator:
         Args:
             sql_file_path: Path to the SQL template file
             output_file_path: Optional path to save the generated Python file
+            schema_file_path: Optional path to the schema file. If None, looks for a .schema file
+                             with the same stem as the SQL file.
 
         Returns:
             Generated Python code as string
+            
+        Raises:
+            FileNotFoundError: If the required schema file is missing
         """
-        # Load schema for type inference
-        self._schema_parser.load_schema_for_sql_file(sql_file_path)
-        
-        # Parse the SQL file
+        # Parse the SQL file first (this will catch validation errors like invalid class names)
         class_name, method_queries = self.parser.parse_file(sql_file_path)
+        
+        # Load schema if available
+        if schema_file_path is None:
+            # Default behavior: look for .schema file with same stem
+            sql_path = Path(sql_file_path)
+            schema_path = sql_path.with_suffix('.schema')
+        else:
+            schema_path = Path(schema_file_path)
+        
+        if schema_path.exists():
+            # Load schema if it exists
+            self._schema_parser.load_schema_for_sql_file(sql_file_path, schema_file_path)
+        else:
+            # Schema files are required
+            raise FileNotFoundError(
+                f"Schema file required but not found: {schema_path}. "
+                f"Specify a schema file using the --schema option or ensure a corresponding .schema file exists."
+            )
 
         # Generate the Python code using template
         python_code = self._generate_python_code(class_name, method_queries)
@@ -171,9 +192,8 @@ class PythonCodeGenerator:
                 python_param = param  # Preserve original parameter name
                 param_mapping[param] = python_param
                 
-                # Infer type from schema or pattern
-                table_name = self._infer_table_name_from_sql(sql_query)
-                param_types[param] = self._schema_parser.infer_parameter_type(param, table_name)
+                # All parameters use Any type (no type inference)
+                param_types[param] = "Any"
                 
                 if python_param not in parameters_list:
                     parameters_list.append(python_param)
@@ -230,37 +250,7 @@ class PythonCodeGenerator:
 
         return ", ".join(python_params)
 
-    def _infer_table_name_from_sql(self, sql_query: str) -> str:
-        """
-        Infer table name from SQL query for type inference.
-        
-        Args:
-            sql_query: SQL query string
-            
-        Returns:
-            Inferred table name or empty string if not found
-        """
-        # Look for FROM clause
-        from_match = re.search(r'\bFROM\s+(\w+)', sql_query, re.IGNORECASE)
-        if from_match:
-            return from_match.group(1)
-        
-        # Look for INSERT INTO
-        insert_match = re.search(r'\bINSERT\s+INTO\s+(\w+)', sql_query, re.IGNORECASE)
-        if insert_match:
-            return insert_match.group(1)
-        
-        # Look for UPDATE
-        update_match = re.search(r'\bUPDATE\s+(\w+)', sql_query, re.IGNORECASE)
-        if update_match:
-            return update_match.group(1)
-        
-        # Look for DELETE FROM
-        delete_match = re.search(r'\bDELETE\s+FROM\s+(\w+)', sql_query, re.IGNORECASE)
-        if delete_match:
-            return delete_match.group(1)
-        
-        return ""
+
 
     def _to_snake_case(self, class_name: str) -> str:
         """
@@ -281,6 +271,7 @@ class PythonCodeGenerator:
         sql_files: list[str],
         *,
         output_dir: str | None = None,
+        schema_file_path: str | None = None,
     ) -> dict[str, str]:
         """
         Generate multiple Python classes from SQL files.
@@ -288,12 +279,50 @@ class PythonCodeGenerator:
         Args:
             sql_files: List of SQL file paths
             output_dir: Optional directory to save generated files
+            schema_file_path: Optional path to a shared schema file. If None, looks for individual
+                             .schema files with the same stem as each SQL file.
 
         Returns:
             Dictionary mapping class names to generated code
+            
+        Raises:
+            FileNotFoundError: If any required schema file is missing
         """
-        # Load all schema files first
-        self._load_all_schemas(sql_files)
+        # Load schemas (required)
+        if schema_file_path is None:
+            # Check for individual schema files for each SQL file
+            all_schemas: dict[str, dict[str, str]] = {}
+            missing_schemas = []
+            for sql_file in sql_files:
+                sql_path = Path(sql_file)
+                schema_path = sql_path.with_suffix('.schema')
+                if schema_path.exists():
+                    # Load schema if it exists
+                    schema_tables = self._schema_parser.parse_schema_file(str(schema_path))
+                    all_schemas.update(schema_tables)
+                else:
+                    missing_schemas.append(str(schema_path))
+            
+            if missing_schemas:
+                raise FileNotFoundError(
+                    f"Schema files required but not found: {', '.join(missing_schemas)}. "
+                    f"Specify a shared schema file using the --schema option or ensure corresponding .schema files exist."
+                )
+            
+            # Update the schema parser with all loaded schemas
+            self._schema_parser._table_schemas = all_schemas
+        else:
+            # Use shared schema file
+            schema_path = Path(schema_file_path)
+            if schema_path.exists():
+                # Load the shared schema file
+                self._schema_parser._table_schemas = self._schema_parser.parse_schema_file(str(schema_path))
+            else:
+                # Schema file is required
+                raise FileNotFoundError(
+                    f"Schema file required but not found: {schema_path}. "
+                    f"Specify a valid schema file using the --schema option."
+                )
         
         generated_classes: dict[str, str] = {}
 
@@ -330,11 +359,11 @@ class PythonCodeGenerator:
         
         for sql_file in sql_files:
             sql_path = Path(sql_file)
-            schema_path = sql_path.with_suffix('.sql.schema')
+            schema_path = sql_path.with_suffix('.schema')
             
-            if schema_path.exists():
-                schema_tables = self._schema_parser.parse_schema_file(str(schema_path))
-                all_schemas.update(schema_tables)
+            # Schema files are mandatory, so this should always exist
+            schema_tables = self._schema_parser.parse_schema_file(str(schema_path))
+            all_schemas.update(schema_tables)
         
         # Update the schema parser with all loaded schemas
         self._schema_parser._table_schemas = all_schemas

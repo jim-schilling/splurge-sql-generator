@@ -5,7 +5,7 @@ A Python library for generating SQLAlchemy classes from SQL template files with 
 ## Features
 
 - **SQL Template Parsing**: Parse SQL files with method name comments to extract queries
-- **Schema-Based Type Inference**: Automatically infer Python types from SQL schema files (`.sql.schema`) for accurate type annotations
+- **Schema-Based Type Inference**: Automatically infer Python types from SQL schema files (`.schema`) for accurate type annotations
 - **Custom SQL Type Mapping**: Support for custom SQL-to-Python type mappings via configurable YAML files
 - **Statement Type Detection**: Automatically detect if SQL statements return rows (fetch) or perform operations (execute)
 - **Code Generation**: Generate Python classes with SQLAlchemy methods and precise type hints
@@ -81,12 +81,14 @@ generator = PythonCodeGenerator()
 code = generator.generate_class(
     'UserRepository.sql',
     output_file_path='generated/UserRepository.py',
+    schema_file_path='database.schema',  # Optional: shared schema file
 )
 
 # Or use the convenience function
 code2 = generate_class(
     'UserRepository.sql',
     output_file_path='generated/UserRepository.py',
+    schema_file_path='database.schema',  # Optional: shared schema file
 )
 ```
 
@@ -146,13 +148,26 @@ Starting with version 2025.4.0, splurge-sql-generator supports schema-based type
 
 ### How It Works
 
-1. **Create a schema file** alongside your SQL file with the `.sql.schema` extension
+1. **Create a schema file** with the `.schema` extension (can be shared across multiple SQL files)
 2. **Define your table schemas** using standard SQL `CREATE TABLE` statements
 3. **The generator automatically maps** SQL column types to Python types based on the schema
 
+### Schema File Options
+
+You have two options for schema files:
+
+**Option 1: Individual schema files** (default)
+- Create a `.schema` file with the same stem as each SQL file
+- Example: `UserRepository.sql` → `UserRepository.schema`
+
+**Option 2: Shared schema file** (recommended for multiple SQL files)
+- Create one schema file that covers all your tables
+- Use the `--schema` option to specify the shared schema file
+- Example: `--schema database.schema` for all SQL files
+
 ### Example
 
-**UserRepository.sql.schema**:
+**UserRepository.schema**:
 ```sql
 CREATE TABLE users (
     id INTEGER PRIMARY KEY,
@@ -220,7 +235,7 @@ DEFAULT: Any
 
 Use it with the CLI:
 ```bash
-python -m splurge_sql_generator.cli UserRepository.sql --sql-types custom_types.yaml
+python -m splurge_sql_generator.cli UserRepository.sql --types custom_types.yaml
 ```
 
 ## Usage Examples
@@ -285,10 +300,16 @@ splurge-sql-gen path/to/sqls/ --output generated/ --strict
 splurge-sql-gen UserRepository.sql -o src/repositories/
 
 # Use custom SQL type mapping file
-splurge-sql-gen UserRepository.sql --output generated/ --sql-types custom_types.yaml
+splurge-sql-gen UserRepository.sql --output generated/ --types custom_types.yaml
 
 # Use custom SQL type mapping file (short form)
-splurge-sql-gen UserRepository.sql --output generated/ -st custom_types.yaml
+splurge-sql-gen UserRepository.sql --output generated/ -t custom_types.yaml
+
+# Use shared schema file for multiple SQL files
+splurge-sql-gen *.sql --output generated/ --schema database.schema
+
+# Use shared schema file with custom type mapping
+splurge-sql-gen *.sql --output generated/ --schema database.schema --types custom_types.yaml
 ```
 
 ## API Reference
@@ -299,19 +320,23 @@ splurge-sql-gen UserRepository.sql --output generated/ -st custom_types.yaml
 Main class for generating Python code from SQL templates.
 
 ```python
-# Use default sql-types.yaml
+# Use default types.yaml
 generator = PythonCodeGenerator()
 
 # Use custom SQL type mapping file
 generator = PythonCodeGenerator(sql_type_mapping_file="custom_types.yaml")
 
 # Generate code
-code = generator.generate_class(sql_file_path, output_file_path=None)
-classes = generator.generate_multiple_classes(sql_files, output_dir=None)
+code = generator.generate_class(sql_file_path, output_file_path=None, schema_file_path=None)
+classes = generator.generate_multiple_classes(sql_files, output_dir=None, schema_file_path=None)
 ```
 
 **Parameters:**
-- `sql_type_mapping_file` (optional): Path to custom SQL type mapping YAML file. Defaults to `sql-types.yaml`.
+- `sql_type_mapping_file` (optional): Path to custom SQL type mapping YAML file. Defaults to `types.yaml`.
+
+**Methods:**
+- `generate_class(sql_file_path, *, output_file_path=None, schema_file_path=None)`: Generate a single Python class
+- `generate_multiple_classes(sql_files, *, output_dir=None, schema_file_path=None)`: Generate multiple Python classes
 
 #### `SqlParser`
 Parser for SQL template files.
@@ -385,10 +410,10 @@ splurge-sql-generator/
 ├── tests/                   # Test suite
 ├── examples/                # Example SQL templates and schemas
 │   ├── *.sql                # SQL template files
-│   ├── *.sql.schema         # SQL schema files for type inference
+│   ├── *.schema             # SQL schema files for type inference
 │   └── custom_types.yaml    # Example custom type mapping
 ├── output/                  # Generated code examples
-└── sql-types.yaml           # Default SQL type mappings
+└── types.yaml               # Default SQL type mappings
 ```
 
 ## License
@@ -411,33 +436,45 @@ MIT License - see LICENSE file for details.
 ### [2025.4.0] - 2025-08-23
 
 #### Added
-- **Custom SQL Type Mapping**: New CLI option `--sql-types` / `-st` to specify custom SQL type mapping YAML files
-- **Schema-Based Type Inference**: Enhanced type inference system using dedicated schema files (`.sql.schema`) for accurate Python type annotations
+- **Custom SQL Type Mapping**: New CLI option `--types` / `-t` to specify custom SQL type mapping YAML files
+- **Schema-Based Type Inference**: Enhanced type inference system using dedicated schema files (`.schema`) for accurate Python type annotations
 - **Comprehensive Database Support**: Added support for MSSQL and Oracle-specific SQL types in addition to existing SQLite, PostgreSQL, and MySQL support
 - **Case-Insensitive Type Lookups**: SQL type matching now works regardless of case (e.g., `INTEGER`, `integer`, `Integer` all work)
+- **Schema File Requirements**: Schema files are now mandatory for code generation, ensuring consistent type inference
+
+#### Changed
+- **CLI Option Names**: Updated `-st | --sql-types` to `-t | --types` for better consistency
+- **Default Type Mapping File**: Changed default from `sql-types.yaml` to `types.yaml` for cleaner naming
+- **Schema File Extension**: Updated schema file lookup from `*.sql.schema` to `*.schema` for simpler naming
+- **Schema File Requirements**: Made schema files mandatory - code generation now requires at least one schema file to be present
 
 #### Enhanced
-- **CLI Flexibility**: Users can now specify custom type mappings per project using `--sql-types custom_types.yaml`
-- **Type Mapping Configuration**: Sortable and maintainable `sql-types.yaml` file with alphabetical ordering and `DEFAULT` fallback
+- **CLI Flexibility**: Users can now specify custom type mappings per project using `--types custom_types.yaml`
+- **Type Mapping Configuration**: Sortable and maintainable `types.yaml` file with alphabetical ordering and `DEFAULT` fallback
 - **Schema Parser Improvements**: Enhanced schema parsing with better error handling and fallback mechanisms
-- **Test Coverage**: Added comprehensive tests for custom type mapping functionality
+- **Test Coverage**: Added comprehensive tests for custom type mapping functionality and schema file requirements
+- **Test Organization**: Refactored test modules to follow "one test class per module" principle for better maintainability
 
 #### Technical Improvements
 - **PythonCodeGenerator**: Updated to accept `sql_type_mapping_file` parameter for custom type mappings
 - **SchemaParser**: Enhanced with Oracle types in default mapping for better fallback support
 - **CLI Integration**: Seamless integration of custom type mapping files with existing CLI workflow
-- **Backward Compatibility**: Default behavior unchanged when custom types not specified
+- **Schema Validation**: Enhanced schema file validation with clear error messages for missing schema files
+- **Test Utilities**: Fixed schema file naming in test utilities to match expected patterns
 
 #### Usage Examples
 ```bash
-# Use default sql-types.yaml
+# Use default types.yaml
 python -m splurge_sql_generator.cli examples/User.sql --dry-run
 
 # Use custom type mapping file (long form)
-python -m splurge_sql_generator.cli examples/User.sql --dry-run --sql-types custom_types.yaml
+python -m splurge_sql_generator.cli examples/User.sql --dry-run --types custom_types.yaml
 
 # Use custom type mapping file (short form)
-python -m splurge_sql_generator.cli examples/User.sql --dry-run -st custom_types.yaml
+python -m splurge_sql_generator.cli examples/User.sql --dry-run -t custom_types.yaml
+
+# Use shared schema file for multiple SQL files
+python -m splurge_sql_generator.cli *.sql --output generated/ --schema database.schema
 ```
 
 #### Database Type Support
@@ -452,6 +489,7 @@ python -m splurge_sql_generator.cli examples/User.sql --dry-run -st custom_types
 - **Type Consistency**: Ensures consistent type inference across different database dialects
 - **Project Flexibility**: Different projects can use different type mapping strategies
 - **Maintainable Configuration**: YAML-based configuration for easy type mapping management
+- **Schema File Management**: Support for both individual schema files and shared schema files across multiple SQL files
 
 ### [2025.3.1] - 2025-08-19
 

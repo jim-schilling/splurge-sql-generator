@@ -19,7 +19,7 @@ import yaml
 class SchemaParser:
     """Parser for SQL schema files to extract column type information."""
 
-    def __init__(self, sql_type_mapping_file: str = "sql-types.yaml") -> None:
+    def __init__(self, sql_type_mapping_file: str = "types.yaml") -> None:
         """
         Initialize the schema parser.
         
@@ -269,70 +269,23 @@ class SchemaParser:
         
         return 'Any'
 
-    def load_schema_for_sql_file(self, sql_file_path: str) -> None:
+    def load_schema_for_sql_file(self, sql_file_path: str, schema_file_path: str | None = None) -> None:
         """
         Load schema file for a given SQL file.
         
         Args:
             sql_file_path: Path to the SQL file
+            schema_file_path: Optional path to the schema file. If None, looks for a .schema file
+                             with the same stem as the SQL file.
         """
-        sql_path = Path(sql_file_path)
-        schema_path = sql_path.with_suffix('.sql.schema')
+        if schema_file_path is None:
+            # Default behavior: look for .schema file with same stem
+            sql_path = Path(sql_file_path)
+            schema_path = sql_path.with_suffix('.schema')
+        else:
+            schema_path = Path(schema_file_path)
         
-        if schema_path.exists():
-            self._table_schemas = self.parse_schema_file(str(schema_path))
+        # Schema files are mandatory, so this should always exist
+        self._table_schemas = self.parse_schema_file(str(schema_path))
 
-    def infer_parameter_type(self, param_name: str, table_name: str) -> str:
-        """
-        Infer Python type for a parameter based on schema information.
-        
-        Args:
-            param_name: Parameter name (should match column name)
-            table_name: Table name for context
-            
-        Returns:
-            Python type annotation
-        """
-        # First try to get type from schema
-        if table_name in self._table_schemas:
-            column_type = self.get_column_type(table_name, param_name)
-            if column_type != 'Any':
-                return column_type
-        
-        # Fallback to pattern-based inference
-        return self._infer_type_by_pattern(param_name)
 
-    def _infer_type_by_pattern(self, param_name: str) -> str:
-        """
-        Infer type based on parameter name patterns (fallback method).
-        
-        Args:
-            param_name: Parameter name
-            
-        Returns:
-            Python type annotation
-        """
-        param_lower = param_name.lower()
-        
-        # ID parameters
-        if param_lower.endswith('_id') or param_lower == 'id':
-            return 'int'
-        
-        # Quantity/count parameters
-        if any(word in param_lower for word in ['quantity', 'count', 'amount', 'number']):
-            return 'int'
-        
-        # Price/money parameters
-        if any(word in param_lower for word in ['price', 'cost', 'amount', 'total']):
-            return 'float'
-        
-        # Boolean parameters
-        if any(word in param_lower for word in ['is_', 'has_', 'active', 'enabled', 'valid']):
-            return 'bool'
-        
-        # Date/time parameters
-        if any(word in param_lower for word in ['date', 'time', 'created', 'updated', 'start', 'end']):
-            return 'str'
-        
-        # Default to string
-        return 'str'
