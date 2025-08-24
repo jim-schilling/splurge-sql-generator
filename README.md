@@ -65,11 +65,14 @@ WHERE id = :user_id;
 Using the CLI:
 
 ```bash
-# Module invocation
+# Module invocation (automatic schema discovery)
 python -m splurge_sql_generator.cli UserRepository.sql --output generated/
 
-# Or via the installed console script
+# Or via the installed console script (automatic schema discovery)
 splurge-sql-gen UserRepository.sql --output generated/
+
+# With explicit schema file (if needed)
+python -m splurge_sql_generator.cli UserRepository.sql --output generated/ --schema database.schema
 ```
 
 Or using Python:
@@ -154,7 +157,7 @@ Starting with version 2025.4.0, splurge-sql-generator supports schema-based type
 
 ### Schema File Options
 
-You have two options for schema files:
+You have three options for schema files:
 
 **Option 1: Individual schema files** (default)
 - Create a `.schema` file with the same stem as each SQL file
@@ -164,6 +167,12 @@ You have two options for schema files:
 - Create one schema file that covers all your tables
 - Use the `--schema` option to specify the shared schema file
 - Example: `--schema database.schema` for all SQL files
+
+**Option 3: Automatic schema discovery** (new in 2025.4.1)
+- Place `*.schema` files in the current directory or directories containing SQL files
+- The CLI automatically finds and uses the first `*.schema` file it encounters
+- No need to specify `--schema` when schema files are in the expected locations
+- Example: `splurge-sql-gen *.sql --output generated/` automatically finds schema files
 
 ### Example
 
@@ -310,6 +319,9 @@ splurge-sql-gen *.sql --output generated/ --schema database.schema
 
 # Use shared schema file with custom type mapping
 splurge-sql-gen *.sql --output generated/ --schema database.schema --types custom_types.yaml
+
+# Automatic schema discovery (no --schema needed)
+splurge-sql-gen *.sql --output generated/  # Automatically finds *.schema files
 ```
 
 ## API Reference
@@ -434,6 +446,46 @@ MIT License - see LICENSE file for details.
 ## Changelog
 
 ### [2025.4.1] - 2025-08-24
+
+#### Added
+- **Automatic Schema Discovery**: CLI now automatically searches for `*.schema` files when no `--schema` option is specified
+- **Smart Schema Location Detection**: Searches for schema files in the current directory and directories containing SQL files being processed
+- **Improved User Experience**: Users no longer need to explicitly specify schema files when they follow common naming conventions
+
+#### Changed
+- **CLI Schema Handling**: Updated CLI to automatically find schema files using `_find_schema_files()` function
+- **Schema File Requirements**: Schema files are still mandatory, but the CLI now helps users locate them automatically
+- **Error Messages**: Enhanced error messages to guide users when no schema files are found
+
+#### Enhanced
+- **CLI Flexibility**: Users can still explicitly specify schema files with `--schema` for full control
+- **Backward Compatibility**: All existing CLI usage patterns continue to work unchanged
+- **Test Coverage**: Added comprehensive tests for automatic schema discovery functionality
+
+#### Technical Improvements
+- **CLI Logic**: Added `_find_schema_files()` helper function for intelligent schema file discovery
+- **Code Generator**: Simplified schema handling by making `schema_file_path` a required parameter
+- **API Consistency**: Updated convenience functions in `__init__.py` to include schema file parameters
+- **Error Handling**: Clear error messages when no schema files are found in expected locations
+
+#### Usage Examples
+```bash
+# Automatic schema discovery (finds *.schema files automatically)
+python -m splurge_sql_generator.cli examples/User.sql --dry-run
+
+# Multiple files with automatic schema discovery
+python -m splurge_sql_generator.cli examples/*.sql --output generated/
+
+# Still works with explicit schema specification
+python -m splurge_sql_generator.cli examples/User.sql --schema custom.schema --dry-run
+```
+
+#### Schema Discovery Behavior
+- **Search Locations**: Current directory and directories containing SQL files
+- **File Pattern**: Looks for `*.schema` files (e.g., `database.schema`, `User.schema`)
+- **Selection**: Uses the first schema file found in the search order
+- **Fallback**: Clear error message if no schema files are found
+- **Override**: `--schema` option always takes precedence over automatic discovery
 
 ### [2025.4.0] - 2025-08-23
 
