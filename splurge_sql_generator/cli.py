@@ -9,8 +9,36 @@ This module is licensed under the MIT License.
 import argparse
 import sys
 from pathlib import Path
+from typing import Optional
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
+
+
+def _find_schema_files(sql_files: list[str]) -> Optional[str]:
+    """
+    Find schema files when no --schema option is specified.
+    
+    Looks for *.schema files in the current directory and directories containing SQL files.
+    
+    Args:
+        sql_files: List of SQL file paths
+        
+    Returns:
+        Path to the first found schema file, or None if no schema files found
+    """
+    # Get unique directories from SQL files
+    sql_dirs = {Path(sql_file).parent for sql_file in sql_files}
+    # Add current directory
+    search_dirs = {Path.cwd()} | sql_dirs
+    
+    # Look for *.schema files in each directory
+    for search_dir in search_dirs:
+        schema_files = list(search_dir.glob("*.schema"))
+        if schema_files:
+            # Return the first schema file found
+            return str(schema_files[0])
+    
+    return None
 
 
 def main() -> None:
@@ -71,7 +99,7 @@ Examples:
 
     parser.add_argument(
         "--schema",
-        help="Path to schema file to use for all SQL files (default: look for .schema files with same stem as each SQL file)",
+        help="Path to schema file to use for all SQL files (default: look for *.schema files in current directory and SQL file directories)",
     )
 
     args = parser.parse_args()
@@ -111,20 +139,33 @@ Examples:
         output_dir = Path(args.output)
         output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Determine schema file to use
+    schema_file = args.schema
+    if schema_file is None and sql_files:
+        schema_file = _find_schema_files(sql_files)
+        if schema_file is None:
+            print("Error: No schema file specified and no *.schema files found in current directory or SQL file directories", file=sys.stderr)
+            print("Use --schema to specify a schema file or ensure *.schema files exist", file=sys.stderr)
+            sys.exit(1)
+
     # Generate classes
     generator = PythonCodeGenerator(sql_type_mapping_file=args.types)
 
     try:
+        # If no SQL files were found, we're done
+        if not sql_files:
+            return
+            
         if len(sql_files) == 1 and args.dry_run:
             # Single file, print to stdout
-            code = generator.generate_class(sql_files[0], schema_file_path=args.schema)
+            code = generator.generate_class(sql_files[0], schema_file_path=schema_file)
             print(code)
         else:
             # Multiple files or save to directory
             generated_classes = generator.generate_multiple_classes(
                 sql_files,
                 output_dir=args.output if not args.dry_run else None,
-                schema_file_path=args.schema,
+                schema_file_path=schema_file,
             )
 
             if args.dry_run:

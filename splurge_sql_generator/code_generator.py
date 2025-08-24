@@ -55,7 +55,7 @@ class PythonCodeGenerator:
         sql_file_path: str,
         *,
         output_file_path: str | None = None,
-        schema_file_path: str | None = None,
+        schema_file_path: str,
     ) -> str:
         """
         Generate a Python class from a SQL file.
@@ -63,8 +63,8 @@ class PythonCodeGenerator:
         Args:
             sql_file_path: Path to the SQL template file
             output_file_path: Optional path to save the generated Python file
-            schema_file_path: Optional path to the schema file. If None, looks for a .schema file
-                             with the same stem as the SQL file.
+            schema_file_path: Path to the schema file. The CLI will automatically find a schema file
+                             if none is specified.
 
         Returns:
             Generated Python code as string
@@ -77,9 +77,10 @@ class PythonCodeGenerator:
         
         # Load schema if available
         if schema_file_path is None:
-            # Default behavior: look for .schema file with same stem
-            sql_path = Path(sql_file_path)
-            schema_path = sql_path.with_suffix('.schema')
+            # This should not happen anymore as CLI now provides a schema file
+            raise ValueError(
+                "No schema file provided. This is an internal error - the CLI should have found a schema file."
+            )
         else:
             schema_path = Path(schema_file_path)
         
@@ -271,7 +272,7 @@ class PythonCodeGenerator:
         sql_files: list[str],
         *,
         output_dir: str | None = None,
-        schema_file_path: str | None = None,
+        schema_file_path: str,
     ) -> dict[str, str]:
         """
         Generate multiple Python classes from SQL files.
@@ -279,8 +280,8 @@ class PythonCodeGenerator:
         Args:
             sql_files: List of SQL file paths
             output_dir: Optional directory to save generated files
-            schema_file_path: Optional path to a shared schema file. If None, looks for individual
-                             .schema files with the same stem as each SQL file.
+            schema_file_path: Path to a shared schema file. The CLI will automatically find a schema file
+                             if none is specified.
 
         Returns:
             Dictionary mapping class names to generated code
@@ -290,27 +291,10 @@ class PythonCodeGenerator:
         """
         # Load schemas (required)
         if schema_file_path is None:
-            # Check for individual schema files for each SQL file
-            all_schemas: dict[str, dict[str, str]] = {}
-            missing_schemas = []
-            for sql_file in sql_files:
-                sql_path = Path(sql_file)
-                schema_path = sql_path.with_suffix('.schema')
-                if schema_path.exists():
-                    # Load schema if it exists
-                    schema_tables = self._schema_parser.parse_schema_file(str(schema_path))
-                    all_schemas.update(schema_tables)
-                else:
-                    missing_schemas.append(str(schema_path))
-            
-            if missing_schemas:
-                raise FileNotFoundError(
-                    f"Schema files required but not found: {', '.join(missing_schemas)}. "
-                    f"Specify a shared schema file using the --schema option or ensure corresponding .schema files exist."
-                )
-            
-            # Update the schema parser with all loaded schemas
-            self._schema_parser._table_schemas = all_schemas
+            # This should not happen anymore as CLI now provides a schema file
+            raise ValueError(
+                "No schema file provided. This is an internal error - the CLI should have found a schema file."
+            )
         else:
             # Use shared schema file
             schema_path = Path(schema_file_path)

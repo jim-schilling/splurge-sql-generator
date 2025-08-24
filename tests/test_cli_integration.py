@@ -36,7 +36,7 @@ class TestCLIIntegration:
 SELECT * FROM test_table WHERE id = :id;
 """
         
-        with temp_sql_files(sql_content, create_basic_schema("test_table")) as (sql_file, _):
+        with temp_sql_files(sql_content, create_basic_schema("test_table")) as (sql_file, schema_file):
             # Test dry run
             # Capture stdout
             old_stdout = sys.stdout
@@ -60,7 +60,7 @@ SELECT * FROM test_table WHERE id = :id;
 SELECT * FROM users WHERE id = :user_id;
 """
         
-        with temp_sql_files(sql_content, create_basic_schema()) as (sql_file, _):
+        with temp_sql_files(sql_content, create_basic_schema()) as (sql_file, schema_file):
             output_dir = Path(self.temp_dir) / "output"
             
             # Test CLI with output directory
@@ -68,7 +68,7 @@ SELECT * FROM users WHERE id = :user_id;
             sys.stdout = StringIO()
             
             try:
-                sys.argv = ['cli.py', sql_file, '-o', str(output_dir)]
+                sys.argv = ['cli.py', sql_file, '-o', str(output_dir), '--schema', str(schema_file)]
                 cli_main()
                 
                 # Validate output

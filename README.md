@@ -433,6 +433,8 @@ MIT License - see LICENSE file for details.
 
 ## Changelog
 
+### [2025.4.1] - 2025-08-24
+
 ### [2025.4.0] - 2025-08-23
 
 #### Added

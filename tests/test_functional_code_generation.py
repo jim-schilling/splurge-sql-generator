@@ -65,8 +65,8 @@ CREATE TABLE users (
 );
 """
         
-        with temp_sql_files(sql_content, schema_content) as (sql_file, _):
-            generated_code = self.generator.generate_class(sql_file)
+        with temp_sql_files(sql_content, schema_content) as (sql_file, schema_file):
+            generated_code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
             
             # Validate generated code structure
             assert_generated_code_structure(generated_code, "UserRepository", 
@@ -110,7 +110,8 @@ SELECT * FROM products WHERE id = :product_id;
         
         with temp_multiple_sql_files(files_data) as file_paths:
             sql_file_paths = [sql_path for sql_path, _ in file_paths]
-            result = self.generator.generate_multiple_classes(sql_file_paths)
+            schema_file_paths = [schema_path for _, schema_path in file_paths]
+            result = self.generator.generate_multiple_classes(sql_file_paths, schema_file_path=schema_file_paths[0])
             
             # Validate results
             assert len(result) == 2
@@ -154,8 +155,8 @@ GROUP BY user_id
 HAVING SUM(total_amount) > :min_amount;
 """
         
-        with temp_sql_files(sql_content, create_complex_schema()) as (sql_file, _):
-            generated_code = self.generator.generate_class(sql_file)
+        with temp_sql_files(sql_content, create_complex_schema()) as (sql_file, schema_file):
+            generated_code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
             
             # Validate complex SQL handling
             assert_generated_code_structure(generated_code, "OrderService", 
@@ -177,13 +178,14 @@ HAVING SUM(total_amount) > :min_amount;
 SELECT * FROM users WHERE id = :user_id;
 """
         
-        with temp_sql_files(sql_content, create_basic_schema()) as (sql_file, _):
+        with temp_sql_files(sql_content, create_basic_schema()) as (sql_file, schema_file):
             output_dir = Path(self.temp_dir) / "output"
             
             # Generate with output directory
             result = self.generator.generate_multiple_classes(
                 [sql_file], 
-                output_dir=str(output_dir)
+                output_dir=str(output_dir),
+                schema_file_path=schema_file
             )
             
             # Validate output directory creation
@@ -202,7 +204,7 @@ SELECT * FROM users WHERE id = :user_id;
         """Test error handling with invalid or missing files."""
         # Test with non-existent file
         with pytest.raises(FileNotFoundError):
-            self.generator.generate_class("nonexistent_file.sql")
+            self.generator.generate_class("nonexistent_file.sql", schema_file_path="nonexistent.schema")
         
         # Test with valid SQL but missing schema (should fail now)
         valid_sql = """# TestClass
@@ -214,8 +216,8 @@ SELECT * FROM test_table WHERE id = :id;
         sql_file.write_text(valid_sql)
         
         # Should fail without schema file (schema files are required)
-        with pytest.raises(FileNotFoundError, match="Schema file required but not found"):
-            self.generator.generate_class(str(sql_file))
+        with pytest.raises(ValueError, match="No schema file provided"):
+            self.generator.generate_class(str(sql_file), schema_file_path=None)
 
     def test_schema_required_validation(self) -> None:
         """Test that schema files are required for all SQL files."""
@@ -237,8 +239,8 @@ SELECT * FROM test_table WHERE id = :id AND name = :name;
 );
 """
         
-        with temp_sql_files(sql_content, schema_content) as (sql_file, _):
-            generated_code = self.generator.generate_class(sql_file)
+        with temp_sql_files(sql_content, schema_content) as (sql_file, schema_file):
+            generated_code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
             
             # Validate that all parameters use Any type (no type inference)
             assert "id: Any" in generated_code
