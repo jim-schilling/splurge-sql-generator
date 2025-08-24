@@ -331,6 +331,38 @@ Default: Any
 
 
 
+    def test_load_schema(self):
+        """Test loading schema directly with schema file path."""
+        # Create a schema file
+        schema_content = """
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY,
+            name TEXT
+        );
+        """
+        
+        schema_file = os.path.join(self.temp_dir, "test.schema")
+        with open(schema_file, "w", encoding="utf-8") as f:
+            f.write(schema_content)
+
+        # Test loading schema directly
+        self.parser.load_schema(schema_file)
+
+        # Verify that the schema was loaded
+        self.assertIn("users", self.parser._table_schemas)
+        self.assertEqual(self.parser.get_column_type("users", "id"), "int")
+        self.assertEqual(self.parser.get_column_type("users", "name"), "str")
+
+    def test_load_schema_missing_file(self):
+        """Test loading schema with missing file raises FileNotFoundError."""
+        missing_schema = os.path.join(self.temp_dir, "missing.schema")
+        
+        with self.assertRaises(FileNotFoundError) as context:
+            self.parser.load_schema(missing_schema)
+        
+        self.assertIn("Schema file not found", str(context.exception))
+        self.assertIn("missing.schema", str(context.exception))
+
     def test_load_schema_for_sql_file(self):
         """Test loading schema file for a given SQL file."""
         # Create a schema file

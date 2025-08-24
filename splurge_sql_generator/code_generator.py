@@ -15,21 +15,24 @@ from jinja2 import Environment, FileSystemLoader
 
 from splurge_sql_generator.sql_parser import SqlParser
 from splurge_sql_generator.schema_parser import SchemaParser
+from splurge_sql_generator.errors import SqlValidationError
 
 
 class PythonCodeGenerator:
     """Generator for Python classes with SQLAlchemy methods using Jinja2 templates."""
 
-    def __init__(self, sql_type_mapping_file: str | None = None) -> None:
+    def __init__(self, sql_type_mapping_file: str | None = None, validate_parameters: bool = False) -> None:
         """
         Initialize the Python code generator.
         
         Args:
             sql_type_mapping_file: Optional path to custom SQL type mapping YAML file.
                 If None, uses default "types.yaml"
+            validate_parameters: Whether to validate SQL parameters against schema (default: False)
         """
         self._parser = SqlParser()
         self._schema_parser = SchemaParser(sql_type_mapping_file or "types.yaml")
+        self._validate_parameters = validate_parameters
         # Set up Jinja2 environment with templates directory
         template_dir = Path(__file__).parent / "templates"
         self._jinja_env = Environment(
@@ -86,7 +89,7 @@ class PythonCodeGenerator:
         
         if schema_path.exists():
             # Load schema if it exists
-            self._schema_parser.load_schema_for_sql_file(sql_file_path, schema_file_path)
+            self._schema_parser.load_schema(schema_file_path)
         else:
             # Schema files are required
             raise FileNotFoundError(
@@ -95,7 +98,7 @@ class PythonCodeGenerator:
             )
 
         # Generate the Python code using template
-        python_code = self._generate_python_code(class_name, method_queries)
+        python_code = self._generate_python_code(class_name, method_queries, sql_file_path)
 
         # Save to file if output path provided
         if output_file_path:
@@ -112,6 +115,7 @@ class PythonCodeGenerator:
         self,
         class_name: str,
         method_queries: dict[str, str],
+        file_path: str | None = None,
     ) -> str:
         """
         Generate Python class code from method queries using Jinja2 template.
@@ -119,6 +123,7 @@ class PythonCodeGenerator:
         Args:
             class_name: Name of the class to generate
             method_queries: Dictionary mapping method names to SQL queries
+            file_path: Optional file path for error context
 
         Returns:
             Generated Python code
@@ -127,7 +132,7 @@ class PythonCodeGenerator:
         methods: list[dict[str, Any]] = []
         for method_name, sql_query in method_queries.items():
             method_info = self.parser.get_method_info(sql_query)
-            method_data = self._prepare_method_data(method_name, sql_query, method_info)
+            method_data = self._prepare_method_data(method_name, sql_query, method_info, file_path)
             methods.append(method_data)
 
         # Render template (preloaded)
@@ -166,6 +171,7 @@ class PythonCodeGenerator:
         method_name: str,
         sql_query: str,
         method_info: dict[str, Any],
+        file_path: str | None = None,
     ) -> dict[str, Any]:
         """
         Prepare method data for template rendering.
@@ -174,10 +180,19 @@ class PythonCodeGenerator:
             method_name: Name of the method
             sql_query: SQL query string
             method_info: Analysis information about the method
+            file_path: Optional file path for error context
 
         Returns:
             Dictionary with method data for template
         """
+        # Validate parameters against schema if enabled
+        if self._validate_parameters:
+            self._validate_parameters_against_schema(
+                sql_query, 
+                method_info["parameters"], 
+                file_path
+            )
+        
         # Generate method signature
         parameters = self._generate_method_signature(method_info["parameters"])
 
@@ -253,6 +268,110 @@ class PythonCodeGenerator:
 
 
 
+    def _extract_table_names(self, sql_query: str) -> list[str]:
+        """
+        Extract table names from SQL query.
+        
+        Args:
+            sql_query: SQL query string
+            
+        Returns:
+            List of table names referenced in the query (in lowercase)
+        """
+        table_names = []
+        
+        # Extract table names from different SQL clauses
+        # FROM clause
+        from_pattern = r'\bFROM\s+(\w+)'
+        from_matches = re.findall(from_pattern, sql_query, re.IGNORECASE)
+        table_names.extend([match.lower() for match in from_matches])
+        
+        # UPDATE clause
+        update_pattern = r'\bUPDATE\s+(\w+)'
+        update_matches = re.findall(update_pattern, sql_query, re.IGNORECASE)
+        table_names.extend([match.lower() for match in update_matches])
+        
+        # INSERT INTO clause
+        insert_pattern = r'\bINSERT\s+INTO\s+(\w+)'
+        insert_matches = re.findall(insert_pattern, sql_query, re.IGNORECASE)
+        table_names.extend([match.lower() for match in insert_matches])
+        
+        # JOIN clauses
+        join_pattern = r'\bJOIN\s+(\w+)'
+        join_matches = re.findall(join_pattern, sql_query, re.IGNORECASE)
+        table_names.extend([match.lower() for match in join_matches])
+        
+        # Remove duplicates while preserving order
+        return list(dict.fromkeys(table_names))
+
+    def _validate_parameters_against_schema(
+        self,
+        sql_query: str,
+        parameters: list[str],
+        file_path: str | None = None,
+    ) -> None:
+        """
+        Validate that all SQL parameters exist in the loaded schema.
+        
+        Args:
+            sql_query: SQL query string
+            parameters: List of parameter names to validate
+            file_path: Optional file path for error context
+            
+        Raises:
+            SqlValidationError: If parameters don't match schema definitions
+        """
+        if not parameters:
+            return
+            
+        # Extract table names from the SQL query
+        table_names = self._extract_table_names(sql_query)
+        
+        if not table_names:
+            # No tables found in query, can't validate parameters
+            return
+            
+        # Check each parameter against the schema
+        invalid_params = []
+        for param in parameters:
+            param_found = False
+            for table_name in table_names:
+                if (table_name in self._schema_parser._table_schemas and 
+                    param in self._schema_parser._table_schemas[table_name]):
+                    param_found = True
+                    break
+                    
+            if not param_found:
+                invalid_params.append(param)
+        
+        if invalid_params:
+            file_context = f" in {file_path}" if file_path else ""
+            tables_str = ", ".join(table_names)
+            params_str = ", ".join(invalid_params)
+            raise SqlValidationError(
+                f"Parameters not found in schema{file_context}: {params_str}. "
+                f"Referenced tables: {tables_str}. "
+                f"Available columns: {self._get_available_columns(table_names)}"
+            )
+
+    def _get_available_columns(self, table_names: list[str]) -> str:
+        """
+        Get a formatted string of available columns for the given tables.
+        
+        Args:
+            table_names: List of table names
+            
+        Returns:
+            Formatted string showing available columns
+        """
+        available_columns = []
+        for table_name in table_names:
+            if table_name in self._schema_parser._table_schemas:
+                columns = list(self._schema_parser._table_schemas[table_name].keys())
+                available_columns.append(f"{table_name}({', '.join(columns)})")
+        
+        return "; ".join(available_columns) if available_columns else "none"
+
     def _to_snake_case(self, class_name: str) -> str:
         """
         Convert PascalCase class name to snake_case filename.
@@ -300,7 +419,7 @@ class PythonCodeGenerator:
             schema_path = Path(schema_file_path)
             if schema_path.exists():
                 # Load the shared schema file
-                self._schema_parser._table_schemas = self._schema_parser.parse_schema_file(str(schema_path))
+                self._schema_parser.load_schema(schema_file_path)
             else:
                 # Schema file is required
                 raise FileNotFoundError(
@@ -332,22 +451,4 @@ class PythonCodeGenerator:
 
         return generated_classes
 
-    def _load_all_schemas(self, sql_files: list[str]) -> None:
-        """
-        Load all schema files for the given SQL files.
-        
-        Args:
-            sql_files: List of SQL file paths
-        """
-        all_schemas: dict[str, dict[str, str]] = {}
-        
-        for sql_file in sql_files:
-            sql_path = Path(sql_file)
-            schema_path = sql_path.with_suffix('.schema')
-            
-            # Schema files are mandatory, so this should always exist
-            schema_tables = self._schema_parser.parse_schema_file(str(schema_path))
-            all_schemas.update(schema_tables)
-        
-        # Update the schema parser with all loaded schemas
-        self._schema_parser._table_schemas = all_schemas
+

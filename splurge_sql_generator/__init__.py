@@ -12,6 +12,7 @@ from SQL template files, with sophisticated SQL parsing and statement type detec
 from importlib.metadata import version
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
+from splurge_sql_generator.schema_parser import SchemaParser
 from splurge_sql_generator.sql_helper import (
     EXECUTE_STATEMENT,
     FETCH_STATEMENT,
@@ -33,9 +34,11 @@ __all__ = [
     # Core classes
     "SqlParser",
     "PythonCodeGenerator",
+    "SchemaParser",
     # Convenience functions
     "generate_class",
     "generate_multiple_classes",
+    "generate_types_file",
     # Statement helpers (kept public for convenience)
     "is_fetch_statement",
     "is_execute_statement",
@@ -126,3 +129,23 @@ def generate_multiple_classes(
     """
     generator = PythonCodeGenerator()
     return generator.generate_multiple_classes(sql_files, output_dir=output_dir, schema_file_path=schema_file_path)
+
+
+def generate_types_file(output_path: str | None = None) -> str:
+    """
+    Convenience function to generate the default SQL type mapping YAML file.
+
+    Args:
+        output_path: Optional path to save the types file. If None, saves as 'types.yaml' in current directory.
+
+    Returns:
+        Path to the generated types file
+
+    Examples:
+        >>> generate_types_file()
+        'types.yaml'
+        >>> generate_types_file('custom_types.yaml')
+        'custom_types.yaml'
+    """
+    schema_parser = SchemaParser()
+    return schema_parser.generate_types_file(output_path)

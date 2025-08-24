@@ -3,6 +3,7 @@ import tempfile
 import unittest
 
 from splurge_sql_generator.sql_parser import SqlParser
+from splurge_sql_generator.errors import SqlValidationError
 from test_utils import temp_sql_files
 
 
@@ -248,23 +249,23 @@ SELECT * FROM users WHERE name = :name;
             os.remove(fname)
 
     def test_parse_file_missing_class_comment(self):
-        """Test that parse_file raises ValueError when first line is not a class comment."""
-        sql = """#get_user
+        """Test that parse_file raises SqlValidationError when first line is not a class comment."""
+        sql = """get_user
 SELECT * FROM users WHERE id = :user_id;
         """
         with tempfile.NamedTemporaryFile("w+", delete=False, suffix=".sql") as f:
             f.write(sql)
             fname = f.name
         try:
-            with self.assertRaises(ValueError) as cm:
+            with self.assertRaises(SqlValidationError) as cm:
                 self.parser.parse_file(fname)
-            self.assertIn("Class comment must start with", str(cm.exception))
+            self.assertIn("First line must be a class comment", str(cm.exception))
         finally:
             os.remove(fname)
 
     def test_parse_file_empty_class_comment(self):
-        """Test that parse_file raises ValueError when class comment is empty."""
-        sql = """# 
+        """Test that parse_file raises SqlValidationError when class comment is empty."""
+        sql = """#
 #get_user
 SELECT * FROM users WHERE id = :user_id;
         """
@@ -272,15 +273,15 @@ SELECT * FROM users WHERE id = :user_id;
             f.write(sql)
             fname = f.name
         try:
-            with self.assertRaises(ValueError) as cm:
+            with self.assertRaises(SqlValidationError) as cm:
                 self.parser.parse_file(fname)
-            self.assertIn("Class comment must start with", str(cm.exception))
+            self.assertIn("Class name cannot be empty", str(cm.exception))
         finally:
             os.remove(fname)
 
     def test_parse_file_invalid_class_comment_format(self):
-        """Test that parse_file raises ValueError when class comment doesn't start with '# '."""
-        sql = """#TestClass
+        """Test that parse_file raises SqlValidationError when class comment doesn't start with '#'."""
+        sql = """TestClass
 #get_user
 SELECT * FROM users WHERE id = :user_id;
         """
@@ -288,9 +289,9 @@ SELECT * FROM users WHERE id = :user_id;
             f.write(sql)
             fname = f.name
         try:
-            with self.assertRaises(ValueError) as cm:
+            with self.assertRaises(SqlValidationError) as cm:
                 self.parser.parse_file(fname)
-            self.assertIn("Class comment must start with", str(cm.exception))
+            self.assertIn("First line must be a class comment", str(cm.exception))
         finally:
             os.remove(fname)
 
@@ -307,6 +308,124 @@ SELECT * FROM users WHERE id = :user_id;
             )
         finally:
             os.remove(fname)
+
+    def test_parse_string_basic(self):
+        """Test parse_string with valid SQL content."""
+        sql = """# TestClass
+#get_user
+SELECT * FROM users WHERE id = :user_id;
+
+#create_user
+INSERT INTO users (name, email) VALUES (:name, :email);
+        """
+        class_name, methods = self.parser.parse_string(sql)
+        self.assertEqual(class_name, "TestClass")
+        self.assertIn("get_user", methods)
+        self.assertIn("create_user", methods)
+        self.assertTrue(methods["get_user"].startswith("SELECT"))
+
+    def test_parse_string_with_file_path(self):
+        """Test parse_string with file path for error context."""
+        sql = """# TestClass
+#get_user
+SELECT * FROM users WHERE id = :user_id;
+        """
+        class_name, methods = self.parser.parse_string(sql, "test.sql")
+        self.assertEqual(class_name, "TestClass")
+        self.assertIn("get_user", methods)
+
+    def test_parse_string_missing_class_comment(self):
+        """Test parse_string raises error when first line is not a class comment."""
+        sql = """get_user
+SELECT * FROM users WHERE id = :user_id;
+        """
+        with self.assertRaises(SqlValidationError) as cm:
+            self.parser.parse_string(sql)
+        self.assertIn("First line must be a class comment", str(cm.exception))
+
+    def test_parse_string_missing_class_comment_with_file_path(self):
+        """Test parse_string error includes file path when provided."""
+        sql = """get_user
+SELECT * FROM users WHERE id = :user_id;
+        """
+        with self.assertRaises(SqlValidationError) as cm:
+            self.parser.parse_string(sql, "test.sql")
+        self.assertIn("First line must be a class comment starting with # in test.sql", str(cm.exception))
+
+    def test_parse_string_empty_class_comment(self):
+        """Test parse_string raises error when class comment is empty."""
+        sql = """# 
+#get_user
+SELECT * FROM users WHERE id = :user_id;
+        """
+        with self.assertRaises(SqlValidationError) as cm:
+            self.parser.parse_string(sql)
+        self.assertIn("Class name cannot be empty", str(cm.exception))
+
+    def test_parse_string_invalid_class_comment_format(self):
+        """Test parse_string raises error when class comment doesn't start with '#'."""
+        sql = """TestClass
+#get_user
+SELECT * FROM users WHERE id = :user_id;
+        """
+        with self.assertRaises(SqlValidationError) as cm:
+            self.parser.parse_string(sql)
+        self.assertIn("First line must be a class comment", str(cm.exception))
+
+    def test_parse_string_empty_content(self):
+        """Test parse_string raises error when content is empty."""
+        with self.assertRaises(SqlValidationError) as cm:
+            self.parser.parse_string("")
+        self.assertIn("First line must be a class comment", str(cm.exception))
+
+    def test_parse_string_invalid_class_name(self):
+        """Test parse_string raises error when class name is invalid."""
+        sql = """# 123InvalidClass
+#get_user
+SELECT * FROM users WHERE id = :user_id;
+        """
+        with self.assertRaises(SqlValidationError) as cm:
+            self.parser.parse_string(sql)
+        self.assertIn("Class name must be a valid Python identifier", str(cm.exception))
+
+    def test_parse_string_reserved_keyword_class_name(self):
+        """Test parse_string raises error when class name is a reserved keyword."""
+        sql = """# class
+#get_user
+SELECT * FROM users WHERE id = :user_id;
+        """
+        with self.assertRaises(SqlValidationError) as cm:
+            self.parser.parse_string(sql)
+        self.assertIn("Class name must be a valid Python identifier", str(cm.exception))
+
+    def test_parse_string_class_comment_formats(self):
+        """Test parse_string accepts both '#Class' and '# Class' formats."""
+        # Test without space
+        sql1 = """#TestClass
+#get_user
+SELECT * FROM users WHERE id = :user_id;
+        """
+        class_name1, methods1 = self.parser.parse_string(sql1)
+        self.assertEqual(class_name1, "TestClass")
+        self.assertIn("get_user", methods1)
+
+        # Test with space
+        sql2 = """# TestClass
+#get_user
+SELECT * FROM users WHERE id = :user_id;
+        """
+        class_name2, methods2 = self.parser.parse_string(sql2)
+        self.assertEqual(class_name2, "TestClass")
+        self.assertIn("get_user", methods2)
+
+
+
+    def test_get_method_info_with_file_path(self):
+        """Test get_method_info with file path for error context."""
+        sql = "SELECT * FROM users WHERE id = :class"  # 'class' is a reserved keyword
+        with self.assertRaises(SqlValidationError) as cm:
+            self.parser.get_method_info(sql, "test.sql")
+        self.assertIn("Parameter name cannot be a reserved keyword in test.sql", str(cm.exception))
 
 
 if __name__ == "__main__":
