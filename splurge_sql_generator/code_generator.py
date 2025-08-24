@@ -71,8 +71,7 @@ class PythonCodeGenerator:
         Args:
             sql_file_path: Path to the SQL template file
             output_file_path: Optional path to save the generated Python file
-            schema_file_path: Path to the schema file. The CLI will automatically find a schema file
-                             if none is specified.
+            schema_file_path: Path to the schema file (required)
 
         Returns:
             Generated Python code as string
@@ -83,14 +82,8 @@ class PythonCodeGenerator:
         # Parse the SQL file first (this will catch validation errors like invalid class names)
         class_name, method_queries = self.parser.parse_file(sql_file_path)
         
-        # Load schema if available
-        if schema_file_path is None:
-            # This should not happen anymore as CLI now provides a schema file
-            raise ValueError(
-                "No schema file provided. This is an internal error - the CLI should have found a schema file."
-            )
-        else:
-            schema_path = Path(schema_file_path)
+        # Load schema
+        schema_path = Path(schema_file_path)
         
         if schema_path.exists():
             # Load schema if it exists
@@ -407,8 +400,7 @@ class PythonCodeGenerator:
         Args:
             sql_files: List of SQL file paths
             output_dir: Optional directory to save generated files
-            schema_file_path: Path to a shared schema file. The CLI will automatically find a schema file
-                             if none is specified.
+            schema_file_path: Path to a shared schema file (required)
 
         Returns:
             Dictionary mapping class names to generated code
@@ -416,24 +408,17 @@ class PythonCodeGenerator:
         Raises:
             FileNotFoundError: If any required schema file is missing
         """
-        # Load schemas (required)
-        if schema_file_path is None:
-            # This should not happen anymore as CLI now provides a schema file
-            raise ValueError(
-                "No schema file provided. This is an internal error - the CLI should have found a schema file."
-            )
+        # Load shared schema file
+        schema_path = Path(schema_file_path)
+        if schema_path.exists():
+            # Load the shared schema file
+            self._schema_parser.load_schema(schema_file_path)
         else:
-            # Use shared schema file
-            schema_path = Path(schema_file_path)
-            if schema_path.exists():
-                # Load the shared schema file
-                self._schema_parser.load_schema(schema_file_path)
-            else:
-                # Schema file is required
-                raise FileNotFoundError(
-                    f"Schema file required but not found: {schema_path}. "
-                    f"Specify a valid schema file using the --schema option."
-                )
+            # Schema file is required
+            raise FileNotFoundError(
+                f"Schema file required but not found: {schema_path}. "
+                f"Specify a valid schema file using the --schema option."
+            )
         
         generated_classes: dict[str, str] = {}
 

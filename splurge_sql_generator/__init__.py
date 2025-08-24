@@ -91,16 +91,15 @@ def generate_class(
     sql_file_path: str,
     *,
     output_file_path: str | None = None,
-    schema_file_path: str | None = None,
+    schema_file_path: str,
 ) -> str:
     """
     Convenience function to generate a Python class from a SQL file.
 
-    Args:
-        sql_file_path: Path to the SQL template file
-        output_file_path: Optional path to save the generated Python file
-        schema_file_path: Optional path to the schema file. The CLI will automatically find a schema file
-                         if none is specified.
+            Args:
+            sql_file_path: Path to the SQL template file
+            output_file_path: Optional path to save the generated Python file
+            schema_file_path: Path to the schema file (required)
 
     Returns:
         Generated Python code as string
@@ -113,16 +112,15 @@ def generate_multiple_classes(
     sql_files: list[str],
     *,
     output_dir: str | None = None,
-    schema_file_path: str | None = None,
+    schema_file_path: str,
 ) -> dict[str, str]:
     """
     Convenience function to generate multiple Python classes from SQL files.
 
-    Args:
-        sql_files: List of SQL file paths
-        output_dir: Optional directory to save generated files
-        schema_file_path: Optional path to a shared schema file. The CLI will automatically find a schema file
-                         if none is specified.
+            Args:
+            sql_files: List of SQL file paths
+            output_dir: Optional directory to save generated files
+            schema_file_path: Path to a shared schema file (required)
 
     Returns:
         Dictionary mapping class names to generated code
