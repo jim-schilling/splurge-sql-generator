@@ -15,7 +15,7 @@ A Python library for generating SQLAlchemy classes from SQL template files with 
 - **Parameter Extraction**: Extract and map SQL parameters to Python method signatures with inferred types
 - **Multi-Database Support**: Built-in support for SQLite, PostgreSQL, MySQL, MSSQL, and Oracle SQL types
 - **CLI Interface**: Command-line tool for batch processing with flexible configuration options
-- **Comprehensive Error Handling**: Robust error handling for file operations and SQL parsing
+- **Comprehensive Error Handling**: Robust error handling for file operations and SQL parsing with fail-fast validation
 
 ## SQL File Format Requirement
 
@@ -458,6 +458,12 @@ Parse a SQL string containing multiple statements into individual statements.
 #### `split_sql_file(file_path: str, strip_semicolon: bool = False) -> List[str]`
 Read a SQL file and split it into individual statements.
 
+#### `parse_table_columns(table_body: str) -> dict[str, str]`
+Parse column definitions from table body using sqlparse tokens. Raises `SqlValidationError` if parsing fails or no valid columns are found.
+
+#### `extract_table_names(sql_query: str) -> list[str]`
+Extract table names from SQL query using sqlparse. Raises `SqlValidationError` if parsing fails or no table names are found.
+
 #### `generate_types_file(output_path: str | None = None) -> str`
 Generate the default SQL type mapping YAML file.
 
@@ -477,10 +483,42 @@ Generate the default SQL type mapping YAML file.
 - **Parameter Validation**: Optional validation of SQL parameters against schema definitions
 - **Multi-Database Types**: Built-in support for SQLite, PostgreSQL, MySQL, MSSQL, and Oracle types
 - **Docstrings**: Comprehensive documentation for each method
-- **Error Handling**: Proper SQLAlchemy result handling
+- **Error Handling**: Proper SQLAlchemy result handling with fail-fast validation
 - **Parameter Mapping**: Automatic mapping of SQL parameters to Python arguments with inferred types
 - **Statement Type Detection**: Correct return types based on SQL statement type
 - **Auto-Generated Headers**: Clear identification of generated files
+
+## Error Handling and Validation
+
+The library provides robust error handling with a fail-fast approach to ensure data integrity and clear error reporting:
+
+### SQL Parsing Validation
+- **Strict SQL Parsing**: Functions like `parse_table_columns()` and `extract_table_names()` use sqlparse for reliable parsing
+- **No Fallback Mechanisms**: Eliminates unreliable regex-based fallback parsing in favor of clear error reporting
+- **Clear Error Messages**: Functions raise `SqlValidationError` with descriptive messages when parsing fails
+- **Validation Checks**: Ensures valid column definitions and table names are found before processing
+
+### Error Types
+- **`SqlValidationError`**: Raised when SQL parsing fails or validation checks fail
+- **`SqlFileError`**: Raised for file operation errors (file not found, permission denied, etc.)
+- **Clear Context**: Error messages include file paths, referenced tables, and available columns for debugging
+
+### Example Error Handling
+```python
+from splurge_sql_generator.errors import SqlValidationError, SqlFileError
+
+try:
+    # This will raise SqlValidationError if no valid columns are found
+    columns = parse_table_columns("CONSTRAINT pk_id PRIMARY KEY (id)")
+except SqlValidationError as e:
+    print(f"SQL validation failed: {e}")
+
+try:
+    # This will raise SqlValidationError if no table names are found
+    tables = extract_table_names("SELECT 1 as value")
+except SqlValidationError as e:
+    print(f"SQL validation failed: {e}")
+```
 
 ## Development
 
@@ -527,6 +565,34 @@ MIT License - see LICENSE file for details.
 ---
 
 ## Changelog
+
+### [2025.4.4] - 2025-08-24
+
+#### Changed
+- **Enhanced Error Handling**: Removed fallback mechanisms in `sql_helper.py` functions to ensure robust error handling
+- **Stricter SQL Parsing**: `parse_table_columns()` and `extract_table_names()` now raise `SqlValidationError` when sqlparse fails instead of falling back to regex-based parsing
+- **Improved Code Quality**: Eliminated unreliable fallback parsing in favor of clear error reporting
+- **Better Test Coverage**: Added comprehensive test coverage for `sql_helper.py` with 55 tests achieving 90% code coverage
+
+#### Technical Improvements
+- **Removed Fallback Functions**: Eliminated `_parse_table_columns_fallback()` and `_extract_tables_with_regex()` functions
+- **Enhanced Error Messages**: Functions now provide clear error messages when SQL parsing fails
+- **Robust Validation**: Added validation to ensure valid column definitions and table names are found
+- **Comprehensive Testing**: Added extensive test suite covering edge cases, error conditions, and integration scenarios
+
+#### Behavior Changes
+- **`parse_table_columns()`**: Now raises `SqlValidationError` when:
+  - sqlparse fails to parse the table body
+  - No valid column definitions are found (e.g., only constraint definitions)
+- **`extract_table_names()`**: Now raises `SqlValidationError` when:
+  - sqlparse fails to parse the SQL query
+  - No table names are found in the query (e.g., `SELECT 1 as value`)
+
+#### Development Experience
+- **Fail-Fast Approach**: Functions now fail fast with clear error messages rather than attempting unreliable fallback parsing
+- **Better Debugging**: Clear error messages help developers identify and fix SQL parsing issues
+- **Improved Reliability**: Eliminates potential for incorrect parsing results from fallback mechanisms
+- **Enhanced Maintainability**: Simplified codebase with fewer edge cases and fallback paths
 
 ### [2025.4.3] - 2025-08-24
 
