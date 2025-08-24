@@ -6,13 +6,13 @@ Copyright (c) 2025, Jim Schilling
 This module is licensed under the MIT License.
 """
 
+import keyword
 import re
-import keyword  # Added for reserved keyword check
 from pathlib import Path
 from typing import Any
 
-from splurge_sql_generator.sql_helper import FETCH_STATEMENT, detect_statement_type
 from splurge_sql_generator.errors import SqlValidationError
+from splurge_sql_generator.sql_helper import FETCH_STATEMENT, detect_statement_type
 
 
 class SqlParser:
@@ -65,6 +65,11 @@ class SqlParser:
 
         Returns:
             Tuple of (class_name, method_queries_dict)
+            
+        Raises:
+            FileNotFoundError: If the SQL file does not exist
+            OSError: If there are I/O errors reading the file
+            SqlValidationError: If the file format is invalid
         """
         file_path = Path(file_path)
 
@@ -77,39 +82,69 @@ class SqlParser:
         except OSError as e:
             raise OSError(f"Error reading SQL file {file_path}: {e}") from e
 
+        return self.parse_string(content, file_path)
+
+    def parse_string(self, content: str, file_path: str | Path | None = None) -> tuple[str, dict[str, str]]:
+        """
+        Parse SQL content string and extract class name and method-query mappings.
+
+        Args:
+            content: SQL file content as string
+            file_path: Optional file path for error messages (default: None)
+
+        Returns:
+            Tuple of (class_name, method_queries_dict)
+            
+        Raises:
+            SqlValidationError: If the content format is invalid
+        """
         # Extract class name from first line comment
         lines = content.split("\n")
         if not lines or not lines[0].strip().startswith("#"):
+            file_context = f" in {file_path}" if file_path else ""
             raise SqlValidationError(
-                f"First line must be a class comment starting with #: {file_path}"
+                f"First line must be a class comment starting with #{file_context}"
+            )
+
+        # Check if first line starts with "#" (before stripping)
+        if not lines[0].startswith("#"):
+            file_context = f" in {file_path}" if file_path else ""
+            raise SqlValidationError(
+                f"First line must be a class comment starting with #{file_context}"
             )
 
         class_comment = lines[0].strip()
-        if not class_comment.startswith("# "):
-            raise SqlValidationError(f"Class comment must start with '# ': {class_comment}")
-
-        class_name = class_comment[2:].strip()  # Remove '# ' prefix
+        class_name = class_comment[1:].strip()  # Remove '#' prefix
         if not class_name:
-            raise SqlValidationError(f"Class name cannot be empty: {class_comment}")
-        if not class_name.isidentifier() or keyword.iskeyword(class_name):
+            file_context = f" in {file_path}" if file_path else ""
             raise SqlValidationError(
-                f"Class name must be a valid Python identifier and not a reserved keyword: {class_name}"
+                f"Class name cannot be empty{file_context}: {class_comment}"
+            )
+        
+        if not class_name.isidentifier() or keyword.iskeyword(class_name):
+            file_context = f" in {file_path}" if file_path else ""
+            raise SqlValidationError(
+                f"Class name must be a valid Python identifier and not a reserved keyword{file_context}: {class_name}"
             )
 
         # Parse methods and queries
-        method_queries = self._extract_methods_and_queries(content)
+        method_queries = self._extract_methods_and_queries(content, file_path)
 
         return class_name, method_queries
 
-    def _extract_methods_and_queries(self, content: str) -> dict[str, str]:
+    def _extract_methods_and_queries(self, content: str, file_path: str | Path | None = None) -> dict[str, str]:
         """
         Extract method names and their corresponding SQL queries.
 
         Args:
             content: SQL file content
+            file_path: Optional file path for error messages (default: None)
 
         Returns:
             Dictionary mapping method names to SQL queries
+            
+        Raises:
+            SqlValidationError: If method names are invalid
         """
         method_queries = {}
 
@@ -129,23 +164,28 @@ class SqlParser:
                 # Check for valid Python identifier and not a reserved keyword
                 if method_name and sql_query:
                     if not method_name.isidentifier() or keyword.iskeyword(method_name):
+                        file_context = f" in {file_path}" if file_path else ""
                         raise SqlValidationError(
-                            f"Method name must be a valid Python identifier and not a reserved keyword: {method_name}"
+                            f"Method name must be a valid Python identifier and not a reserved keyword{file_context}: {method_name}"
                         )
                     method_queries[method_name] = sql_query
 
         return method_queries
 
-    def get_method_info(self, sql_query: str) -> dict[str, Any]:
+    def get_method_info(self, sql_query: str, file_path: str | Path | None = None) -> dict[str, Any]:
         """
         Analyze SQL query to determine method type and parameters.
         Uses sql_helper.detect_statement_type() for accurate statement type detection.
 
         Args:
             sql_query: SQL query string
+            file_path: Optional file path for error messages (default: None)
 
         Returns:
             Dictionary with method analysis info
+            
+        Raises:
+            SqlValidationError: If parameter names are invalid
         """
         # Guard clause: trivial inputs return default analysis without extra work
         if not sql_query or not sql_query.strip():
@@ -191,7 +231,10 @@ class SqlParser:
         # Check for reserved keywords in parameters
         for param in parameters:
             if keyword.iskeyword(param):
-                raise SqlValidationError(f"Parameter name cannot be a reserved keyword: {param}")
+                file_context = f" in {file_path}" if file_path else ""
+                raise SqlValidationError(
+                    f"Parameter name cannot be a reserved keyword{file_context}: {param}"
+                )
 
         return {
             "type": query_type,

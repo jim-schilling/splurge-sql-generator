@@ -36,19 +36,19 @@ def _ensure_generated_classes() -> None:
 
     # Generate each required module if missing
     mapping = {
-        "User": os.path.join(PROJECT_ROOT, "examples", "User.sql"),
-        "ProductRepository": os.path.join(PROJECT_ROOT, "examples", "ProductRepository.sql"),
-        "OrderService": os.path.join(PROJECT_ROOT, "examples", "OrderService.sql"),
+        "User": (os.path.join(PROJECT_ROOT, "examples", "User.sql"), os.path.join(PROJECT_ROOT, "examples", "User.schema")),
+        "ProductRepository": (os.path.join(PROJECT_ROOT, "examples", "ProductRepository.sql"), os.path.join(PROJECT_ROOT, "examples", "ProductRepository.schema")),
+        "OrderService": (os.path.join(PROJECT_ROOT, "examples", "OrderService.sql"), os.path.join(PROJECT_ROOT, "examples", "OrderService.schema")),
     }
 
     # Create generator instance to access the snake_case conversion method
     generator = PythonCodeGenerator()
 
-    for module_name, sql_path in mapping.items():
+    for module_name, (sql_path, schema_path) in mapping.items():
         snake_case_name = generator._to_snake_case(module_name)
         py_path = os.path.join(output_dir, f"{snake_case_name}.py")
         if not os.path.exists(py_path):
-            generate_class(sql_path, output_file_path=py_path)
+            generate_class(sql_path, output_file_path=py_path, schema_file_path=schema_path)
 
 
 def setup_database():

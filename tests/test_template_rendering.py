@@ -56,9 +56,9 @@ WHERE id IN (:user_ids);
 );
 """
         
-        with temp_sql_files(sql_content, schema_content) as (sql_file, _):
+        with temp_sql_files(sql_content, schema_content) as (sql_file, schema_file):
             # Generate code
-            generated_code = generator.generate_class(sql_file)
+            generated_code = generator.generate_class(sql_file, schema_file_path=schema_file)
             
             # Validate template rendering
             assert_generated_code_structure(generated_code, "ComplexService", 

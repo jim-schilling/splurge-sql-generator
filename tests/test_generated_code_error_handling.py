@@ -89,9 +89,9 @@ SELECT * FROM users WHERE id = :user_id;
 
     def _create_and_import_module(self, sql_content: str, schema_content: str | None = None) -> Any:
         """Create SQL file, generate Python code, and import the generated module."""
-        with temp_sql_files(sql_content, schema_content) as (sql_file, _):
+        with temp_sql_files(sql_content, schema_content) as (sql_file, schema_file):
             # Generate Python code
-            generated_code = self.generator.generate_class(sql_file)
+            generated_code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
             
             # Write generated code to file
             py_file = Path(self.temp_dir) / "generated_module.py"

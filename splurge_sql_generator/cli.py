@@ -9,8 +9,156 @@ This module is licensed under the MIT License.
 import argparse
 import sys
 from pathlib import Path
+from typing import Optional
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
+
+
+def _find_schema_files(sql_files: list[str]) -> Optional[str]:
+    """
+    Find schema files when no --schema option is specified.
+    
+    Looks for *.schema files in the current directory and directories containing SQL files.
+    
+    Args:
+        sql_files: List of SQL file paths
+        
+    Returns:
+        Path to the first found schema file, or None if no schema files found
+    """
+    # Get unique directories from SQL files
+    sql_dirs = {Path(sql_file).parent for sql_file in sql_files}
+    # Add current directory
+    search_dirs = {Path.cwd()} | sql_dirs
+    
+    # Look for *.schema files in each directory
+    for search_dir in search_dirs:
+        schema_files = list(search_dir.glob("*.schema"))
+        if schema_files:
+            # Return the first schema file found
+            return str(schema_files[0])
+    
+    return None
+
+
+def _expand_and_validate_inputs(input_paths: list[str], *, strict: bool = False) -> list[str]:
+    """
+    Expand directories and validate SQL files.
+    
+    Args:
+        input_paths: List of file paths or directories to process
+        strict: Whether to treat warnings as errors
+        
+    Returns:
+        List of validated SQL file paths
+        
+    Raises:
+        SystemExit: If strict mode is enabled and validation fails
+    """
+    sql_files: list[str] = []
+    
+    for file_path in input_paths:
+        path = Path(file_path)
+        if not path.exists():
+            print(f"Error: SQL file not found: {file_path}", file=sys.stderr)
+            sys.exit(1)
+
+        if path.is_dir():
+            discovered = [str(p) for p in path.rglob("*.sql")]
+            if not discovered:
+                msg = f"Warning: No .sql files found in directory {file_path}"
+                if strict:
+                    print(f"Error: {msg}", file=sys.stderr)
+                    sys.exit(1)
+                print(msg, file=sys.stderr)
+                continue
+            sql_files.extend(discovered)
+            continue
+
+        if path.is_file():
+            if path.suffix.lower() != ".sql":
+                msg = f"Warning: File {file_path} doesn't have .sql extension"
+                if strict:
+                    print(f"Error: {msg}", file=sys.stderr)
+                    sys.exit(1)
+                print(msg, file=sys.stderr)
+            sql_files.append(str(path))
+    
+    return sql_files
+
+
+def _discover_schema_file(sql_files: list[str], schema_arg: Optional[str]) -> Optional[str]:
+    """
+    Determine which schema file to use for generation.
+    
+    Args:
+        sql_files: List of SQL file paths
+        schema_arg: Schema file path from command line argument
+        
+    Returns:
+        Path to the schema file to use, or None if no SQL files to process
+        
+    Raises:
+        SystemExit: If schema file is required but not found
+    """
+    if schema_arg is not None:
+        return schema_arg
+        
+    if not sql_files:
+        # No SQL files to process, so no schema file needed
+        return None
+        
+    schema_file = _find_schema_files(sql_files)
+    if schema_file is None:
+        print("Error: No schema file specified and no *.schema files found in current directory or SQL file directories", file=sys.stderr)
+        print("Use --schema to specify a schema file or ensure *.schema files exist", file=sys.stderr)
+        sys.exit(1)
+        
+    return schema_file
+
+
+def _to_snake_case(class_name: str) -> str:
+    """
+    Convert PascalCase class name to snake_case filename.
+    
+    Args:
+        class_name: PascalCase class name (e.g., 'UserRepository')
+        
+    Returns:
+        Snake case filename (e.g., 'user_repository')
+    """
+    import re
+    # Insert underscore before capital letters, then convert to lowercase
+    snake_case = re.sub(r'(?<!^)(?=[A-Z])', '_', class_name).lower()
+    return snake_case
+
+
+def _report_generated_classes(generated_classes: dict[str, str], output_dir: Optional[Path], *, dry_run: bool = False) -> None:
+    """
+    Report generated classes to the user.
+    
+    Args:
+        generated_classes: Dictionary mapping class names to generated code
+        output_dir: Output directory path (None for current directory)
+        dry_run: Whether this is a dry run (print to stdout)
+    """
+    if dry_run:
+        # Print all generated code
+        for class_name, code in generated_classes.items():
+            snake_case_name = _to_snake_case(class_name)
+            print(f"# Generated class: {class_name}: {snake_case_name}.py")
+            print("=" * 50)
+            print(code)
+            print("\n" + "=" * 50 + "\n")
+    else:
+        # Report what was generated
+        print(f"Generated {len(generated_classes)} Python classes:")
+        for class_name in generated_classes.keys():
+            snake_case_name = _to_snake_case(class_name)
+            if output_dir:
+                print(f"    - {class_name}: {output_dir / f'{snake_case_name}.py'}")
+            else:
+                print(f"    - {class_name}: {snake_case_name}.py")
 
 
 def main() -> None:
@@ -43,10 +191,16 @@ Examples:
   
   # Use custom SQL type mapping file
   python -m splurge_sql_generator.cli examples/User.sql -o generated/ --types custom_types.yaml
+  
+  # Generate default SQL type mapping file
+  python -m splurge_sql_generator.cli --generate-types
+  
+  # Generate custom SQL type mapping file
+  python -m splurge_sql_generator.cli --generate-types my_types.yaml
         """,
     )
 
-    parser.add_argument("sql_files", nargs="+", help="SQL template file(s) to process")
+    parser.add_argument("sql_files", nargs="*", help="SQL template file(s) to process")
 
     parser.add_argument(
         "-o", "--output", help="Output directory for generated Python files"
@@ -71,39 +225,38 @@ Examples:
 
     parser.add_argument(
         "--schema",
-        help="Path to schema file to use for all SQL files (default: look for .schema files with same stem as each SQL file)",
+        help="Path to schema file to use for all SQL files (default: look for *.schema files in current directory and SQL file directories)",
+    )
+
+    parser.add_argument(
+        "--generate-types",
+        nargs="?",
+        const="types.yaml",
+        metavar="[TYPES_FILE]",
+        help="Generate default SQL type mapping file. If no file specified, creates 'types.yaml' in current directory",
     )
 
     args = parser.parse_args()
 
-    # Validate input files or expand directories
-    sql_files: list[str] = []
-    for file_path in args.sql_files:
-        path = Path(file_path)
-        if not path.exists():
-            print(f"Error: SQL file not found: {file_path}", file=sys.stderr)
+    # Handle --generate-types option
+    if args.generate_types is not None:
+        try:
+            from splurge_sql_generator.schema_parser import SchemaParser
+            schema_parser = SchemaParser()
+            output_path = schema_parser.generate_types_file(output_path=args.generate_types)
+            print(f"Generated SQL type mapping file: {output_path}")
+            print("You can now customize this file for your specific database requirements.")
+            return
+        except OSError as e:
+            print(f"Error generating types file: {e}", file=sys.stderr)
             sys.exit(1)
 
-        if path.is_dir():
-            discovered = [str(p) for p in path.rglob("*.sql")]
-            if not discovered:
-                msg = f"Warning: No .sql files found in directory {file_path}"
-                if args.strict:
-                    print(f"Error: {msg}", file=sys.stderr)
-                    sys.exit(1)
-                print(msg, file=sys.stderr)
-                continue
-            sql_files.extend(discovered)
-            continue
+    # Check if SQL files are provided (required unless --generate-types is used)
+    if not args.sql_files:
+        parser.error("the following arguments are required: sql_files (unless using --generate-types)")
 
-        if path.is_file():
-            if path.suffix.lower() != ".sql":
-                msg = f"Warning: File {file_path} doesn't have .sql extension"
-                if args.strict:
-                    print(f"Error: {msg}", file=sys.stderr)
-                    sys.exit(1)
-                print(msg, file=sys.stderr)
-            sql_files.append(str(path))
+    # Expand and validate input files
+    sql_files = _expand_and_validate_inputs(args.sql_files, strict=args.strict)
 
     # Create output directory if specified
     output_dir: Path | None = None
@@ -111,39 +264,31 @@ Examples:
         output_dir = Path(args.output)
         output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Discover schema file
+    schema_file = _discover_schema_file(sql_files, args.schema)
+
+    # If no SQL files were found, we're done
+    if not sql_files:
+        return
+
     # Generate classes
     generator = PythonCodeGenerator(sql_type_mapping_file=args.types)
 
     try:
         if len(sql_files) == 1 and args.dry_run:
             # Single file, print to stdout
-            code = generator.generate_class(sql_files[0], schema_file_path=args.schema)
+            code = generator.generate_class(sql_files[0], schema_file_path=schema_file)
             print(code)
         else:
             # Multiple files or save to directory
             generated_classes = generator.generate_multiple_classes(
                 sql_files,
                 output_dir=args.output if not args.dry_run else None,
-                schema_file_path=args.schema,
+                schema_file_path=schema_file,
             )
-
-            if args.dry_run:
-                # Print all generated code
-                for class_name, code in generated_classes.items():
-                    snake_case_name = generator._to_snake_case(class_name)
-                    print(f"# Generated class: {class_name}: {snake_case_name}.py")
-                    print("=" * 50)
-                    print(code)
-                    print("\n" + "=" * 50 + "\n")
-            else:
-                # Report what was generated
-                print(f"Generated {len(generated_classes)} Python classes:")
-                for class_name in generated_classes.keys():
-                    snake_case_name = generator._to_snake_case(class_name)
-                    if output_dir:
-                        print(f"    - {class_name}: {output_dir / f'{snake_case_name}.py'}")
-                    else:
-                        print(f"    - {class_name}: {snake_case_name}.py")
+            
+            # Report generated classes
+            _report_generated_classes(generated_classes, output_dir, dry_run=args.dry_run)
 
     except (OSError, IOError, FileNotFoundError) as e:
         print(f"Error accessing files: {e}", file=sys.stderr)

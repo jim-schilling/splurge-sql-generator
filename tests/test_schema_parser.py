@@ -44,7 +44,7 @@ DEFAULT: Any
         with open(yaml_file, "w", encoding="utf-8") as f:
             f.write(yaml_content)
 
-        parser = SchemaParser(yaml_file)
+        parser = SchemaParser(sql_type_mapping_file=yaml_file)
         mapping = parser._sql_type_mapping
 
         self.assertEqual(mapping["INTEGER"], "int")
@@ -57,7 +57,7 @@ DEFAULT: Any
     def test_load_sql_type_mapping_missing_file(self):
         """Test behavior when SQL type mapping file is missing."""
         # Should not raise an exception, should use default mapping
-        parser = SchemaParser("nonexistent_file.yaml")
+        parser = SchemaParser(sql_type_mapping_file="nonexistent_file.yaml")
         
         # Should have some default mappings
         self.assertIn("INTEGER", parser._sql_type_mapping)
@@ -80,7 +80,7 @@ Default: Any
         with open(yaml_file, "w", encoding="utf-8") as f:
             f.write(yaml_content)
 
-        parser = SchemaParser(yaml_file)
+        parser = SchemaParser(sql_type_mapping_file=yaml_file)
         
         # Test case insensitive lookups
         self.assertEqual(parser.get_python_type("INTEGER"), "int")
@@ -330,6 +330,38 @@ Default: Any
         self.assertEqual(self.parser.get_python_type("INTERVAL"), "str")
 
 
+
+    def test_load_schema(self):
+        """Test loading schema directly with schema file path."""
+        # Create a schema file
+        schema_content = """
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY,
+            name TEXT
+        );
+        """
+        
+        schema_file = os.path.join(self.temp_dir, "test.schema")
+        with open(schema_file, "w", encoding="utf-8") as f:
+            f.write(schema_content)
+
+        # Test loading schema directly
+        self.parser.load_schema(schema_file)
+
+        # Verify that the schema was loaded
+        self.assertIn("users", self.parser._table_schemas)
+        self.assertEqual(self.parser.get_column_type("users", "id"), "int")
+        self.assertEqual(self.parser.get_column_type("users", "name"), "str")
+
+    def test_load_schema_missing_file(self):
+        """Test loading schema with missing file raises FileNotFoundError."""
+        missing_schema = os.path.join(self.temp_dir, "missing.schema")
+        
+        with self.assertRaises(FileNotFoundError) as context:
+            self.parser.load_schema(missing_schema)
+        
+        self.assertIn("Schema file not found", str(context.exception))
+        self.assertIn("missing.schema", str(context.exception))
 
     def test_load_schema_for_sql_file(self):
         """Test loading schema file for a given SQL file."""

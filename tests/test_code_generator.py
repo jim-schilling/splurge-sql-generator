@@ -32,8 +32,8 @@ SELECT * FROM users WHERE id = :user_id;
 INSERT INTO users (name, email) VALUES (:name, :email);
         """
         
-        with temp_sql_files(sql, create_basic_schema()) as (sql_file, _):
-            code = self.generator.generate_class(sql_file)
+        with temp_sql_files(sql, create_basic_schema()) as (sql_file, schema_file):
+            code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
             assert_generated_code_structure(code, "TestClass", ["get_user", "create_user"])
             assert_method_parameters(code, "get_user", ["user_id"])
             assert_method_parameters(code, "create_user", ["name", "email"])
@@ -56,7 +56,7 @@ SELECT 1;
         py_fd, py_fname = tempfile.mkstemp(suffix=".py")
         os.close(py_fd)
         try:
-            code = self.generator.generate_class(sql_fname, output_file_path=py_fname)
+            code = self.generator.generate_class(sql_fname, output_file_path=py_fname, schema_file_path=schema_fname)
             self.assertTrue(os.path.exists(py_fname))
             with open(py_fname, "r") as f:
                 content = f.read()
@@ -81,7 +81,9 @@ SELECT 2;
         
         with temp_multiple_sql_files(sql_files) as file_paths:
             sql_file_paths = [sql_path for sql_path, _ in file_paths]
-            result = self.generator.generate_multiple_classes(sql_file_paths)
+            schema_file_paths = [schema_path for _, schema_path in file_paths]
+            # Use the first schema file as the shared schema
+            result = self.generator.generate_multiple_classes(sql_file_paths, schema_file_path=schema_file_paths[0])
             
             self.assertEqual(len(result), 2)
             self.assertIn("ClassA", result)
@@ -91,9 +93,7 @@ SELECT 2;
 
     def test_generate_class_invalid_file(self):
         with self.assertRaises(FileNotFoundError):
-            self.generator.generate_class("nonexistent_file.sql")
-
-
+            self.generator.generate_class("nonexistent_file.sql", schema_file_path="nonexistent.schema")
 
     def test_method_docstring_generation(self):
         # Test that the template correctly generates docstrings for different method types
@@ -122,7 +122,7 @@ SELECT * FROM users;
             f.write(schema)
 
         try:
-            code = self.generator.generate_class(fname)
+            code = self.generator.generate_class(fname, schema_file_path=schema_fname)
 
             # Test method with parameters
             self.assertIn("Select operation: get_user", code)
@@ -173,7 +173,7 @@ INSERT INTO users DEFAULT VALUES;
             f.write(schema)
 
         try:
-            code = self.generator.generate_class(fname)
+            code = self.generator.generate_class(fname, schema_file_path=schema_fname)
 
             # Test class method structure
             self.assertIn("@classmethod", code)
@@ -211,8 +211,8 @@ LEFT JOIN user_orders uo ON u.id = uo.user_id
 WHERE u.id = :user_id AND u.status = :status
         """
         
-        with temp_sql_files(sql, create_complex_schema()) as (sql_file, _):
-            code = self.generator.generate_class(sql_file)
+        with temp_sql_files(sql, create_complex_schema()) as (sql_file, schema_file):
+            code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
             assert_generated_code_structure(code, "TestClass", ["get_user_stats"])
             assert_method_parameters(code, "get_user_stats", ["user_id", "status"])
             
@@ -231,8 +231,8 @@ SELECT * FROM users WHERE id = :user_id;
 INSERT INTO users (name, email) VALUES (:name, :email);
         """
         
-        with temp_sql_files(sql, create_basic_schema()) as (sql_file, _):
-            code = self.generator.generate_class(sql_file)
+        with temp_sql_files(sql, create_basic_schema()) as (sql_file, schema_file):
+            code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
             # Try to parse the generated code as Python
             ast.parse(code)
 
@@ -260,8 +260,8 @@ DESCRIBE users;
 WITH cte AS (SELECT 1) SELECT * FROM cte;
         """
         
-        with temp_sql_files(sql, create_basic_schema()) as (sql_file, _):
-            code = self.generator.generate_class(sql_file)
+        with temp_sql_files(sql, create_basic_schema()) as (sql_file, schema_file):
+            code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
             # Check that all methods are generated as class methods
             assert_generated_code_structure(code, "TestClass", 
                 ["get_users", "create_user", "update_user", "delete_user", "show_tables", "describe_table", "with_cte"])
@@ -293,9 +293,11 @@ SELECT 2;
             
             output_dir = tempfile.mkdtemp()
             try:
+                schema_file_paths = [schema_path for _, schema_path in file_paths]
                 result = self.generator.generate_multiple_classes(
                     sql_file_paths,
                     output_dir=output_dir,
+                    schema_file_path=schema_file_paths[0],
                 )
                 self.assertEqual(len(result), 2)
                 self.assertIn("ClassA", result)
@@ -317,8 +319,8 @@ SELECT * FROM users WHERE id = :user_id;
 INSERT INTO users (name) VALUES (:name);
         """
 
-        with temp_sql_files(sql, create_basic_schema()) as (sql_file, _):
-            code = self.generator.generate_class(sql_file)
+        with temp_sql_files(sql, create_basic_schema()) as (sql_file, schema_file):
+            code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
 
             # Verify only class methods are generated
             assert_generated_code_structure(code, "TestClass", ["get_user", "create_user"])
@@ -347,8 +349,8 @@ SELECT * FROM test WHERE id = :test_id;
 );
         """
 
-        with temp_sql_files(sql, schema) as (sql_file, _):
-            code = self.generator.generate_class(sql_file)
+        with temp_sql_files(sql, schema) as (sql_file, schema_file):
+            code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
 
             # Verify template-generated structure
             assert_generated_code_structure(code, "TemplateTest", ["simple_query"])

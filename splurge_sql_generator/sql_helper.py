@@ -349,11 +349,20 @@ def detect_statement_type(sql: str) -> str:
 
     token_value = first_token.value.strip().upper()
 
+    # Fast-path: classify by first significant token
     # DESC/DESCRIBE detection (regardless of token type)
     if token_value in _DESCRIBE_STATEMENT_TYPES:
         return FETCH_STATEMENT
 
-    # CTE detection: WITH ...
+    # Fast-path: common fetch statements
+    if token_value in ("SELECT", "VALUES", "SHOW", "EXPLAIN", "PRAGMA"):
+        return FETCH_STATEMENT
+
+    # Fast-path: common execute statements
+    if token_value in ("INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "DROP", "TRUNCATE"):
+        return EXECUTE_STATEMENT
+
+    # CTE detection: WITH ... (only when first token is WITH)
     if token_value == _WITH_KEYWORD:
         after_with_tokens = _extract_tokens_after_with(stmt)
 
@@ -375,11 +384,12 @@ def detect_statement_type(sql: str) -> str:
             return FETCH_STATEMENT
         return EXECUTE_STATEMENT
 
-    # SELECT
+    # Fallback: use existing logic for edge cases
+    # SELECT (with DML token type check)
     if first_token.ttype is DML and token_value == _SELECT_KEYWORD:
         return FETCH_STATEMENT
 
-    # VALUES, SHOW, EXPLAIN, PRAGMA
+    # Other fetch statements
     if _is_fetch_statement(token_value):
         return FETCH_STATEMENT
 

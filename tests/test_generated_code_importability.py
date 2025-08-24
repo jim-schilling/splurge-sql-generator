@@ -42,9 +42,9 @@ class TestGeneratedCodeImportability:
         Returns:
             Imported module object
         """
-        with temp_sql_files(sql_content, schema_content) as (sql_file, _):
+        with temp_sql_files(sql_content, schema_content) as (sql_file, schema_file):
             # Generate Python code
-            generated_code = self.generator.generate_class(sql_file)
+            generated_code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
             
             # Write generated code to file
             py_file = Path(self.temp_dir) / "generated_module.py"
@@ -161,8 +161,8 @@ SELECT * FROM test_table WHERE id = :id;
 );
 """
         
-        with temp_sql_files(sql_content, schema_content) as (sql_file, _):
-            generated_code = self.generator.generate_class(sql_file)
+        with temp_sql_files(sql_content, schema_content) as (sql_file, schema_file):
+            generated_code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
             
             # Validate required imports
             required_imports = [
