@@ -192,7 +192,7 @@ class PythonCodeGenerator:
                 python_param = param  # Preserve original parameter name
                 param_mapping[param] = python_param
                 
-                # All parameters use Any type (no type inference)
+                # All parameters use Any type (no type inference implemented)
                 param_types[param] = "Any"
                 
                 if python_param not in parameters_list:

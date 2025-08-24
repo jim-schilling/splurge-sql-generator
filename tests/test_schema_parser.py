@@ -25,18 +25,8 @@ class TestSchemaParser(unittest.TestCase):
 
     def tearDown(self):
         """Clean up test fixtures."""
-        # Clean up temporary files
-        try:
-            for file in os.listdir(self.temp_dir):
-                file_path = os.path.join(self.temp_dir, file)
-                if os.path.isfile(file_path):
-                    os.remove(file_path)
-                elif os.path.isdir(file_path):
-                    shutil.rmtree(file_path)
-            os.rmdir(self.temp_dir)
-        except (OSError, PermissionError):
-            # Ignore cleanup errors on Windows
-            pass
+        # Clean up temporary files and directories
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_load_sql_type_mapping_default(self):
         """Test loading default SQL type mapping."""

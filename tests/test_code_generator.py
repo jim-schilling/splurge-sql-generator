@@ -1,6 +1,7 @@
 import ast
 import logging
 import os
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -305,9 +306,7 @@ SELECT 2;
                 self.assertEqual(len(files), 2)
                 self.assertTrue(all(f.endswith(".py") for f in files))
             finally:
-                for file in os.listdir(output_dir):
-                    os.remove(os.path.join(output_dir, file))
-                os.rmdir(output_dir)
+                shutil.rmtree(output_dir, ignore_errors=True)
 
     def test_class_methods_only_generation(self):
         """Test that only class methods are generated, no instance methods or constructors."""

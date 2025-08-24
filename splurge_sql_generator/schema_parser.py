@@ -269,6 +269,8 @@ class SchemaParser:
         
         return 'Any'
 
+
+
     def load_schema_for_sql_file(self, sql_file_path: str, schema_file_path: str | None = None) -> None:
         """
         Load schema file for a given SQL file.
