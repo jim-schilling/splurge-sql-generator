@@ -414,6 +414,20 @@ def extract_create_table_statements(sql_content: str) -> list[tuple[str, str]]:
         raise SqlValidationError(f"Failed to parse CREATE TABLE statements: {e}") from e
 
 
+def _is_identifier_token(token: Token) -> bool:
+    """
+    Check if a token is an identifier (Name, Name.Placeholder, etc.) or quoted identifier.
+    
+    Args:
+        token: sqlparse token to check
+        
+    Returns:
+        True if the token is an identifier, False otherwise
+    """
+    return (hasattr(token, 'ttype') and token.ttype is not None and 
+            ('Name' in str(token.ttype) or 'Literal.String.Symbol' in str(token.ttype)))
+
+
 def _extract_identifier_name(token: Token) -> str:
     """
     Extract the actual name from a quoted or unquoted identifier token.
@@ -453,34 +467,48 @@ def _extract_create_table_components(tokens: list[Token], start_index: int) -> t
     
     # Find table name (next identifier after TABLE), skipping optional IF NOT EXISTS
     i = start_index
-    while True:
-        i, name_token = _next_significant_token(tokens, start=i)
+    
+    # Check for optional "IF NOT EXISTS" sequence
+    i, name_token = _next_significant_token(tokens, start=i)
+    if name_token is None:
+        return None, None
+    token_value = normalize_token(name_token)
+    
+    # If we find "IF", check for "NOT EXISTS" sequence
+    if token_value == "IF":
+        # Check for "NOT"
+        i, not_token = _next_significant_token(tokens, start=i + 1)
+        if not_token is None or normalize_token(not_token) != "NOT":
+            return None, None
+        
+        # Check for "EXISTS"
+        i, exists_token = _next_significant_token(tokens, start=i + 1)
+        if exists_token is None or normalize_token(exists_token) != "EXISTS":
+            return None, None
+        
+        # Get the table name token after "IF NOT EXISTS"
+        i, name_token = _next_significant_token(tokens, start=i + 1)
         if name_token is None:
             return None, None
+    elif token_value in {"NOT", "EXISTS"}:
+        # Malformed SQL - "NOT" or "EXISTS" without "IF"
+        return None, None
 
-        token_value = normalize_token(name_token)
-        if token_value in {"IF", "NOT", "EXISTS"}:
-            # Continue to next token - i is already updated by _next_significant_token
-            continue
-
-        # Check if this is an identifier (Name, Name.Placeholder, etc.) or quoted identifier
-        if (hasattr(name_token, 'ttype') and name_token.ttype is not None and 
-            ('Name' in str(name_token.ttype) or 'Literal.String.Symbol' in str(name_token.ttype))):
-            # Check if this is followed by a dot (schema prefix)
-            next_i, next_token = _next_significant_token(tokens, start=i + 1)
-            if next_token and str(next_token.value) == '.':
-                # Skip the dot and get the actual table name
-                next_i, table_token = _next_significant_token(tokens, start=next_i + 1)
-                if (table_token and hasattr(table_token, 'ttype') and table_token.ttype is not None and 
-                    ('Name' in str(table_token.ttype) or 'Literal.String.Symbol' in str(table_token.ttype))):
-                    table_name = _extract_identifier_name(table_token)
-                    i = next_i  # Update position to after the table name
-                else:
-                    return None, None
+    # Now check if this is an identifier (Name, Name.Placeholder, etc.) or quoted identifier
+    if _is_identifier_token(name_token):
+        # Check if this is followed by a dot (schema prefix)
+        next_i, next_token = _next_significant_token(tokens, start=i + 1)
+        if next_token and str(next_token.value) == '.':
+            # Skip the dot and get the actual table name
+            next_i, table_token = _next_significant_token(tokens, start=next_i + 1)
+            if table_token and _is_identifier_token(table_token):
+                table_name = _extract_identifier_name(table_token)
+                i = next_i  # Update position to after the table name
             else:
-                table_name = _extract_identifier_name(name_token)
-            break
-        
+                return None, None
+        else:
+            table_name = _extract_identifier_name(name_token)
+    else:
         # If we get here, the token is not an identifier, so we can't find a table name
         return None, None
 

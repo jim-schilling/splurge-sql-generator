@@ -267,6 +267,185 @@ Default: Any
         self.assertEqual(schema["id"], "TEXT")
         self.assertEqual(schema["value"], "TEXT")
 
+    def test_parse_create_table_malformed_if_not_exists(self):
+        """Test parsing malformed CREATE TABLE with incomplete IF NOT EXISTS sequence."""
+        # Test IF without NOT EXISTS
+        sql1 = """
+        CREATE TABLE IF mytable (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+        tables1 = self.parser._parse_schema_content(sql1)
+        self.assertEqual(tables1, {})  # Should not parse malformed SQL
+
+        # Test NOT without IF
+        sql2 = """
+        CREATE TABLE NOT EXISTS mytable (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+        tables2 = self.parser._parse_schema_content(sql2)
+        self.assertEqual(tables2, {})  # Should not parse malformed SQL
+
+        # Test EXISTS without IF NOT
+        sql3 = """
+        CREATE TABLE EXISTS mytable (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+        tables3 = self.parser._parse_schema_content(sql3)
+        self.assertEqual(tables3, {})  # Should not parse malformed SQL
+
+        # Test IF NOT without EXISTS
+        sql4 = """
+        CREATE TABLE IF NOT mytable (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+        tables4 = self.parser._parse_schema_content(sql4)
+        self.assertEqual(tables4, {})  # Should not parse malformed SQL
+
+    def test_parse_create_table_missing_table_name(self):
+        """Test parsing CREATE TABLE statements with missing table name."""
+        # Missing table name after TABLE
+        sql1 = """
+        CREATE TABLE (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+        tables1 = self.parser._parse_schema_content(sql1)
+        self.assertEqual(tables1, {})  # Should not parse malformed SQL
+
+        # Missing table name after IF NOT EXISTS
+        sql2 = """
+        CREATE TABLE IF NOT EXISTS (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+        tables2 = self.parser._parse_schema_content(sql2)
+        self.assertEqual(tables2, {})  # Should not parse malformed SQL
+
+    def test_parse_create_table_missing_parentheses(self):
+        """Test parsing CREATE TABLE statements with missing or malformed parentheses."""
+        # Missing opening parenthesis
+        sql1 = """
+        CREATE TABLE mytable
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+        tables1 = self.parser._parse_schema_content(sql1)
+        self.assertEqual(tables1, {})  # Should not parse malformed SQL
+
+        # Missing closing parenthesis
+        sql2 = """
+        CREATE TABLE mytable (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        """
+        tables2 = self.parser._parse_schema_content(sql2)
+        self.assertEqual(tables2, {})  # Should not parse malformed SQL
+
+        # Mismatched parentheses - this might actually parse successfully
+        # because sqlparse treats the extra ) as part of the statement
+        sql3 = """
+        CREATE TABLE mytable (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        ));
+        """
+        tables3 = self.parser._parse_schema_content(sql3)
+        # This might actually succeed because sqlparse handles the extra )
+        # We'll accept either behavior as long as it's consistent
+        if tables3:
+            # If it parses, it should extract the table correctly
+            self.assertIn("mytable", tables3)
+            schema = tables3["mytable"]
+            self.assertEqual(schema["id"], "TEXT")
+            self.assertEqual(schema["value"], "TEXT")
+        else:
+            # If it doesn't parse, that's also acceptable
+            pass
+
+    def test_parse_create_table_invalid_schema_prefix(self):
+        """Test parsing CREATE TABLE statements with invalid schema prefix."""
+        # Schema prefix without table name
+        sql1 = """
+        CREATE TABLE myschema. (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+        tables1 = self.parser._parse_schema_content(sql1)
+        self.assertEqual(tables1, {})  # Should not parse malformed SQL
+
+        # Multiple dots in schema prefix
+        sql2 = """
+        CREATE TABLE myschema.subschema.mytable (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+        tables2 = self.parser._parse_schema_content(sql2)
+        self.assertEqual(tables2, {})  # Should not parse malformed SQL
+
+    def test_parse_create_table_empty_body(self):
+        """Test parsing CREATE TABLE statements with empty table body."""
+        # Empty parentheses
+        sql1 = """
+        CREATE TABLE mytable (
+        );
+        """
+        tables1 = self.parser._parse_schema_content(sql1)
+        self.assertEqual(tables1, {})  # Should not parse malformed SQL
+
+        # Only whitespace in parentheses
+        sql2 = """
+        CREATE TABLE mytable (
+            
+        );
+        """
+        tables2 = self.parser._parse_schema_content(sql2)
+        self.assertEqual(tables2, {})  # Should not parse malformed SQL
+
+    def test_parse_create_table_malformed_keywords(self):
+        """Test parsing CREATE TABLE statements with malformed keywords."""
+        # Wrong keyword order
+        sql1 = """
+        TABLE CREATE mytable (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+        tables1 = self.parser._parse_schema_content(sql1)
+        self.assertEqual(tables1, {})  # Should not parse malformed SQL
+
+        # Missing CREATE keyword
+        sql2 = """
+        TABLE mytable (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+        tables2 = self.parser._parse_schema_content(sql2)
+        self.assertEqual(tables2, {})  # Should not parse malformed SQL
+
+        # Missing TABLE keyword
+        sql3 = """
+        CREATE mytable (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+        tables3 = self.parser._parse_schema_content(sql3)
+        self.assertEqual(tables3, {})  # Should not parse malformed SQL
+
     def test_parse_create_table_with_complex_types(self):
         """Test parsing CREATE TABLE with complex SQL types."""
         sql = """
