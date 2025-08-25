@@ -414,6 +414,29 @@ def extract_create_table_statements(sql_content: str) -> list[tuple[str, str]]:
         raise SqlValidationError(f"Failed to parse CREATE TABLE statements: {e}") from e
 
 
+def _extract_identifier_name(token: Token) -> str:
+    """
+    Extract the actual name from a quoted or unquoted identifier token.
+    
+    Args:
+        token: sqlparse token that may be quoted
+        
+    Returns:
+        The actual identifier name without quotes
+    """
+    value = str(token.value).strip()
+    
+    # Handle different quoting styles
+    if value.startswith('[') and value.endswith(']'):
+        return value[1:-1]  # Remove [ and ]
+    elif value.startswith('`') and value.endswith('`'):
+        return value[1:-1]  # Remove ` and `
+    elif value.startswith('"') and value.endswith('"'):
+        return value[1:-1]  # Remove " and "
+    else:
+        return value  # No quotes
+
+
 def _extract_create_table_components(tokens: list[Token], start_index: int) -> tuple[str, str]:
     """
     Extract table name and body from CREATE TABLE statement tokens.
@@ -428,13 +451,38 @@ def _extract_create_table_components(tokens: list[Token], start_index: int) -> t
     table_name = None
     table_body = None
     
-    # Find table name (next identifier after TABLE)
-    i, name_token = _next_significant_token(tokens, start=start_index)
-    if name_token and hasattr(name_token, 'ttype') and name_token.ttype is not None:
-        # Check if it's an identifier (Name, Name.Placeholder, etc.)
-        if 'Name' in str(name_token.ttype):
-            table_name = str(name_token.value).strip()
-    
+    # Find table name (next identifier after TABLE), skipping optional IF NOT EXISTS
+    i = start_index
+    while True:
+        i, name_token = _next_significant_token(tokens, start=i)
+        if name_token is None:
+            return None, None
+
+        token_value = normalize_token(name_token)
+        if token_value in {"IF", "NOT", "EXISTS"}:
+            i = i + 1
+            continue
+
+        # Check if this is an identifier (Name, Name.Placeholder, etc.) or quoted identifier
+        if (hasattr(name_token, 'ttype') and name_token.ttype is not None and 
+            ('Name' in str(name_token.ttype) or 'Literal.String.Symbol' in str(name_token.ttype))):
+            # Check if this is followed by a dot (schema prefix)
+            next_i, next_token = _next_significant_token(tokens, start=i + 1)
+            if next_token and str(next_token.value) == '.':
+                # Skip the dot and get the actual table name
+                next_i, table_token = _next_significant_token(tokens, start=next_i + 1)
+                if (table_token and hasattr(table_token, 'ttype') and table_token.ttype is not None and 
+                    ('Name' in str(table_token.ttype) or 'Literal.String.Symbol' in str(table_token.ttype))):
+                    table_name = _extract_identifier_name(table_token)
+                    i = next_i  # Update position to after the table name
+                else:
+                    return None, None
+            else:
+                table_name = _extract_identifier_name(name_token)
+            break
+        
+        return None, None
+
     if not table_name:
         return None, None
     
@@ -636,9 +684,6 @@ def _extract_column_name_and_type(tokens: list[Token]) -> tuple[str, str]:
     return column_name, sql_type
 
 
-# Fallback function removed - sqlparse parsing is required
-
-
 def extract_table_names(sql_query: str) -> list[str]:
     """
     Extract table names from SQL query using sqlparse.
@@ -742,9 +787,6 @@ def _extract_tables_from_statement(statement: Statement) -> set[str]:
         table_names.update(match.lower() for match in matches)
     
     return table_names
-
-
-# Fallback function removed - sqlparse parsing is required
 
 
 def split_sql_file(

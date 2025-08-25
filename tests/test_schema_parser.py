@@ -123,6 +123,150 @@ Default: Any
         self.assertEqual(schema["created_at"], "TIMESTAMP")
         self.assertEqual(schema["updated_at"], "TIMESTAMP")
 
+    def test_parse_create_table_if_not_exists(self):
+        """Test parsing CREATE TABLE IF NOT EXISTS statements extracts table name."""
+        sql = """
+        CREATE TABLE IF NOT EXISTS mytable (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+
+        tables = self.parser._parse_schema_content(sql)
+
+        self.assertIn("mytable", tables)
+        schema = tables["mytable"]
+        self.assertEqual(schema["id"], "TEXT")
+        self.assertEqual(schema["value"], "TEXT")
+
+    def test_parse_create_table_with_schema_prefix(self):
+        """Test parsing CREATE TABLE statements with schema prefix extracts table name."""
+        sql = """
+        CREATE TABLE my_schema.mytable (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+
+        tables = self.parser._parse_schema_content(sql)
+
+        self.assertIn("mytable", tables)
+        schema = tables["mytable"]
+        self.assertEqual(schema["id"], "TEXT")
+        self.assertEqual(schema["value"], "TEXT")
+
+    def test_parse_create_table_with_bracketed_schema_prefix(self):
+        """Test parsing CREATE TABLE statements with bracketed schema prefix extracts table name."""
+        sql = """
+        CREATE TABLE [myschema].[mytable] (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+
+        tables = self.parser._parse_schema_content(sql)
+
+        self.assertIn("mytable", tables)
+        schema = tables["mytable"]
+        self.assertEqual(schema["id"], "TEXT")
+        self.assertEqual(schema["value"], "TEXT")
+
+    def test_parse_create_table_with_bracketed_table_name(self):
+        """Test parsing CREATE TABLE statements with bracketed table name extracts table name."""
+        sql = """
+        CREATE TABLE [mytable] (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+
+        tables = self.parser._parse_schema_content(sql)
+
+        self.assertIn("mytable", tables)
+        schema = tables["mytable"]
+        self.assertEqual(schema["id"], "TEXT")
+        self.assertEqual(schema["value"], "TEXT")
+
+    def test_parse_create_table_with_backtick_table_name(self):
+        """Test parsing CREATE TABLE statements with backtick-quoted table name extracts table name."""
+        sql = """
+        CREATE TABLE `mytable` (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+
+        tables = self.parser._parse_schema_content(sql)
+
+        self.assertIn("mytable", tables)
+        schema = tables["mytable"]
+        self.assertEqual(schema["id"], "TEXT")
+        self.assertEqual(schema["value"], "TEXT")
+
+    def test_parse_create_table_with_backtick_schema_prefix(self):
+        """Test parsing CREATE TABLE statements with backtick-quoted schema prefix extracts table name."""
+        sql = """
+        CREATE TABLE `myschema`.`mytable` (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+
+        tables = self.parser._parse_schema_content(sql)
+
+        self.assertIn("mytable", tables)
+        schema = tables["mytable"]
+        self.assertEqual(schema["id"], "TEXT")
+        self.assertEqual(schema["value"], "TEXT")
+
+    def test_parse_create_table_with_quoted_table_name(self):
+        """Test parsing CREATE TABLE statements with double-quoted table name extracts table name."""
+        sql = """
+        CREATE TABLE "mytable" (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+
+        tables = self.parser._parse_schema_content(sql)
+
+        self.assertIn("mytable", tables)
+        schema = tables["mytable"]
+        self.assertEqual(schema["id"], "TEXT")
+        self.assertEqual(schema["value"], "TEXT")
+
+    def test_parse_create_table_with_quoted_schema_prefix(self):
+        """Test parsing CREATE TABLE statements with double-quoted schema prefix extracts table name."""
+        sql = """
+        CREATE TABLE "myschema"."mytable" (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+
+        tables = self.parser._parse_schema_content(sql)
+
+        self.assertIn("mytable", tables)
+        schema = tables["mytable"]
+        self.assertEqual(schema["id"], "TEXT")
+        self.assertEqual(schema["value"], "TEXT")
+
+    def test_parse_create_table_with_mixed_quoting(self):
+        """Test parsing CREATE TABLE statements with mixed quoting styles extracts table name."""
+        sql = """
+        CREATE TABLE [myschema].`mytable` (
+            id TEXT PRIMARY KEY,
+            value TEXT
+        );
+        """
+
+        tables = self.parser._parse_schema_content(sql)
+
+        self.assertIn("mytable", tables)
+        schema = tables["mytable"]
+        self.assertEqual(schema["id"], "TEXT")
+        self.assertEqual(schema["value"], "TEXT")
+
     def test_parse_create_table_with_complex_types(self):
         """Test parsing CREATE TABLE with complex SQL types."""
         sql = """
