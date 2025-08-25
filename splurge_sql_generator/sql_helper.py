@@ -11,7 +11,7 @@ This module is licensed under the MIT License.
 from pathlib import Path
 import re
 import sqlparse
-from sqlparse.tokens import Comment, DML
+from sqlparse.tokens import Comment, DML, Name, Literal
 from sqlparse.sql import Statement, Token
 from splurge_sql_generator.errors import (
     SqlFileError,
@@ -424,8 +424,11 @@ def _is_identifier_token(token: Token) -> bool:
     Returns:
         True if the token is an identifier, False otherwise
     """
-    return (hasattr(token, 'ttype') and token.ttype is not None and 
-            ('Name' in str(token.ttype) or 'Literal.String.Symbol' in str(token.ttype)))
+    return (
+        hasattr(token, 'ttype') and token.ttype is not None and (
+            token.ttype in (Name, Name.Placeholder, Literal.String.Symbol)
+        )
+    )
 
 
 def _extract_identifier_name(token: Token) -> str:
