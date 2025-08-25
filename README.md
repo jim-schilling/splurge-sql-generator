@@ -572,7 +572,7 @@ MIT License - see LICENSE file for details.
 
 ## Changelog
 
-### [2025.4.6] - 2025-01-27
+### [2025.4.5] - 2025-08-25
 
 #### Added
 - **Enhanced Table Name Extraction**: Comprehensive support for various table name formats in CREATE TABLE statements
@@ -621,8 +621,6 @@ CREATE TABLE "myschema"."mytable" (id TEXT PRIMARY KEY);
 -- Mixed quoting styles
 CREATE TABLE [myschema].`mytable` (id TEXT PRIMARY KEY);
 ```
-
-### [2025.4.5] - 2025-08-25
 
 ### [2025.4.4] - 2025-08-24
 
