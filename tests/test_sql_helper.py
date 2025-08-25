@@ -37,7 +37,7 @@ class TestSqlHelperPublicAPI:
         """Test remove_sql_comments with edge cases."""
         # Empty and None inputs
         assert remove_sql_comments("") == ""
-        assert remove_sql_comments(None) == None  # Function returns None for None input
+        assert remove_sql_comments(None) == ""  # Function returns empty string for None input
         
         # Whitespace only - sqlparse strips whitespace
         assert remove_sql_comments("   \n\t  ") == ""

@@ -16,6 +16,7 @@ from jinja2 import Environment, FileSystemLoader
 from splurge_sql_generator.errors import SqlValidationError
 from splurge_sql_generator.schema_parser import SchemaParser
 from splurge_sql_generator.sql_parser import SqlParser
+from splurge_sql_generator.utils import to_snake_case, safe_write_file
 
 
 class PythonCodeGenerator:
@@ -100,15 +101,7 @@ class PythonCodeGenerator:
 
         # Save to file if output path provided
         if output_file_path:
-            try:
-                Path(output_file_path).write_text(
-                    python_code,
-                    encoding="utf-8",
-                )
-            except OSError as e:
-                raise OSError(
-                    f"Error writing Python file {output_file_path}: {e}"
-                ) from e
+            safe_write_file(output_file_path, python_code)
 
         return python_code
 
@@ -450,19 +443,7 @@ class PythonCodeGenerator:
         
         return "; ".join(available_columns) if available_columns else "none"
 
-    def _to_snake_case(self, class_name: str) -> str:
-        """
-        Convert PascalCase class name to snake_case filename.
-        
-        Args:
-            class_name: PascalCase class name (e.g., 'UserRepository')
-            
-        Returns:
-            Snake case filename (e.g., 'user_repository')
-        """
-        # Insert underscore before capital letters, then convert to lowercase
-        snake_case = re.sub(r'(?<!^)(?=[A-Z])', '_', class_name).lower()
-        return snake_case
+
 
     def generate_multiple_classes(
         self,
@@ -510,17 +491,9 @@ class PythonCodeGenerator:
                 # Ensure output directory exists
                 Path(output_dir).mkdir(parents=True, exist_ok=True)
                 # Convert class name to snake_case for filename
-                snake_case_name = self._to_snake_case(class_name)
+                snake_case_name = to_snake_case(class_name)
                 output_path = Path(output_dir) / f"{snake_case_name}.py"
-                try:
-                    output_path.write_text(
-                        python_code,
-                        encoding="utf-8",
-                    )
-                except OSError as e:
-                    raise OSError(
-                        f"Error writing Python file {output_path}: {e}"
-                    ) from e
+                safe_write_file(output_path, python_code)
 
         return generated_classes
 

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 from splurge_sql_generator.sql_helper import remove_sql_comments, extract_create_table_statements, parse_table_columns
 from splurge_sql_generator.errors import SqlValidationError
+from splurge_sql_generator.utils import clean_sql_type, safe_read_file, safe_write_file
 import yaml
 
 
@@ -195,22 +196,14 @@ class SchemaParser:
             If the schema file does not exist, an empty dictionary is returned.
         """
         try:
-            with open(schema_file_path, 'r', encoding='utf-8') as f:
-                schema_content = f.read()
-            
+            schema_content = safe_read_file(schema_file_path)
             return self._parse_schema_content(schema_content)
         except FileNotFoundError:
             self._logger.warning(f"Schema file not found: '{schema_file_path}'. Returning empty schema.")
             return {}
-        except PermissionError as e:
-            self._logger.error(f"Permission denied reading schema file '{schema_file_path}': {e}. Please check file permissions.")
-            raise PermissionError(f"Permission denied reading schema file '{schema_file_path}'. Please check file permissions.") from e
-        except UnicodeDecodeError as e:
-            self._logger.error(f"Invalid UTF-8 encoding in schema file '{schema_file_path}': {e}. Please ensure the file is saved with UTF-8 encoding.")
-            raise UnicodeDecodeError(f"Invalid UTF-8 encoding in schema file '{schema_file_path}'. Please ensure the file is saved with UTF-8 encoding.", e.object, e.start, e.end) from e
-        except OSError as e:
-            self._logger.error(f"OS error reading schema file '{schema_file_path}': {e}. Please check if the file is accessible.")
-            raise OSError(f"OS error reading schema file '{schema_file_path}': {e}. Please check if the file is accessible.") from e
+        except (PermissionError, UnicodeDecodeError, OSError) as e:
+            self._logger.error(f"Error reading schema file '{schema_file_path}': {e}")
+            raise
         except SqlValidationError as e:
             self._logger.error(f"SQL validation error in schema file '{schema_file_path}': {e}. Please check the SQL syntax in your schema file.")
             raise SqlValidationError(f"SQL validation error in schema file '{schema_file_path}': {e}. Please check the SQL syntax in your schema file.") from e
@@ -264,7 +257,7 @@ class SchemaParser:
             Python type annotation
         """
         # Clean up the type by removing size specifications and normalizing case
-        clean_type = re.sub(r'\(\s*\d+(?:\s*,\s*\d+)?\s*\)', '', sql_type).upper().strip()
+        clean_type = clean_sql_type(sql_type).upper().strip()
         
         # Try exact match first
         if clean_type in self._sql_type_mapping:
@@ -425,19 +418,13 @@ class SchemaParser:
         
         yaml_content += "\n# Default fallback for unknown types\nDEFAULT: Any\n"
         
-        # Write the file
+        # Write the file using safe write utility
         try:
-            with open(output_path, 'w', encoding='utf-8') as f:
-                f.write(yaml_content)
+            safe_write_file(output_path, yaml_content)
             self._logger.info(f"Successfully generated types file: '{output_path}'")
-        except PermissionError as e:
-            error_msg = f"Permission denied writing types file to '{output_path}': {e}. Please check directory permissions."
-            self._logger.error(error_msg)
-            raise PermissionError(error_msg) from e
-        except OSError as e:
-            error_msg = f"Failed to write types file to '{output_path}': {e}. Please check if the directory exists and is writable."
-            self._logger.error(error_msg)
-            raise OSError(error_msg) from e
+        except (PermissionError, OSError) as e:
+            self._logger.error(f"Failed to write types file to '{output_path}': {e}")
+            raise
         
         return str(output_path)
 

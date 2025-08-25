@@ -18,6 +18,7 @@ from splurge_sql_generator.sql_helper import (
     remove_sql_comments,
     extract_table_names,
 )
+from splurge_sql_generator.utils import validate_python_identifier, format_error_context, safe_read_file
 
 
 class SqlParser:
@@ -76,17 +77,8 @@ class SqlParser:
             OSError: If there are I/O errors reading the file
             SqlValidationError: If the file format is invalid
         """
-        file_path = Path(file_path)
-
-        if not file_path.exists():
-            raise FileNotFoundError(f"SQL file not found: {file_path}")
-
-        # Read file content
-        try:
-            content = file_path.read_text(encoding="utf-8")
-        except OSError as e:
-            raise OSError(f"Error reading SQL file {file_path}: {e}") from e
-
+        # Use safe file reading utility
+        content = safe_read_file(file_path)
         return self.parse_string(content, file_path)
 
     def parse_string(self, content: str, file_path: str | Path | None = None) -> tuple[str, dict[str, str]]:
@@ -106,31 +98,26 @@ class SqlParser:
         # Extract class name from first line comment
         lines = content.split("\n")
         if not lines or not lines[0].strip().startswith("#"):
-            file_context = f" in {file_path}" if file_path else ""
+            file_context = format_error_context(file_path)
             raise SqlValidationError(
                 f"First line must be a class comment starting with #{file_context}"
             )
 
         # Check if first line starts with "#" (before stripping)
         if not lines[0].startswith("#"):
-            file_context = f" in {file_path}" if file_path else ""
+            file_context = format_error_context(file_path)
             raise SqlValidationError(
                 f"First line must be a class comment starting with #{file_context}"
             )
 
         class_comment = lines[0].strip()
         class_name = class_comment[1:].strip()  # Remove '#' prefix
-        if not class_name:
-            file_context = f" in {file_path}" if file_path else ""
-            raise SqlValidationError(
-                f"Class name cannot be empty{file_context}: {class_comment}"
-            )
         
-        if not class_name.isidentifier() or keyword.iskeyword(class_name):
-            file_context = f" in {file_path}" if file_path else ""
-            raise SqlValidationError(
-                f"Class name must be a valid Python identifier and not a reserved keyword{file_context}: {class_name}"
-            )
+        # Validate class name using utility function
+        try:
+            validate_python_identifier(class_name, context="class name", file_path=file_path)
+        except ValueError as e:
+            raise SqlValidationError(str(e))
 
         # Parse methods and queries
         method_queries = self._extract_methods_and_queries(content, file_path)
@@ -168,12 +155,11 @@ class SqlParser:
 
                 # Check for valid Python identifier and not a reserved keyword
                 if method_name and sql_query:
-                    if not method_name.isidentifier() or keyword.iskeyword(method_name):
-                        file_context = f" in {file_path}" if file_path else ""
-                        raise SqlValidationError(
-                            f"Method name must be a valid Python identifier and not a reserved keyword{file_context}: {method_name}"
-                        )
-                    method_queries[method_name] = sql_query
+                    try:
+                        validate_python_identifier(method_name, context="method name", file_path=file_path)
+                        method_queries[method_name] = sql_query
+                    except ValueError as e:
+                        raise SqlValidationError(str(e))
 
         return method_queries
 
@@ -248,11 +234,10 @@ class SqlParser:
         parameters = list(dict.fromkeys(parameters))
         # Check for reserved keywords in parameters
         for param in parameters:
-            if keyword.iskeyword(param):
-                file_context = f" in {file_path}" if file_path else ""
-                raise SqlValidationError(
-                    f"Parameter name cannot be a reserved keyword{file_context}: {param}"
-                )
+            try:
+                validate_python_identifier(param, context="parameter name", file_path=file_path)
+            except ValueError as e:
+                raise SqlValidationError(str(e))
 
         return {
             "type": query_type,
