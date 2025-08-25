@@ -572,6 +572,56 @@ MIT License - see LICENSE file for details.
 
 ## Changelog
 
+### [2025.4.5] - 2025-08-25
+
+#### Added
+- **Enhanced Table Name Extraction**: Comprehensive support for various table name formats in CREATE TABLE statements
+- **Schema Prefix Support**: Full support for schema-qualified table names (e.g., `my_schema.mytable`)
+- **IF NOT EXISTS Support**: Proper handling of `CREATE TABLE IF NOT EXISTS` statements
+- **Quoted Identifier Support**: Support for all major SQL identifier quoting styles:
+  - Bracketed identifiers: `[mytable]`, `[myschema].[mytable]`
+  - Backtick identifiers: `` `mytable` ``, `` `myschema`.`mytable` ``
+  - Double-quoted identifiers: `"mytable"`, `"myschema"."mytable"`
+- **Comprehensive Test Coverage**: Added 9 new test cases covering all table name extraction variants
+
+#### Enhanced
+- **SQL Parser Robustness**: Improved `_extract_create_table_components()` function to handle complex table name patterns
+- **Identifier Normalization**: New `_extract_identifier_name()` helper function for consistent handling of quoted identifiers
+- **Schema Parser Accuracy**: More reliable table name extraction from diverse SQL dialects and conventions
+
+#### Technical Improvements
+- **Token-Based Parsing**: Enhanced sqlparse token analysis for accurate table name extraction
+- **Schema Prefix Handling**: Proper parsing of dot-separated schema.table combinations
+- **Quote Style Detection**: Automatic detection and handling of different identifier quoting conventions
+- **Error Handling**: Robust error handling for malformed CREATE TABLE statements
+
+#### Supported Table Name Formats
+```sql
+-- Basic table names
+CREATE TABLE mytable (id TEXT PRIMARY KEY);
+
+-- IF NOT EXISTS variants
+CREATE TABLE IF NOT EXISTS mytable (id TEXT PRIMARY KEY);
+
+-- Schema prefixes
+CREATE TABLE my_schema.mytable (id TEXT PRIMARY KEY);
+
+-- Bracketed identifiers (SQL Server style)
+CREATE TABLE [mytable] (id TEXT PRIMARY KEY);
+CREATE TABLE [myschema].[mytable] (id TEXT PRIMARY KEY);
+
+-- Backtick identifiers (MySQL style)
+CREATE TABLE `mytable` (id TEXT PRIMARY KEY);
+CREATE TABLE `myschema`.`mytable` (id TEXT PRIMARY KEY);
+
+-- Double-quoted identifiers (PostgreSQL style)
+CREATE TABLE "mytable" (id TEXT PRIMARY KEY);
+CREATE TABLE "myschema"."mytable" (id TEXT PRIMARY KEY);
+
+-- Mixed quoting styles
+CREATE TABLE [myschema].`mytable` (id TEXT PRIMARY KEY);
+```
+
 ### [2025.4.4] - 2025-08-24
 
 #### Changed

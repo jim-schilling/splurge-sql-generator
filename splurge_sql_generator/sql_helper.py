@@ -11,12 +11,13 @@ This module is licensed under the MIT License.
 from pathlib import Path
 import re
 import sqlparse
-from sqlparse.tokens import Comment, DML
+from sqlparse.tokens import Comment, DML, Name, Literal
 from sqlparse.sql import Statement, Token
 from splurge_sql_generator.errors import (
     SqlFileError,
     SqlValidationError,
 )
+from splurge_sql_generator.utils import clean_sql_type, normalize_string, is_empty_or_whitespace
 
 
 # Private constants for SQL statement types
@@ -31,6 +32,16 @@ _SEMICOLON: str = ";"
 _COMMA: str = ","
 _PAREN_OPEN: str = "("
 _PAREN_CLOSE: str = ")"
+
+# Private constants for SQL constraint keywords
+_CONSTRAINT_KEYWORDS: set[str] = {
+    'PRIMARY', 'FOREIGN', 'UNIQUE', 'CHECK', 'CONSTRAINT', 'INDEX',
+    'KEY', 'AUTOINCREMENT', 'DEFAULT', 'NOT', 'NULL', 'REFERENCES'
+}
+
+# Private constants for SQL type suffixes
+_TYPE_SUFFIX: str = "_TYPE"
+_TYPE_SUFFIX_LENGTH: int = 5
 
 # Public constants for statement type return values
 EXECUTE_STATEMENT: str = "execute"
@@ -50,23 +61,18 @@ def remove_sql_comments(sql_text: str) -> str:
     Returns:
         SQL string with comments removed
     """
-    if not sql_text:
-        return sql_text
+    if is_empty_or_whitespace(sql_text):
+        return ""
 
     result = sqlparse.format(sql_text, strip_comments=True)
     return str(result) if result is not None else ""
-
 
 
 def normalize_token(token: Token) -> str:
     """
     Return the uppercased, stripped value of a token.
     """
-    return (
-        str(token.value).strip().upper()
-        if hasattr(token, "value") and token.value
-        else ""
-    )
+    return normalize_string(_safe_token_value(token)).upper()
 
 
 def _next_significant_token(
@@ -79,7 +85,7 @@ def _next_significant_token(
     """
     for i in range(start, len(tokens)):
         token = tokens[i]
-        if not token.is_whitespace and token.ttype not in Comment:
+        if not _is_whitespace_or_comment(token):
             return i, token
     return None, None
 
@@ -107,7 +113,7 @@ def find_main_statement_after_with(tokens: list[Token]) -> str | None:
         token_value = normalize_token(token)
         
         # Skip whitespace and comments
-        if token.is_whitespace or token.ttype in Comment:
+        if _is_whitespace_or_comment(token):
             i += 1
             continue
             
@@ -365,7 +371,12 @@ def extract_create_table_statements(sql_content: str) -> list[tuple[str, str]]:
     Raises:
         SqlValidationError: If sqlparse fails to parse the content or encounters malformed CREATE TABLE statements
     """
-    if not sql_content or not sql_content.strip():
+    # Validate input
+    if not sql_content:
+        return []
+    
+    sql_content = str(sql_content).strip()
+    if not sql_content:
         return []
     
     # Remove comments first for cleaner parsing
@@ -392,7 +403,7 @@ def extract_create_table_statements(sql_content: str) -> list[tuple[str, str]]:
                 token = tokens[i]
                 
                 # Skip whitespace and comments
-                if token.is_whitespace or token.ttype in Comment:
+                if _is_whitespace_or_comment(token):
                     i += 1
                     continue
                 
@@ -414,6 +425,106 @@ def extract_create_table_statements(sql_content: str) -> list[tuple[str, str]]:
         raise SqlValidationError(f"Failed to parse CREATE TABLE statements: {e}") from e
 
 
+def _is_identifier_token(token: Token) -> bool:
+    """
+    Check if a token is an identifier (Name, Name.Placeholder, etc.) or quoted identifier.
+    
+    Args:
+        token: sqlparse token to check
+        
+    Returns:
+        True if the token is an identifier, False otherwise
+    """
+    return (
+        hasattr(token, 'ttype') and token.ttype is not None and (
+            token.ttype in (Name, Name.Placeholder, Literal.String.Symbol)
+        )
+    )
+
+
+def _is_name_token(token: Token) -> bool:
+    """
+    Check if a token is a Name token (unquoted identifier).
+    
+    Args:
+        token: sqlparse token to check
+        
+    Returns:
+        True if the token is a Name token, False otherwise
+    """
+    return (
+        hasattr(token, 'ttype') and token.ttype is not None and 
+        token.ttype == Name
+    )
+
+
+def _is_whitespace_or_comment(token: Token) -> bool:
+    """
+    Check if a token is whitespace or a comment.
+    
+    Args:
+        token: sqlparse token to check
+        
+    Returns:
+        True if the token is whitespace or comment, False otherwise
+    """
+    return token.is_whitespace or token.ttype in Comment
+
+
+
+
+
+def _safe_token_value(token: Token) -> str:
+    """
+    Safely extract string value from a token, handling None and missing attributes.
+    
+    Args:
+        token: sqlparse token
+        
+    Returns:
+        String value of the token, or empty string if token is invalid
+    """
+    if not token or not hasattr(token, 'value'):
+        return ""
+    return normalize_string(token.value)
+
+
+def _validate_tokens_list(tokens: list[Token]) -> bool:
+    """
+    Validate that a tokens list is not None and contains valid tokens.
+    
+    Args:
+        tokens: List of tokens to validate
+        
+    Returns:
+        True if tokens list is valid, False otherwise
+    """
+    return tokens is not None and len(tokens) > 0
+
+
+def _extract_identifier_name(token: Token) -> str:
+    """
+    Extract the actual name from a quoted or unquoted identifier token.
+    
+    Args:
+        token: sqlparse token that may be quoted
+        
+    Returns:
+        The actual identifier name without quotes
+    """
+    value = _safe_token_value(token).strip()
+    
+    # Handle different quoting styles
+    if value.startswith('[') and value.endswith(']'):
+        return value[1:-1]  # Remove [ and ]
+    elif value.startswith('`') and value.endswith('`'):
+        return value[1:-1]  # Remove ` and `
+    elif value.startswith('"') and value.endswith('"'):
+        return value[1:-1]  # Remove " and "
+    else:
+        return value  # No quotes
+
+
 def _extract_create_table_components(tokens: list[Token], start_index: int) -> tuple[str, str]:
     """
     Extract table name and body from CREATE TABLE statement tokens.
@@ -425,16 +536,60 @@ def _extract_create_table_components(tokens: list[Token], start_index: int) -> t
     Returns:
         Tuple of (table_name, table_body) or (None, None) if not found
     """
+    # Validate input parameters
+    if not _validate_tokens_list(tokens) or start_index < 0 or start_index >= len(tokens):
+        return None, None
+    
     table_name = None
     table_body = None
     
-    # Find table name (next identifier after TABLE)
-    i, name_token = _next_significant_token(tokens, start=start_index)
-    if name_token and hasattr(name_token, 'ttype') and name_token.ttype is not None:
-        # Check if it's an identifier (Name, Name.Placeholder, etc.)
-        if 'Name' in str(name_token.ttype):
-            table_name = str(name_token.value).strip()
+    # Find table name (next identifier after TABLE), skipping optional IF NOT EXISTS
+    i = start_index
     
+    # Check for optional "IF NOT EXISTS" sequence
+    i, name_token = _next_significant_token(tokens, start=i)
+    if name_token is None:
+        return None, None
+    token_value = normalize_token(name_token)
+    
+    # If we find "IF", check for "NOT EXISTS" sequence
+    if token_value == "IF":
+        # Check for "NOT"
+        i, not_token = _next_significant_token(tokens, start=i + 1)
+        if not_token is None or normalize_token(not_token) != "NOT":
+            return None, None
+        
+        # Check for "EXISTS"
+        i, exists_token = _next_significant_token(tokens, start=i + 1)
+        if exists_token is None or normalize_token(exists_token) != "EXISTS":
+            return None, None
+        
+        # Get the table name token after "IF NOT EXISTS"
+        i, name_token = _next_significant_token(tokens, start=i + 1)
+        if name_token is None:
+            return None, None
+    elif token_value in {"NOT", "EXISTS"}:
+        # Malformed SQL - "NOT" or "EXISTS" without "IF"
+        return None, None
+
+    # Now check if this is an identifier (Name, Name.Placeholder, etc.) or quoted identifier
+    if _is_identifier_token(name_token):
+        # Check if this is followed by a dot (schema prefix)
+        next_i, next_token = _next_significant_token(tokens, start=i + 1)
+        if next_token and str(next_token.value) == '.':
+            # Skip the dot and get the actual table name
+            next_i, table_token = _next_significant_token(tokens, start=next_i + 1)
+            if table_token and _is_identifier_token(table_token):
+                table_name = _extract_identifier_name(table_token)
+                i = next_i  # Update position to after the table name
+            else:
+                return None, None
+        else:
+            table_name = _extract_identifier_name(name_token)
+    else:
+        # If we get here, the token is not an identifier, so we can't find a table name
+        return None, None
+
     if not table_name:
         return None, None
     
@@ -450,9 +605,10 @@ def _extract_create_table_components(tokens: list[Token], start_index: int) -> t
     
     for j in range(body_start, len(tokens)):
         token = tokens[j]
-        if str(token.value) == '(':
+        token_value = _safe_token_value(token)
+        if token_value == '(':
             paren_count += 1
-        elif str(token.value) == ')':
+        elif token_value == ')':
             paren_count -= 1
             if paren_count == 0:
                 body_end = j
@@ -492,7 +648,12 @@ def parse_table_columns(table_body: str) -> dict[str, str]:
         >>> parse_table_columns("user_id INTEGER, email VARCHAR(255) UNIQUE")
         {'user_id': 'INTEGER', 'email': 'VARCHAR'}
     """
-    if not table_body or not table_body.strip():
+    # Validate input
+    if is_empty_or_whitespace(table_body):
+        raise SqlValidationError("Table body cannot be None or empty")
+    
+    table_body = normalize_string(table_body)
+    if is_empty_or_whitespace(table_body):
         raise SqlValidationError("No valid column definitions found in table body")
     
     columns: dict[str, str] = {}
@@ -539,7 +700,7 @@ def _split_by_top_level_commas(tokens: list[Token]) -> list[list[Token]]:
     paren_count = 0
     
     for token in tokens:
-        token_value = str(token.value)
+        token_value = _safe_token_value(token)
         
         if token_value == '(':
             paren_count += 1
@@ -572,50 +733,42 @@ def _extract_column_name_and_type(tokens: list[Token]) -> tuple[str, str]:
     if not tokens:
         return None, None
     
-    # Skip constraint keywords at the beginning
-    constraint_keywords = {
-        'PRIMARY', 'FOREIGN', 'UNIQUE', 'CHECK', 'CONSTRAINT', 'INDEX',
-        'KEY', 'AUTOINCREMENT', 'DEFAULT', 'NOT', 'NULL', 'REFERENCES'
-    }
-    
     # Find the first identifier (column name)
     column_name = None
     type_start_idx = None
     
     for i, token in enumerate(tokens):
-        if token.is_whitespace or token.ttype in Comment:
+        if _is_whitespace_or_comment(token):
             continue
         
         token_value = normalize_token(token)
         
-        # Skip constraint keywords
-        if token_value in constraint_keywords:
+        # Skip constraint keywords at the beginning (these indicate table-level constraints)
+        if token_value in _CONSTRAINT_KEYWORDS:
             return None, None
         
         # Check if this is an identifier (column name)
-        if hasattr(token, 'ttype') and token.ttype is not None:
-            if 'Name' in str(token.ttype):
-                column_name = str(token.value).strip()
-                type_start_idx = i + 1
-                break
+        if _is_name_token(token):
+            column_name = str(token.value).strip()
+            type_start_idx = i + 1
+            break
     
     if not column_name or type_start_idx is None:
         return None, None
     
     # Extract SQL type (next identifier after column name)
-    sql_type = None
     type_tokens = []
     
     for i in range(type_start_idx, len(tokens)):
         token = tokens[i]
         
-        if token.is_whitespace or token.ttype in Comment:
+        if _is_whitespace_or_comment(token):
             continue
         
         token_value = str(token.value)
         
         # Stop at constraint keywords
-        if normalize_token(token) in constraint_keywords:
+        if normalize_token(token) in _CONSTRAINT_KEYWORDS:
             break
         
         # Collect type tokens
@@ -624,19 +777,17 @@ def _extract_column_name_and_type(tokens: list[Token]) -> tuple[str, str]:
     if type_tokens:
         # Join type tokens and clean up
         sql_type = ''.join(type_tokens).strip()
-        # Remove size specifications like (255), (10,2)
-        sql_type = re.sub(r'\(\s*\d+(?:\s*,\s*\d+)?\s*\)', '', sql_type).strip()
+        # First clean size specifications
+        sql_type = clean_sql_type(sql_type)
         # Remove any remaining constraint keywords that might have been included
-        for keyword in constraint_keywords:
+        for keyword in _CONSTRAINT_KEYWORDS:
             sql_type = sql_type.replace(keyword, '').strip()
         # Legacy behavior: strip _TYPE suffix for unknown types
-        if sql_type.endswith('_TYPE'):
-            sql_type = sql_type[:-5]  # Remove '_TYPE' suffix
+        if sql_type.endswith(_TYPE_SUFFIX):
+            sql_type = sql_type[:-_TYPE_SUFFIX_LENGTH]
+        return column_name, sql_type
     
-    return column_name, sql_type
-
-
-# Fallback function removed - sqlparse parsing is required
+    return column_name, None
 
 
 def extract_table_names(sql_query: str) -> list[str]:
@@ -742,9 +893,6 @@ def _extract_tables_from_statement(statement: Statement) -> set[str]:
         table_names.update(match.lower() for match in matches)
     
     return table_names
-
-
-# Fallback function removed - sqlparse parsing is required
 
 
 def split_sql_file(

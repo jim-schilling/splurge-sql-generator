@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Optional
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
+from splurge_sql_generator.utils import to_snake_case, find_files_by_extension
 
 
 def _find_schema_files(sql_files: list[str]) -> Optional[str]:
@@ -33,7 +34,7 @@ def _find_schema_files(sql_files: list[str]) -> Optional[str]:
     
     # Look for *.schema files in each directory
     for search_dir in search_dirs:
-        schema_files = list(search_dir.glob("*.schema"))
+        schema_files = find_files_by_extension(search_dir, ".schema")
         if schema_files:
             # Return the first schema file found
             return str(schema_files[0])
@@ -117,20 +118,7 @@ def _discover_schema_file(sql_files: list[str], schema_arg: Optional[str]) -> Op
     return schema_file
 
 
-def _to_snake_case(class_name: str) -> str:
-    """
-    Convert PascalCase class name to snake_case filename.
-    
-    Args:
-        class_name: PascalCase class name (e.g., 'UserRepository')
-        
-    Returns:
-        Snake case filename (e.g., 'user_repository')
-    """
-    import re
-    # Insert underscore before capital letters, then convert to lowercase
-    snake_case = re.sub(r'(?<!^)(?=[A-Z])', '_', class_name).lower()
-    return snake_case
+
 
 
 def _report_generated_classes(generated_classes: dict[str, str], output_dir: Optional[Path], *, dry_run: bool = False) -> None:
@@ -145,7 +133,7 @@ def _report_generated_classes(generated_classes: dict[str, str], output_dir: Opt
     if dry_run:
         # Print all generated code
         for class_name, code in generated_classes.items():
-            snake_case_name = _to_snake_case(class_name)
+            snake_case_name = to_snake_case(class_name)
             print(f"# Generated class: {class_name}: {snake_case_name}.py")
             print("=" * 50)
             print(code)
@@ -154,7 +142,7 @@ def _report_generated_classes(generated_classes: dict[str, str], output_dir: Opt
         # Report what was generated
         print(f"Generated {len(generated_classes)} Python classes:")
         for class_name in generated_classes.keys():
-            snake_case_name = _to_snake_case(class_name)
+            snake_case_name = to_snake_case(class_name)
             if output_dir:
                 print(f"    - {class_name}: {output_dir / f'{snake_case_name}.py'}")
             else:

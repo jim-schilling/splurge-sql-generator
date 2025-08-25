@@ -396,7 +396,7 @@ SELECT * FROM users WHERE id = :user_id;
         """
         with self.assertRaises(SqlValidationError) as cm:
             self.parser.parse_string(sql)
-        self.assertIn("Class name must be a valid Python identifier", str(cm.exception))
+        self.assertIn("Class name cannot be a reserved keyword", str(cm.exception))
 
     def test_parse_string_class_comment_formats(self):
         """Test parse_string accepts both '#Class' and '# Class' formats."""

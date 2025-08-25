@@ -20,7 +20,7 @@ class TestRemoveSqlComments:
     def test_none_string(self):
         """Test removing comments from None string."""
         result = remove_sql_comments(None)
-        assert result is None
+        assert result == ""
 
     def test_no_comments(self):
         """Test SQL with no comments."""
