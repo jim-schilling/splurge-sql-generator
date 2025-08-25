@@ -481,6 +481,7 @@ def _extract_create_table_components(tokens: list[Token], start_index: int) -> t
                 table_name = _extract_identifier_name(name_token)
             break
         
+        # If we get here, the token is not an identifier, so we can't find a table name
         return None, None
 
     if not table_name:
