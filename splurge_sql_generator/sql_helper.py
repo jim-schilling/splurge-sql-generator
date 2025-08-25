@@ -460,7 +460,7 @@ def _extract_create_table_components(tokens: list[Token], start_index: int) -> t
 
         token_value = normalize_token(name_token)
         if token_value in {"IF", "NOT", "EXISTS"}:
-            i = i + 1
+            # Continue to next token - i is already updated by _next_significant_token
             continue
 
         # Check if this is an identifier (Name, Name.Placeholder, etc.) or quoted identifier
