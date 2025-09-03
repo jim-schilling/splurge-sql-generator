@@ -4,7 +4,6 @@ Test utilities for splurge-sql-generator tests.
 This module provides common helper functions and fixtures used across multiple test files.
 """
 
-import os
 import re
 import tempfile
 from contextlib import contextmanager
@@ -35,26 +34,29 @@ def temp_sql_files(
         with temp_sql_files(sql, schema) as (sql_file, schema_file):
             code = generator.generate_class(sql_file)
     """
-    # Create SQL file
-    with tempfile.NamedTemporaryFile("w+", delete=False, suffix=sql_suffix) as f:
-        f.write(sql_content)
-        sql_fname = f.name
+    # Create temporary directory using pathlib for cross-platform compatibility
+    temp_dir = Path(tempfile.mkdtemp())
     
-    schema_fname = None
+    # Create SQL file
+    sql_file = temp_dir / f"temp{sql_suffix}"
+    sql_file.write_text(sql_content, encoding='utf-8')
+    
+    schema_file = None
     if schema_content is not None:
         # Create schema file
-        schema_fname = Path(sql_fname).with_suffix('.schema')
-        with open(schema_fname, "w", encoding="utf-8") as f:
-            f.write(schema_content)
+        schema_file = temp_dir / "temp.schema"
+        schema_file.write_text(schema_content, encoding='utf-8')
     
     try:
-        yield sql_fname, schema_fname
+        yield str(sql_file), str(schema_file) if schema_file else None
     finally:
         # Cleanup
-        if os.path.exists(sql_fname):
-            os.remove(sql_fname)
-        if schema_fname and os.path.exists(schema_fname):
-            os.remove(schema_fname)
+        if sql_file.exists():
+            sql_file.unlink()
+        if schema_file and schema_file.exists():
+            schema_file.unlink()
+        # Remove temporary directory
+        temp_dir.rmdir()
 
 
 @contextmanager
@@ -75,29 +77,35 @@ def temp_multiple_sql_files(
         with temp_multiple_sql_files(files) as file_paths:
             result = generator.generate_multiple_classes([f[0] for f in file_paths])
     """
+    # Create temporary directory using pathlib for cross-platform compatibility
+    temp_dir = Path(tempfile.mkdtemp())
     file_paths = []
     
     try:
-        for sql_content, schema_content in sql_files:
-            with tempfile.NamedTemporaryFile("w+", delete=False, suffix=".sql") as f:
-                f.write(sql_content)
-                sql_fname = f.name
+        for i, (sql_content, schema_content) in enumerate(sql_files):
+            # Create SQL file with unique name
+            sql_file = temp_dir / f"temp_{i}.sql"
+            sql_file.write_text(sql_content, encoding='utf-8')
             
-            schema_fname = Path(sql_fname).with_suffix('.schema')
-            with open(schema_fname, "w", encoding="utf-8") as f:
-                f.write(schema_content)
+            # Create schema file
+            schema_file = temp_dir / f"temp_{i}.schema"
+            schema_file.write_text(schema_content, encoding='utf-8')
             
-            file_paths.append((sql_fname, schema_fname))
+            file_paths.append((str(sql_file), str(schema_file)))
         
         yield file_paths
         
     finally:
         # Cleanup all files
-        for sql_fname, schema_fname in file_paths:
-            if os.path.exists(sql_fname):
-                os.remove(sql_fname)
-            if os.path.exists(schema_fname):
-                os.remove(schema_fname)
+        for sql_file_path, schema_file_path in file_paths:
+            sql_file = Path(sql_file_path)
+            schema_file = Path(schema_file_path)
+            if sql_file.exists():
+                sql_file.unlink()
+            if schema_file.exists():
+                schema_file.unlink()
+        # Remove temporary directory
+        temp_dir.rmdir()
 
 
 def create_sql_with_schema(tmp_path, filename: str, sql_content: str, schema_content: str | None = None) -> tuple[Path, Path]:

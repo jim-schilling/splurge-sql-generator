@@ -65,6 +65,8 @@ WHERE id = :user_id;
 
 ### 2. Generate Python Class
 
+> **Note:** Schema files (`.schema`) are required for code generation. The examples below use `User.schema` which should exist in your examples directory. If you don't have schema files, you can create them using standard SQL `CREATE TABLE` statements.
+
 Using the CLI:
 
 ```bash
@@ -75,7 +77,7 @@ python -m splurge_sql_generator.cli UserRepository.sql --output generated/
 splurge-sql-gen UserRepository.sql --output generated/
 
 # With explicit schema file (if needed)
-python -m splurge_sql_generator.cli UserRepository.sql --output generated/ --schema database.schema
+python -m splurge_sql_generator.cli UserRepository.sql --output generated/ --schema User.schema
 ```
 
 Or using Python:
@@ -87,14 +89,14 @@ generator = PythonCodeGenerator()
 code = generator.generate_class(
     'UserRepository.sql',
     output_file_path='generated/UserRepository.py',
-    schema_file_path='database.schema',  # Optional: shared schema file
+    schema_file_path='User.schema',  # Optional: shared schema file
 )
 
 # Or use the convenience function
 code2 = generate_class(
     'UserRepository.sql',
     output_file_path='generated/UserRepository.py',
-    schema_file_path='database.schema',  # Optional: shared schema file
+    schema_file_path='User.schema',  # Optional: shared schema file
 )
 ```
 
@@ -169,7 +171,7 @@ You have three options for schema files:
 **Option 2: Shared schema file** (recommended for multiple SQL files)
 - Create one schema file that covers all your tables
 - Use the `--schema` option to specify the shared schema file
-- Example: `--schema database.schema` for all SQL files
+- Example: `--schema User.schema` for all SQL files
 
 **Option 3: Automatic schema discovery** (new in 2025.4.1)
 - Place `*.schema` files in the current directory or directories containing SQL files
@@ -301,8 +303,10 @@ from splurge_sql_generator import generate_types_file
 generate_types_file()
 
 # Generate custom types file
-generate_types_file('my_custom_types.yaml')
+generate_types_file(output_path='my_custom_types.yaml')
 ```
+
+> **Note:** The `generate_types_file()` function uses keyword-only parameters. Always use `output_path='filename'` syntax.
 
 The generated file includes comprehensive mappings for SQLite, PostgreSQL, MySQL, MSSQL, and Oracle types, organized by database with helpful comments.
 
@@ -374,10 +378,10 @@ splurge-sql-gen UserRepository.sql --output generated/ --types custom_types.yaml
 splurge-sql-gen UserRepository.sql --output generated/ -t custom_types.yaml
 
 # Use shared schema file for multiple SQL files
-splurge-sql-gen *.sql --output generated/ --schema database.schema
+splurge-sql-gen *.sql --output generated/ --schema User.schema
 
 # Use shared schema file with custom type mapping
-splurge-sql-gen *.sql --output generated/ --schema database.schema --types custom_types.yaml
+splurge-sql-gen *.sql --output generated/ --schema User.schema --types custom_types.yaml
 
 # Automatic schema discovery (no --schema needed)
 splurge-sql-gen *.sql --output generated/  # Automatically finds *.schema files
@@ -464,7 +468,7 @@ Parse column definitions from table body using sqlparse tokens. Raises `SqlValid
 #### `extract_table_names(sql_query: str) -> list[str]`
 Extract table names from SQL query using sqlparse. Raises `SqlValidationError` if parsing fails or no table names are found.
 
-#### `generate_types_file(output_path: str | None = None) -> str`
+#### `generate_types_file(*, output_path: str | None = None) -> str`
 Generate the default SQL type mapping YAML file.
 
 ## Supported SQL Features
@@ -815,7 +819,7 @@ python -m splurge_sql_generator.cli examples/User.sql --schema custom.schema --d
 
 #### Schema Discovery Behavior
 - **Search Locations**: Current directory and directories containing SQL files
-- **File Pattern**: Looks for `*.schema` files (e.g., `database.schema`, `User.schema`)
+- **File Pattern**: Looks for `*.schema` files (e.g., `User.schema`, `OrderService.schema`)
 - **Selection**: Uses the first schema file found in the search order
 - **Fallback**: Clear error message if no schema files are found
 - **Override**: `--schema` option always takes precedence over automatic discovery
@@ -861,7 +865,7 @@ python -m splurge_sql_generator.cli examples/User.sql --dry-run --types custom_t
 python -m splurge_sql_generator.cli examples/User.sql --dry-run -t custom_types.yaml
 
 # Use shared schema file for multiple SQL files
-python -m splurge_sql_generator.cli *.sql --output generated/ --schema database.schema
+python -m splurge_sql_generator.cli *.sql --output generated/ --schema User.schema
 ```
 
 #### Database Type Support
