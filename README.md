@@ -572,6 +572,26 @@ MIT License - see LICENSE file for details.
 
 ## Changelog
 
+### [2025.4.6] - 2025-09-03
+
+#### Added
+- More comprehensive test coverage:
+  - Unit tests for `splurge_sql_generator.utils` (file operations, identifier validation, normalization utilities)
+  - End-to-end CLI tests covering multi-file generation with a single shared `--schema`, `--dry-run` output, and `--generate-types`
+
+#### Changed
+- CLI internals modernized to Python 3.10+ typing:
+  - Replaced `Optional[...]` with `| None`
+  - Reformatted multi-parameter function signatures to multiline per method standards
+
+#### Fixed
+- Snake case conversion for all-uppercase acronyms (e.g., `API` → `api`) in `to_snake_case`
+- Test portability improvements (OS-agnostic path assertions in utils tests)
+
+#### Technical Improvements
+- Consistency with project standards (absolute imports, method formatting)
+- Strengthened end-to-end validation of CLI workflows and reporting
+
 ### [2025.4.5] - 2025-08-25
 
 #### Added
