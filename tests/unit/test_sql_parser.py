@@ -491,24 +491,21 @@ SELECT * FROM users WHERE id = :user_id;
             self.parser.get_method_info(sql, "test.sql")
         self.assertIn("Parameter name cannot be a reserved keyword in test.sql", str(cm.exception))
 
+    def test_get_method_info_parameter_fallback_on_sqlparse_error(self):
+        """Fallback regex path is used when sqlparse.parse raises; parameters are still captured."""
+        import splurge_sql_generator.sql_parser as sql_parser_module
+        from unittest.mock import patch
+
+        def raise_err(_):
+            raise RuntimeError("boom")
+
+        with patch.object(sql_parser_module.sqlparse, "parse", side_effect=raise_err), \
+             patch.object(sql_parser_module, "detect_statement_type", return_value=sql_parser_module.FETCH_STATEMENT):
+            parser = sql_parser_module.SqlParser()
+            sql = "SELECT * FROM users WHERE id = :id AND status = :status"
+            info = parser.get_method_info(sql)
+            self.assertEqual(info["parameters"], ["id", "status"])
+
 
 if __name__ == "__main__":
     unittest.main()
-
-
-def test_get_method_info_parameter_fallback_on_sqlparse_error(monkeypatch):
-    """Fallback regex path is used when sqlparse.parse raises; parameters are still captured."""
-    import splurge_sql_generator.sql_parser as sql_parser_module
-
-    def raise_err(_):
-        raise RuntimeError("boom")
-
-    # Make token parsing in sql_parser fail
-    monkeypatch.setattr(sql_parser_module.sqlparse, "parse", raise_err)
-    # Stub statement detection to avoid invoking sqlparse in helper
-    monkeypatch.setattr(sql_parser_module, "detect_statement_type", lambda _sql: sql_parser_module.FETCH_STATEMENT)
-
-    parser = sql_parser_module.SqlParser()
-    sql = "SELECT * FROM users WHERE id = :id AND status = :status"
-    info = parser.get_method_info(sql)
-    assert info["parameters"] == ["id", "status"]
