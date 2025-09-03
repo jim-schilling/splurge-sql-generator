@@ -145,7 +145,7 @@ def safe_read_file(file_path: str | Path, *, encoding: str = _DEFAULT_ENCODING) 
             e.object,
             e.start,
             e.end,
-            e.reason
+            f"{e.reason} in file '{path}'"
         ) from e
     except OSError as e:
         raise OSError(f"Error reading file '{path}': {e}") from e
