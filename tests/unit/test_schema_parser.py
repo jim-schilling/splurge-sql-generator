@@ -9,10 +9,8 @@ import os
 import shutil
 import tempfile
 import unittest
-from pathlib import Path
 
 from splurge_sql_generator.schema_parser import SchemaParser
-from test_utils import create_basic_schema, create_complex_schema
 
 
 class TestSchemaParser(unittest.TestCase):

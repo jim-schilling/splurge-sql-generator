@@ -6,14 +6,11 @@ import os
 import shutil
 import tempfile
 import unittest
-from pathlib import Path
 
-from splurge_sql_generator.cli import main
 from splurge_sql_generator.code_generator import PythonCodeGenerator
 from splurge_sql_generator.schema_parser import SchemaParser
-from test_utils import (
+from tests.unit.test_utils import (
     temp_sql_files,
-    create_basic_schema,
     assert_generated_code_structure,
     assert_method_parameters
 )

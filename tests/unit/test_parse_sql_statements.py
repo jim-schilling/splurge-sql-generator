@@ -4,7 +4,6 @@ Unit tests for SQL statement parsing functionality.
 Tests the parse_sql_statements function from the sql_helper module.
 """
 
-import pytest
 
 from splurge_sql_generator.sql_helper import parse_sql_statements
 

@@ -4,7 +4,7 @@ import unittest
 
 from splurge_sql_generator.sql_parser import SqlParser
 from splurge_sql_generator.errors import SqlValidationError
-from test_utils import temp_sql_files
+from tests.unit.test_utils import temp_sql_files
 
 
 class TestSqlParser(unittest.TestCase):

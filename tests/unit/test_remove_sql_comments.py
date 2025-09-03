@@ -4,7 +4,6 @@ Unit tests for SQL comment removal functionality.
 Tests the remove_sql_comments function from the sql_helper module.
 """
 
-import pytest
 
 from splurge_sql_generator.sql_helper import remove_sql_comments
 

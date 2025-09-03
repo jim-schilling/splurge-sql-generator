@@ -12,11 +12,10 @@ from pathlib import Path
 import pytest
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
-from test_utils import (
+from tests.unit.test_utils import (
     temp_sql_files,
     temp_multiple_sql_files,
     create_basic_schema,
-    create_dummy_schema,
     create_complex_schema,
     assert_generated_code_structure,
     assert_method_parameters
@@ -182,7 +181,7 @@ SELECT * FROM users WHERE id = :user_id;
             output_dir = Path(self.temp_dir) / "output"
             
             # Generate with output directory
-            result = self.generator.generate_multiple_classes(
+            self.generator.generate_multiple_classes(
                 [sql_file], 
                 output_dir=str(output_dir),
                 schema_file_path=schema_file

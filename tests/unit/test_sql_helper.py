@@ -12,7 +12,6 @@ import os
 from splurge_sql_generator.sql_helper import (
     remove_sql_comments,
     normalize_token,
-    find_main_statement_after_with,
     detect_statement_type,
     parse_sql_statements,
     extract_create_table_statements,
@@ -136,7 +135,7 @@ class TestSqlHelperPublicAPI:
     def test_normalize_token_edge_cases(self):
         """Test normalize_token with edge cases."""
         from sqlparse.sql import Token
-        from sqlparse.tokens import Name, Whitespace, Punctuation
+        from sqlparse.tokens import Whitespace, Punctuation
         
         # Test with whitespace token
         token = Token(Whitespace, "   ")

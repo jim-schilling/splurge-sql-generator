@@ -14,7 +14,7 @@ from unittest.mock import Mock
 import pytest
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
-from test_utils import (
+from tests.unit.test_utils import (
     temp_sql_files,
     create_basic_schema
 )

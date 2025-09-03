@@ -11,14 +11,12 @@ import sys
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection
+from splurge_sql_generator import generate_class
+from splurge_sql_generator.code_generator import PythonCodeGenerator
 
 # Add the project root to the path so we can import from 'output' and the package
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, PROJECT_ROOT)
-
-# Import splurge_sql_generator modules
-from splurge_sql_generator import generate_class
-from splurge_sql_generator.code_generator import PythonCodeGenerator
 
 
 def _ensure_generated_classes() -> None:
@@ -268,9 +266,6 @@ def main():
 
     # Ensure generated classes and import
     _ensure_generated_classes()
-    from output.user import User
-    from output.product_repository import ProductRepository
-    from output.order_service import OrderService
 
     # Create database and tables
     engine = setup_database()

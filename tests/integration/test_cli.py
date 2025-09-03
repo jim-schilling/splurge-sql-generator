@@ -3,14 +3,11 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from pathlib import Path
-import shutil
-import pytest
 import re
 
-from test_utils import create_basic_schema, create_sql_with_schema
+from tests.unit.test_utils import create_basic_schema, create_sql_with_schema
 
-SCRIPT = os.path.join(os.path.dirname(__file__), '..', 'splurge_sql_generator', 'cli.py')
+SCRIPT = os.path.join(os.path.dirname(__file__), '..', '..', 'splurge_sql_generator', 'cli.py')
 
 
 def run_cli(args, input_sql=None):

@@ -10,10 +10,8 @@ This module is licensed under the MIT License.
 """
 
 import logging
-import re
 from pathlib import Path
-from typing import Any
-from splurge_sql_generator.sql_helper import remove_sql_comments, extract_create_table_statements, parse_table_columns
+from splurge_sql_generator.sql_helper import extract_create_table_statements, parse_table_columns
 from splurge_sql_generator.errors import SqlValidationError
 from splurge_sql_generator.utils import clean_sql_type, safe_read_file, safe_write_file
 import yaml
@@ -351,7 +349,7 @@ class SchemaParser:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
         # Get the default mapping
-        default_mapping = self._get_default_mapping()
+        self._get_default_mapping()
         
         # Write the YAML file with comments
         yaml_content = """# SQL Type to Python Type Mapping

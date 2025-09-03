@@ -14,7 +14,6 @@ import tempfile
 from pathlib import Path
 
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import Connection
 
 # Add the project root to the path so we can import from 'output' and the package
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
