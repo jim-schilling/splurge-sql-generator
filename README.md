@@ -578,19 +578,30 @@ MIT License - see LICENSE file for details.
 - More comprehensive test coverage:
   - Unit tests for `splurge_sql_generator.utils` (file operations, identifier validation, normalization utilities)
   - End-to-end CLI tests covering multi-file generation with a single shared `--schema`, `--dry-run` output, and `--generate-types`
+  - Schema parser edge-case tests to harden behavior and raise coverage:
+    - YAML mapping validation (filters non-string values, ensures `DEFAULT` exists)
+    - Fallback to default mapping on invalid YAML or non-dict content
+    - Error propagation tests for `parse_schema_file` (UnicodeDecodeError, OSError, malformed SQL)
+    - Case-insensitive lookups for `get_column_type`
+    - Explicit `schema_file_path` override in `load_schema_for_sql_file`
 
 #### Changed
 - CLI internals modernized to Python 3.10+ typing:
   - Replaced `Optional[...]` with `| None`
   - Reformatted multi-parameter function signatures to multiline per method standards
+- Documentation clarified for schema loading:
+  - Explicit `schema_file_path` in APIs takes precedence over derived `.schema` files
+  - YAML mapping behavior documented: non-string entries ignored; `DEFAULT` ensured
 
 #### Fixed
 - Snake case conversion for all-uppercase acronyms (e.g., `API` → `api`) in `to_snake_case`
 - Test portability improvements (OS-agnostic path assertions in utils tests)
+- Correct UnicodeDecodeError re-raise in `utils.safe_read_file` to use proper constructor signature, with clearer context message
 
 #### Technical Improvements
 - Consistency with project standards (absolute imports, method formatting)
 - Strengthened end-to-end validation of CLI workflows and reporting
+- Increased module coverage (approximate): `schema_parser.py` ~96%, overall ~94%
 
 ### [2025.4.5] - 2025-08-25
 

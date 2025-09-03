@@ -123,6 +123,11 @@ SELECT 2;
         self.assertEqual(info["type"], "values")
         self.assertTrue(info["is_fetch"])
 
+        # PRAGMA is a fetch statement but not mapped to a named type, so 'other'
+        info = self.parser.get_method_info("PRAGMA table_info(users)")
+        self.assertEqual(info["type"], "other")
+        self.assertTrue(info["is_fetch"])
+
     def test_get_method_info_complex_sql(self):
         # Complex CTE with multiple CTEs
         sql = """
@@ -163,6 +168,31 @@ SELECT 2;
         self.assertIn("status", info["parameters"])
         self.assertEqual(len(info["parameters"]), 2)
 
+        # VALUES-only query
+        sql = "VALUES (1,'a'), (2,'b')"
+        info = self.parser.get_method_info(sql)
+        self.assertEqual(info["type"], "values")
+        self.assertTrue(info["is_fetch"])
+
+        # SHOW with parameters in string literal should not be extracted
+        sql = "SHOW TABLES -- :not_a_param"
+        info = self.parser.get_method_info(sql)
+        self.assertEqual(info["type"], "show")
+        self.assertEqual(info["parameters"], [])
+
+        # WITH RECURSIVE select
+        sql = """
+        WITH RECURSIVE cte(n) AS (
+            SELECT 1
+            UNION ALL
+            SELECT n+1 FROM cte WHERE n < 3
+        )
+        SELECT * FROM cte
+        """
+        info = self.parser.get_method_info(sql)
+        self.assertEqual(info["type"], "cte")
+        self.assertTrue(info["is_fetch"])
+
     def test_get_method_info_parameter_extraction(self):
         # Multiple parameters
         sql = "SELECT * FROM users WHERE id = :user_id AND status = :status"
@@ -199,6 +229,18 @@ SELECT 2;
         self.assertIn("status", info["parameters"])
         self.assertTrue(info["has_returning"])
 
+        # Parameter-like sequence in string should be ignored
+        sql = "SELECT ':not_a_param' as s, col as c FROM t WHERE x = :x"
+        info = self.parser.get_method_info(sql)
+        self.assertIn("x", info["parameters"])
+        self.assertEqual(len(info["parameters"]), 1)
+
+    def test_parameter_extraction_colon_then_comment_then_name(self):
+        """Detect parameter when ':' is followed by a comment then identifier."""
+        sql = "SELECT * FROM users WHERE id = : /* inline */ user_id"
+        info = self.parser.get_method_info(sql)
+        self.assertIn("user_id", info["parameters"])
+
     def test_get_method_info_edge_cases(self):
         # Empty SQL
         info = self.parser.get_method_info("")
@@ -225,6 +267,18 @@ SELECT 2;
         sql = "Select * from users where id = :user_id"
         info = self.parser.get_method_info(sql)
         self.assertEqual(info["type"], "select")
+
+        # CREATE TABLE classified as execute and maps to 'other'
+        info = self.parser.get_method_info("CREATE TABLE t (id INT)")
+        self.assertEqual(info["type"], "other")
+        self.assertFalse(info["is_fetch"])
+
+        # Update with FROM and RETURNING
+        sql = "UPDATE t1 SET x=:x FROM t2 WHERE t1.id=t2.id RETURNING t1.id"
+        info = self.parser.get_method_info(sql)
+        self.assertEqual(info["type"], "update")
+        self.assertFalse(info["is_fetch"])  # execute
+        self.assertTrue(info["has_returning"])  # flag still true
 
     def test_parse_file_not_found(self):
         with self.assertRaises(FileNotFoundError):
@@ -372,6 +426,16 @@ SELECT * FROM users WHERE id = :user_id;
             self.parser.parse_string(sql)
         self.assertIn("First line must be a class comment", str(cm.exception))
 
+    def test_parse_string_leading_whitespace_before_hash_raises(self):
+        """Leading spaces before '#' on first line should raise due to strict startswith check."""
+        sql = """   # TestClass
+#get_user
+SELECT * FROM users WHERE id = :user_id;
+        """
+        with self.assertRaises(SqlValidationError) as cm:
+            self.parser.parse_string(sql)
+        self.assertIn("First line must be a class comment", str(cm.exception))
+
     def test_parse_string_empty_content(self):
         """Test parse_string raises error when content is empty."""
         with self.assertRaises(SqlValidationError) as cm:
@@ -430,3 +494,21 @@ SELECT * FROM users WHERE id = :user_id;
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_get_method_info_parameter_fallback_on_sqlparse_error(monkeypatch):
+    """Fallback regex path is used when sqlparse.parse raises; parameters are still captured."""
+    import splurge_sql_generator.sql_parser as sql_parser_module
+
+    def raise_err(_):
+        raise RuntimeError("boom")
+
+    # Make token parsing in sql_parser fail
+    monkeypatch.setattr(sql_parser_module.sqlparse, "parse", raise_err)
+    # Stub statement detection to avoid invoking sqlparse in helper
+    monkeypatch.setattr(sql_parser_module, "detect_statement_type", lambda _sql: sql_parser_module.FETCH_STATEMENT)
+
+    parser = sql_parser_module.SqlParser()
+    sql = "SELECT * FROM users WHERE id = :id AND status = :status"
+    info = parser.get_method_info(sql)
+    assert info["parameters"] == ["id", "status"]

@@ -11,7 +11,7 @@ import sys
 
 from sqlalchemy import create_engine, text
 from splurge_sql_generator import generate_class
-from splurge_sql_generator.code_generator import PythonCodeGenerator
+from splurge_sql_generator.utils import to_snake_case
 
 # Add the project root to the path so we can import from 'output' and the package
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -33,9 +33,8 @@ def _ensure_generated_classes() -> None:
         with open(init_file, "w", encoding="utf-8") as f:
             f.write("")
 
-    # Create generator instance to access the snake_case conversion method
-    generator = PythonCodeGenerator()
-    snake_case_name = generator._to_snake_case("User")
+    # Use public utility to convert class name to snake_case
+    snake_case_name = to_snake_case("User")
     user_module_path = os.path.join(output_dir, f"{snake_case_name}.py")
     if not os.path.exists(user_module_path):
         sql_path = os.path.join(PROJECT_ROOT, "examples", "User.sql")

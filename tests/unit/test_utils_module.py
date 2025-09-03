@@ -1,7 +1,5 @@
 import os
-import tempfile
 from pathlib import Path
-import os
 
 import pytest
 

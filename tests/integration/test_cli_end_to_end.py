@@ -2,10 +2,8 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
-import pytest
 
 from tests.unit.test_utils import create_basic_schema, create_sql_with_schema
 

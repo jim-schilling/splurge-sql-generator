@@ -980,3 +980,97 @@ class TestSqlHelperIntegration:
             
         finally:
             os.unlink(file_path)
+
+
+def test_extract_create_table_statements_if_not_exists_and_schema_and_quotes():
+    """Ensure CREATE TABLE with IF NOT EXISTS, schema-qualifiers, and quotes parses correctly."""
+    sql = """
+    CREATE TABLE IF NOT EXISTS public."Users" (
+        id INTEGER PRIMARY KEY,
+        name TEXT
+    );
+
+    CREATE TABLE `catalog`.`Item` (
+        item_id INT,
+        title TEXT
+    );
+    """
+    tables = extract_create_table_statements(sql)
+    names = [name for name, _ in tables]
+    assert "users" in names
+    assert "item" in names
+
+
+def test_parse_table_columns_unknown_type_suffix_stripped():
+    """Types ending with _TYPE should have the suffix stripped."""
+    table_body = """
+    id INTEGER,
+    custom UNKNOWN_TYPE
+    """
+    columns = parse_table_columns(table_body)
+    assert columns["id"] == "INTEGER"
+    assert columns["custom"] == "UNKNOWN"
+
+
+def test_detect_statement_type_with_recursive_cte_and_values():
+    """Detect statement type for WITH RECURSIVE and CTE followed by VALUES."""
+    sql_recursive = """
+    WITH RECURSIVE cte(id) AS (
+        SELECT 1
+        UNION ALL
+        SELECT id + 1 FROM cte WHERE id < 3
+    )
+    SELECT * FROM cte
+    """
+    assert detect_statement_type(sql_recursive) == FETCH_STATEMENT
+
+    sql_cte_values = """
+    WITH cte(a,b) AS (
+        VALUES (1,2)
+    )
+    VALUES (3,4)
+    """
+    assert detect_statement_type(sql_cte_values) == FETCH_STATEMENT
+
+
+def test_detect_statement_type_cte_then_update_with_returning():
+    """CTE followed by UPDATE ... RETURNING should still be execute."""
+    sql = """
+    WITH cte AS (
+        SELECT 1 AS id
+    )
+    UPDATE target SET x = 1 FROM cte WHERE target.id = cte.id RETURNING target.id
+    """
+    assert detect_statement_type(sql) == EXECUTE_STATEMENT
+
+
+def test_extract_table_names_insert_select_and_full_outer_join():
+    """Extract table names from INSERT ... SELECT with FULL OUTER JOIN."""
+    sql = """
+    INSERT INTO t1 (id)
+    SELECT a.id
+    FROM t2 a
+    FULL OUTER JOIN t3 b ON a.id = b.id
+    """
+    tables = extract_table_names(sql)
+    assert "t1" in tables
+    assert "t2" in tables
+    assert "t3" in tables
+
+
+def test_extract_table_names_update_with_from():
+    """Extract table names from UPDATE ... FROM statement."""
+    sql = """
+    UPDATE t1 SET x = 1 FROM t2 WHERE t1.id = t2.id
+    """
+    tables = extract_table_names(sql)
+    assert "t1" in tables
+    assert "t2" in tables
+
+
+def test_extract_table_names_quoted_identifiers_raise():
+    """Quoted-only identifiers are not supported; expect validation error."""
+    from splurge_sql_generator.errors import SqlValidationError
+    sql = 'SELECT * FROM "Users"'
+    with pytest.raises(SqlValidationError):
+        extract_table_names(sql)

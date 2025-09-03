@@ -12,7 +12,7 @@ import sys
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection
 from splurge_sql_generator import generate_class
-from splurge_sql_generator.code_generator import PythonCodeGenerator
+from splurge_sql_generator.utils import to_snake_case
 
 # Add the project root to the path so we can import from 'output' and the package
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -39,11 +39,8 @@ def _ensure_generated_classes() -> None:
         "OrderService": (os.path.join(PROJECT_ROOT, "examples", "OrderService.sql"), os.path.join(PROJECT_ROOT, "examples", "OrderService.schema")),
     }
 
-    # Create generator instance to access the snake_case conversion method
-    generator = PythonCodeGenerator()
-
     for module_name, (sql_path, schema_path) in mapping.items():
-        snake_case_name = generator._to_snake_case(module_name)
+        snake_case_name = to_snake_case(module_name)
         py_path = os.path.join(output_dir, f"{snake_case_name}.py")
         if not os.path.exists(py_path):
             generate_class(sql_path, output_file_path=py_path, schema_file_path=schema_path)

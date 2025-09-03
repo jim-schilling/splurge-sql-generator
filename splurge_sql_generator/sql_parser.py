@@ -8,6 +8,8 @@ This module is licensed under the MIT License.
 
 import re
 from pathlib import Path
+import sqlparse
+from sqlparse import tokens as T
 from typing import Any
 
 from splurge_sql_generator.errors import SqlValidationError
@@ -226,11 +228,52 @@ class SqlParser:
             else:
                 query_type = self._TYPE_OTHER
 
-        # Extract parameters (named parameters like :param_name, valid Python identifiers only)
-        # Use the original sql_query to preserve parameter placeholders
-        parameters = self._PARAM_PATTERN.findall(sql_query)
-        # Deduplicate while preserving order
-        parameters = list(dict.fromkeys(parameters))
+        # Extract parameters (named parameters like :param_name) ignoring comments and string literals
+        # 1) Remove comments
+        param_scan_sql = remove_sql_comments(sql_query)
+        parameters: list[str] = []
+        seen: set[str] = set()
+        try:
+            parsed_params = sqlparse.parse(param_scan_sql)
+            if parsed_params:
+                tokens = list(parsed_params[0].flatten())
+
+                def next_non_ws(idx: int) -> tuple[int | None, any]:
+                    j = idx + 1
+                    while j < len(tokens):
+                        t = tokens[j]
+                        # Skip whitespace and comments tokens
+                        if t.is_whitespace or t.ttype in T.Comment:
+                            j += 1
+                            continue
+                        return j, t
+                    return None, None
+
+                for i, tok in enumerate(tokens):
+                    val = str(tok.value)
+                    # Skip anything inside string literals
+                    if tok.ttype in T.Literal.String:
+                        continue
+                    # Direct placeholder like ":param"
+                    if tok.ttype in (T.Name.Placeholder,):
+                        name = val[1:] if val.startswith(":") else val
+                        if name and name not in seen:
+                            seen.add(name)
+                            parameters.append(name)
+                        continue
+                    # Some dialects tokenize ":" and identifier separately
+                    if tok.ttype is T.Punctuation and val == ":":
+                        nxt_idx, nxt_tok = next_non_ws(i)
+                        if nxt_tok and nxt_tok.ttype in (T.Name, T.Name.Placeholder):
+                            name = str(nxt_tok.value)
+                            # Ensure it matches identifier pattern
+                            if self._PARAM_PATTERN.fullmatch(":" + name):
+                                if name not in seen:
+                                    seen.add(name)
+                                    parameters.append(name)
+        except Exception:
+            # Fallback to regex on comment-stripped SQL if sqlparse fails
+            parameters = list(dict.fromkeys(self._PARAM_PATTERN.findall(param_scan_sql)))
         # Check for reserved keywords in parameters
         for param in parameters:
             try:
