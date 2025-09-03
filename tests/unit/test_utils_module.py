@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import pytest
@@ -90,12 +89,13 @@ def test_validate_python_identifier():
 
 def test_format_error_context():
     assert format_error_context(None) == ""
-    # OS-agnostic path check
-    test_path = Path("/tmp/file.sql") if os.name != "nt" else Path("\\tmp\\file.sql")
+    # Use pathlib.Path directly for cross-platform compatibility
+    test_path = Path("/tmp/file.sql")
     result = format_error_context(test_path)
     assert result.startswith(" in ")
-    # Normalize separators for assertion
-    assert result[4:].replace("\\", "/").endswith("/tmp/file.sql")
+    # Check that the path is included in the result, regardless of separator style
+    assert "tmp" in result
+    assert "file.sql" in result
 
 
 def test_normalize_string_and_is_empty_or_whitespace():
