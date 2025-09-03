@@ -347,10 +347,7 @@ class SchemaParser:
         
         # Ensure the directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Get the default mapping
-        self._get_default_mapping()
-        
+
         # Write the YAML file with comments
         yaml_content = """# SQL Type to Python Type Mapping
 # This file maps SQL column types to Python type annotations

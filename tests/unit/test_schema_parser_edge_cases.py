@@ -78,8 +78,10 @@ TEXT: str
         """Binary file with invalid UTF-8 should raise UnicodeDecodeError via safe_read_file."""
         with tempfile.TemporaryDirectory() as temp_dir:
             bad_file = Path(temp_dir) / "bad.schema"
+            # Write invalid UTF-8 byte sequence: 0xFF is always invalid in UTF-8
+            # as it would require continuation bytes that aren't present
             with open(bad_file, "wb") as f:
-                f.write(b"\xff\xfe\xfa\x00\x81")
+                f.write(b"\xff\xfe\xfd\xfc")
 
             parser = SchemaParser()
             with self.assertRaises(UnicodeDecodeError):
