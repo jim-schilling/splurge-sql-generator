@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from splurge_sql_generator.cli import main as cli_main
-from test_utils import (
+from tests.unit.test_utils import (
     temp_sql_files,
     create_basic_schema
 )

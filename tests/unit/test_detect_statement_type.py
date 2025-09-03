@@ -4,7 +4,6 @@ Unit tests for SQL statement type detection.
 Tests the detect_statement_type function from the sql_helper module.
 """
 
-import pytest
 
 from splurge_sql_generator.sql_helper import (
     detect_statement_type,

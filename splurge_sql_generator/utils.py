@@ -48,6 +48,10 @@ def to_snake_case(class_name: str) -> str:
     if not class_name:
         return class_name
     
+    # Special-case all-uppercase acronyms (e.g., "API" -> "api")
+    if class_name.isupper():
+        return class_name.lower()
+
     # Insert underscore before capital letters, then convert to lowercase
     snake_case = _SNAKE_CASE_PATTERN.sub('_', class_name).lower()
     return snake_case
@@ -135,9 +139,13 @@ def safe_read_file(file_path: str | Path, *, encoding: str = _DEFAULT_ENCODING) 
     except PermissionError as e:
         raise PermissionError(f"Permission denied reading file '{path}': {e}") from e
     except UnicodeDecodeError as e:
+        # Re-raise with proper UnicodeDecodeError signature while preserving context
         raise UnicodeDecodeError(
-            f"Invalid {encoding} encoding in file '{path}': {e}",
-            e.object, e.start, e.end
+            encoding,
+            e.object,
+            e.start,
+            e.end,
+            f"Invalid {encoding} encoding in file '{path}': {e.reason}"
         ) from e
     except OSError as e:
         raise OSError(f"Error reading file '{path}': {e}") from e

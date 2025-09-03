@@ -5,13 +5,11 @@ These tests focus on Jinja2 template rendering with real data.
 """
 
 import ast
-import tempfile
-from pathlib import Path
 
 import pytest
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
-from test_utils import (
+from tests.unit.test_utils import (
     temp_sql_files,
     assert_generated_code_structure,
     assert_method_parameters

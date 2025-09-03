@@ -1,5 +1,4 @@
 import ast
-import logging
 import os
 import shutil
 import tempfile
@@ -8,7 +7,7 @@ from pathlib import Path
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
 from splurge_sql_generator.sql_parser import SqlParser
-from test_utils import (
+from tests.unit.test_utils import (
     temp_sql_files,
     temp_multiple_sql_files,
     create_basic_schema,
@@ -56,7 +55,7 @@ SELECT 1;
         py_fd, py_fname = tempfile.mkstemp(suffix=".py")
         os.close(py_fd)
         try:
-            code = self.generator.generate_class(sql_fname, output_file_path=py_fname, schema_file_path=schema_fname)
+            self.generator.generate_class(sql_fname, output_file_path=py_fname, schema_file_path=schema_fname)
             self.assertTrue(os.path.exists(py_fname))
             with open(py_fname, "r") as f:
                 content = f.read()

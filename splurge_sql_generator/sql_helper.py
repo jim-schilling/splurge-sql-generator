@@ -11,7 +11,7 @@ This module is licensed under the MIT License.
 from pathlib import Path
 import re
 import sqlparse
-from sqlparse.tokens import Comment, DML, Name, Literal
+from sqlparse.tokens import Comment, Name, Literal
 from sqlparse.sql import Statement, Token
 from splurge_sql_generator.errors import (
     SqlFileError,

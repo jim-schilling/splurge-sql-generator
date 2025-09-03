@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
-from test_utils import (
+from tests.unit.test_utils import (
     temp_sql_files,
     create_basic_schema
 )
@@ -121,8 +121,8 @@ SELECT * FROM users WHERE id = :user_id AND status = :status;
         
         # Validate parameter types (now use specific types based on schema)
         annotations = TestRepo.get_user.__annotations__
-        assert annotations['user_id'] == int  # Based on schema INTEGER type
-        assert annotations['status'] == str   # Based on schema TEXT type
+        assert annotations['user_id'] is int  # Based on schema INTEGER type
+        assert annotations['status'] is str   # Based on schema TEXT type
 
     def test_generated_code_follows_python_conventions(self) -> None:
         """Test that generated code follows Python conventions."""

@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from splurge_sql_generator import generate_class, generate_multiple_classes
-from test_utils import create_basic_schema, create_sql_with_schema
+from tests.unit.test_utils import create_sql_with_schema
 
 class TestInitAPI(unittest.TestCase):
     def setUp(self):
@@ -30,7 +30,7 @@ class TestInitAPI(unittest.TestCase):
         self.assertIn('class TestClass', code)
         # Test output file
         self.output_file = self.sql_file + '.py'
-        code2 = generate_class(self.sql_file, output_file_path=self.output_file, schema_file_path=self.schema_file)
+        generate_class(self.sql_file, output_file_path=self.output_file, schema_file_path=self.schema_file)
         self.assertTrue(os.path.exists(self.output_file))
         with open(self.output_file) as f:
             self.assertIn('class TestClass', f.read())

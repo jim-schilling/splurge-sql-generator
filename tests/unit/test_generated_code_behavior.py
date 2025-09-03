@@ -14,7 +14,7 @@ from unittest.mock import Mock
 import pytest
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
-from test_utils import (
+from tests.unit.test_utils import (
     temp_sql_files,
     create_basic_schema
 )
@@ -92,7 +92,7 @@ INSERT INTO users (name, email) VALUES (:name, :email) RETURNING id;
         mock_connection.execute.return_value = mock_result
         
         # Call generated method
-        result = UserRepo.create_user(
+        UserRepo.create_user(
             connection=mock_connection,
             name='Test User',
             email='test@example.com'
@@ -132,7 +132,7 @@ UPDATE users SET status = :new_status WHERE id = :user_id;
         mock_connection.execute.return_value = mock_result
         
         # Call generated method
-        result = UserRepo.update_user_status(
+        UserRepo.update_user_status(
             connection=mock_connection,
             user_id=1,
             new_status='inactive'
@@ -166,7 +166,7 @@ DELETE FROM users WHERE id = :user_id;
         mock_connection.execute.return_value = mock_result
         
         # Call generated method
-        result = UserRepo.delete_user(
+        UserRepo.delete_user(
             connection=mock_connection,
             user_id=1
         )
@@ -232,7 +232,7 @@ CREATE TABLE order_details (
         ]
         
         # Call generated method
-        result = OrderRepo.get_user_orders(
+        OrderRepo.get_user_orders(
             connection=mock_connection,
             user_id=1
         )
