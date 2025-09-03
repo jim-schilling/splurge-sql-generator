@@ -48,6 +48,10 @@ def to_snake_case(class_name: str) -> str:
     if not class_name:
         return class_name
     
+    # Special-case all-uppercase acronyms (e.g., "API" -> "api")
+    if class_name.isupper():
+        return class_name.lower()
+
     # Insert underscore before capital letters, then convert to lowercase
     snake_case = _SNAKE_CASE_PATTERN.sub('_', class_name).lower()
     return snake_case

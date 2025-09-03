@@ -9,13 +9,12 @@ This module is licensed under the MIT License.
 import argparse
 import sys
 from pathlib import Path
-from typing import Optional
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
 from splurge_sql_generator.utils import to_snake_case, find_files_by_extension
 
 
-def _find_schema_files(sql_files: list[str]) -> Optional[str]:
+def _find_schema_files(sql_files: list[str]) -> str | None:
     """
     Find schema files when no --schema option is specified.
     
@@ -42,7 +41,11 @@ def _find_schema_files(sql_files: list[str]) -> Optional[str]:
     return None
 
 
-def _expand_and_validate_inputs(input_paths: list[str], *, strict: bool = False) -> list[str]:
+def _expand_and_validate_inputs(
+    input_paths: list[str],
+    *,
+    strict: bool = False,
+) -> list[str]:
     """
     Expand directories and validate SQL files.
     
@@ -88,7 +91,10 @@ def _expand_and_validate_inputs(input_paths: list[str], *, strict: bool = False)
     return sql_files
 
 
-def _discover_schema_file(sql_files: list[str], schema_arg: Optional[str]) -> Optional[str]:
+def _discover_schema_file(
+    sql_files: list[str],
+    schema_arg: str | None,
+) -> str | None:
     """
     Determine which schema file to use for generation.
     
@@ -121,7 +127,12 @@ def _discover_schema_file(sql_files: list[str], schema_arg: Optional[str]) -> Op
 
 
 
-def _report_generated_classes(generated_classes: dict[str, str], output_dir: Optional[Path], *, dry_run: bool = False) -> None:
+def _report_generated_classes(
+    generated_classes: dict[str, str],
+    output_dir: Path | None,
+    *,
+    dry_run: bool = False,
+) -> None:
     """
     Report generated classes to the user.
     
