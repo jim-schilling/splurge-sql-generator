@@ -50,13 +50,16 @@ def temp_sql_files(
     try:
         yield str(sql_file), str(schema_file) if schema_file else None
     finally:
-        # Cleanup
-        if sql_file.exists():
-            sql_file.unlink()
-        if schema_file and schema_file.exists():
-            schema_file.unlink()
-        # Remove temporary directory
-        temp_dir.rmdir()
+        # Cleanup - use shutil.rmtree to handle non-empty directories robustly
+        import shutil
+        try:
+            shutil.rmtree(temp_dir)
+        except OSError:
+            # If rmtree fails, at least attempt to remove the directory itself
+            try:
+                temp_dir.rmdir()
+            except OSError:
+                pass  # Best effort cleanup
 
 
 @contextmanager
@@ -96,16 +99,25 @@ def temp_multiple_sql_files(
         yield file_paths
         
     finally:
-        # Cleanup all files
-        for sql_file_path, schema_file_path in file_paths:
-            sql_file = Path(sql_file_path)
-            schema_file = Path(schema_file_path)
-            if sql_file.exists():
-                sql_file.unlink()
-            if schema_file.exists():
-                schema_file.unlink()
-        # Remove temporary directory
-        temp_dir.rmdir()
+        # Cleanup - use shutil.rmtree to handle non-empty directories robustly
+        import shutil
+        try:
+            shutil.rmtree(temp_dir)
+        except OSError:
+            # If rmtree fails, attempt manual cleanup as fallback
+            try:
+                # Cleanup all files
+                for sql_file_path, schema_file_path in file_paths:
+                    sql_file = Path(sql_file_path)
+                    schema_file = Path(schema_file_path)
+                    if sql_file.exists():
+                        sql_file.unlink()
+                    if schema_file.exists():
+                        schema_file.unlink()
+                # Remove temporary directory
+                temp_dir.rmdir()
+            except OSError:
+                pass  # Best effort cleanup
 
 
 def create_sql_with_schema(tmp_path, filename: str, sql_content: str, schema_content: str | None = None) -> tuple[Path, Path]:
