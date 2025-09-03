@@ -88,14 +88,17 @@ def test_validate_python_identifier():
 
 
 def test_format_error_context():
+    import tempfile
     assert format_error_context(None) == ""
-    # Use pathlib.Path directly for cross-platform compatibility
-    test_path = Path("/tmp/file.sql")
-    result = format_error_context(test_path)
-    assert result.startswith(" in ")
-    # Check that the path is included in the result, regardless of separator style
-    assert "tmp" in result
-    assert "file.sql" in result
+    # Use tempfile.TemporaryDirectory() for truly cross-platform temporary paths
+    with tempfile.TemporaryDirectory() as temp_dir:
+        test_path = Path(temp_dir) / "file.sql"
+        result = format_error_context(test_path)
+        assert result.startswith(" in ")
+        # Check that the filename is included in the result
+        assert "file.sql" in result
+        # Check that some directory path is included (temp directory name varies by platform)
+        assert str(test_path.parent) in result
 
 
 def test_normalize_string_and_is_empty_or_whitespace():
