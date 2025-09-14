@@ -18,7 +18,7 @@ from tests.unit.test_utils import (
     create_basic_schema,
     create_complex_schema,
     assert_generated_code_structure,
-    assert_method_parameters
+    assert_method_parameters,
 )
 
 
@@ -51,7 +51,7 @@ UPDATE users
 SET status = :new_status, updated_at = CURRENT_TIMESTAMP 
 WHERE id = :user_id;
 """
-        
+
         schema_content = """-- User.schema
 CREATE TABLE users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,25 +63,35 @@ CREATE TABLE users (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 """
-        
+
         with temp_sql_files(sql_content, schema_content) as (sql_file, schema_file):
-            generated_code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
-            
+            generated_code = self.generator.generate_class(
+                sql_file, schema_file_path=schema_file
+            )
+
             # Validate generated code structure
-            assert_generated_code_structure(generated_code, "UserRepository", 
-                                          ["get_user_by_id", "create_user", "update_user_status"])
-            
+            assert_generated_code_structure(
+                generated_code,
+                "UserRepository",
+                ["get_user_by_id", "create_user", "update_user_status"],
+            )
+
             # Validate method parameters
             assert_method_parameters(generated_code, "get_user_by_id", ["user_id"])
-            assert_method_parameters(generated_code, "create_user", 
-                                   ["username", "email", "password_hash", "status"])
-            assert_method_parameters(generated_code, "update_user_status", ["new_status", "user_id"])
-        
+            assert_method_parameters(
+                generated_code,
+                "create_user",
+                ["username", "email", "password_hash", "status"],
+            )
+            assert_method_parameters(
+                generated_code, "update_user_status", ["new_status", "user_id"]
+            )
+
         # Validate SQL content
         assert "SELECT id, username, email, created_at" in generated_code
         assert "INSERT INTO users" in generated_code
         assert "UPDATE users" in generated_code
-        
+
         # Validate Python syntax
         try:
             ast.parse(generated_code)
@@ -92,38 +102,48 @@ CREATE TABLE users (
         """Test generating multiple classes with different schemas."""
         # Create multiple SQL files with schemas
         files_data = [
-            ("""# UserRepo
+            (
+                """# UserRepo
 # get_user
 SELECT * FROM users WHERE id = :user_id;
-            """, create_basic_schema()),
-            ("""# ProductRepo
+            """,
+                create_basic_schema(),
+            ),
+            (
+                """# ProductRepo
 # get_product
 SELECT * FROM products WHERE id = :product_id;
-            """, """CREATE TABLE products (
+            """,
+                """CREATE TABLE products (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
     price DECIMAL(10,2)
 );
-            """)
+            """,
+            ),
         ]
-        
+
         with temp_multiple_sql_files(files_data) as file_paths:
             sql_file_paths = [sql_path for sql_path, _ in file_paths]
             schema_file_paths = [schema_path for _, schema_path in file_paths]
-            result = self.generator.generate_multiple_classes(sql_file_paths, schema_file_path=schema_file_paths[0])
-            
+            result = self.generator.generate_multiple_classes(
+                sql_file_paths, schema_file_path=schema_file_paths[0]
+            )
+
             # Validate results
             assert len(result) == 2
             assert "UserRepo" in result
             assert "ProductRepo" in result
-            
+
             # Validate each generated class
             for class_name, code in result.items():
                 assert f"class {class_name}:" in code
                 try:
                     ast.parse(code)
                 except SyntaxError as e:
-                    pytest.fail(f"Generated code for {class_name} has syntax error: {e}")
+                    pytest.fail(
+                        f"Generated code for {class_name} has syntax error: {e}"
+                    )
 
     def test_complex_sql_with_joins_and_subqueries(self) -> None:
         """Test generating code for complex SQL with joins and subqueries."""
@@ -153,18 +173,30 @@ WHERE order_date >= :start_date
 GROUP BY user_id
 HAVING SUM(total_amount) > :min_amount;
 """
-        
-        with temp_sql_files(sql_content, create_complex_schema()) as (sql_file, schema_file):
-            generated_code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
-            
+
+        with temp_sql_files(sql_content, create_complex_schema()) as (
+            sql_file,
+            schema_file,
+        ):
+            generated_code = self.generator.generate_class(
+                sql_file, schema_file_path=schema_file
+            )
+
             # Validate complex SQL handling
-            assert_generated_code_structure(generated_code, "OrderService", 
-                                          ["get_user_orders_with_details", "get_order_summary"])
-            
+            assert_generated_code_structure(
+                generated_code,
+                "OrderService",
+                ["get_user_orders_with_details", "get_order_summary"],
+            )
+
             # Validate method parameters
-            assert_method_parameters(generated_code, "get_user_orders_with_details", ["user_id"])
-            assert_method_parameters(generated_code, "get_order_summary", ["start_date", "min_amount"])
-            
+            assert_method_parameters(
+                generated_code, "get_user_orders_with_details", ["user_id"]
+            )
+            assert_method_parameters(
+                generated_code, "get_order_summary", ["start_date", "min_amount"]
+            )
+
             # Validate SQL content preservation
             assert "JOIN users u ON o.user_id = u.id" in generated_code
             assert "GROUP BY user_id" in generated_code
@@ -176,24 +208,25 @@ HAVING SUM(total_amount) > :min_amount;
 # get_user
 SELECT * FROM users WHERE id = :user_id;
 """
-        
-        with temp_sql_files(sql_content, create_basic_schema()) as (sql_file, schema_file):
+
+        with temp_sql_files(sql_content, create_basic_schema()) as (
+            sql_file,
+            schema_file,
+        ):
             output_dir = Path(self.temp_dir) / "output"
-            
+
             # Generate with output directory
             self.generator.generate_multiple_classes(
-                [sql_file], 
-                output_dir=str(output_dir),
-                schema_file_path=schema_file
+                [sql_file], output_dir=str(output_dir), schema_file_path=schema_file
             )
-            
+
             # Validate output directory creation
             assert output_dir.exists()
-            
+
             # Validate filename conversion (PascalCase to snake_case)
             expected_file = output_dir / "user_repository.py"
             assert expected_file.exists()
-            
+
             # Validate file content
             content = expected_file.read_text()
             assert "class UserRepository:" in content
@@ -203,19 +236,23 @@ SELECT * FROM users WHERE id = :user_id;
         """Test error handling with invalid or missing files."""
         # Test with non-existent file
         with pytest.raises(FileNotFoundError):
-            self.generator.generate_class("nonexistent_file.sql", schema_file_path="nonexistent.schema")
-        
+            self.generator.generate_class(
+                "nonexistent_file.sql", schema_file_path="nonexistent.schema"
+            )
+
         # Test with valid SQL but missing schema (should fail now)
         valid_sql = """# TestClass
 # test_method
 SELECT * FROM test_table WHERE id = :id;
 """
-        
+
         sql_file = Path(self.temp_dir) / "valid_no_schema.sql"
         sql_file.write_text(valid_sql)
-        
+
         # Should fail without schema file (schema files are required)
-        with pytest.raises(TypeError, match="argument should be a str or an os.PathLike object"):
+        with pytest.raises(
+            TypeError, match="argument should be a str or an os.PathLike object"
+        ):
             self.generator.generate_class(str(sql_file), schema_file_path=None)
 
     def test_schema_required_validation(self) -> None:
@@ -224,7 +261,7 @@ SELECT * FROM test_table WHERE id = :id;
 # test_method
 SELECT * FROM test_table WHERE id = :id AND name = :name;
 """
-        
+
         # Test with various column types
         schema_content = """CREATE TABLE test_table (
     id INTEGER PRIMARY KEY,
@@ -237,10 +274,12 @@ SELECT * FROM test_table WHERE id = :id AND name = :name;
     binary_data BLOB
 );
 """
-        
+
         with temp_sql_files(sql_content, schema_content) as (sql_file, schema_file):
-            generated_code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
-            
+            generated_code = self.generator.generate_class(
+                sql_file, schema_file_path=schema_file
+            )
+
             # Validate that parameters use proper types inferred from schema
             assert "id: int" in generated_code
             assert "name: str" in generated_code

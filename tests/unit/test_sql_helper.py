@@ -36,11 +36,13 @@ class TestSqlHelperPublicAPI:
         """Test remove_sql_comments with edge cases."""
         # Empty and None inputs
         assert remove_sql_comments("") == ""
-        assert remove_sql_comments(None) == ""  # Function returns empty string for None input
-        
+        assert (
+            remove_sql_comments(None) == ""
+        )  # Function returns empty string for None input
+
         # Whitespace only - sqlparse strips whitespace
         assert remove_sql_comments("   \n\t  ") == ""
-        
+
         # No comments
         sql = "SELECT * FROM users WHERE id = 1"
         assert remove_sql_comments(sql) == "SELECT * FROM users WHERE id = 1"
@@ -115,19 +117,19 @@ class TestSqlHelperPublicAPI:
         """Test normalize_token function."""
         from sqlparse.sql import Token
         from sqlparse.tokens import Name
-        
+
         # Test with valid token
         token = Token(Name, "SELECT")
         assert normalize_token(token) == "SELECT"
-        
+
         # Test with whitespace
         token = Token(Name, "  SELECT  ")
         assert normalize_token(token) == "SELECT"
-        
+
         # Test with lowercase
         token = Token(Name, "select")
         assert normalize_token(token) == "SELECT"
-        
+
         # Test with empty token
         token = Token(Name, "")
         assert normalize_token(token) == ""
@@ -136,15 +138,15 @@ class TestSqlHelperPublicAPI:
         """Test normalize_token with edge cases."""
         from sqlparse.sql import Token
         from sqlparse.tokens import Whitespace, Punctuation
-        
+
         # Test with whitespace token
         token = Token(Whitespace, "   ")
         assert normalize_token(token) == ""
-        
+
         # Test with punctuation token
         token = Token(Punctuation, ";")
         assert normalize_token(token) == ";"
-        
+
         # Test with None token
         assert normalize_token(None) == ""
 
@@ -158,15 +160,26 @@ class TestSqlHelperPublicAPI:
         assert detect_statement_type("PRAGMA table_info(users)") == FETCH_STATEMENT
         assert detect_statement_type("DESCRIBE users") == FETCH_STATEMENT
         assert detect_statement_type("DESC users") == FETCH_STATEMENT
-        
+
         # Execute statements
-        assert detect_statement_type("INSERT INTO users VALUES (1, 'John')") == EXECUTE_STATEMENT
-        assert detect_statement_type("UPDATE users SET name = 'Jane' WHERE id = 1") == EXECUTE_STATEMENT
-        assert detect_statement_type("DELETE FROM users WHERE id = 1") == EXECUTE_STATEMENT
+        assert (
+            detect_statement_type("INSERT INTO users VALUES (1, 'John')")
+            == EXECUTE_STATEMENT
+        )
+        assert (
+            detect_statement_type("UPDATE users SET name = 'Jane' WHERE id = 1")
+            == EXECUTE_STATEMENT
+        )
+        assert (
+            detect_statement_type("DELETE FROM users WHERE id = 1") == EXECUTE_STATEMENT
+        )
         assert detect_statement_type("CREATE TABLE users (id INT)") == EXECUTE_STATEMENT
-        assert detect_statement_type("ALTER TABLE users ADD COLUMN email TEXT") == EXECUTE_STATEMENT
+        assert (
+            detect_statement_type("ALTER TABLE users ADD COLUMN email TEXT")
+            == EXECUTE_STATEMENT
+        )
         assert detect_statement_type("DROP TABLE users") == EXECUTE_STATEMENT
-        
+
         # Edge cases
         assert detect_statement_type("") == EXECUTE_STATEMENT
         assert detect_statement_type("   \n\t  ") == EXECUTE_STATEMENT
@@ -182,7 +195,7 @@ class TestSqlHelperPublicAPI:
         SELECT * FROM user_counts
         """
         assert detect_statement_type(sql) == FETCH_STATEMENT
-        
+
         sql = """
         WITH temp_users AS (
             SELECT * FROM users WHERE active = 1
@@ -201,7 +214,7 @@ class TestSqlHelperPublicAPI:
         WHERE u.active = 1
         """
         assert detect_statement_type(sql) == FETCH_STATEMENT
-        
+
         # Complex INSERT with SELECT
         sql = """
         INSERT INTO user_summary (user_id, total_orders, total_amount)
@@ -236,13 +249,13 @@ class TestSqlHelperPublicAPI:
     def test_parse_sql_statements_strip_semicolon(self):
         """Test parse_sql_statements with strip_semicolon option."""
         sql = "SELECT * FROM users; SELECT * FROM products;"
-        
+
         # With strip_semicolon=True (default)
         statements = parse_sql_statements(sql, strip_semicolon=True)
         assert len(statements) == 2
         assert statements[0] == "SELECT * FROM users"
         assert statements[1] == "SELECT * FROM products"
-        
+
         # With strip_semicolon=False
         statements = parse_sql_statements(sql, strip_semicolon=False)
         assert len(statements) == 2
@@ -330,7 +343,7 @@ class TestSqlHelperPublicAPI:
         """
         tables = extract_create_table_statements(sql)
         assert len(tables) == 2
-        
+
         table_names = [name for name, _ in tables]
         assert "users" in table_names
         assert "products" in table_names
@@ -360,7 +373,7 @@ class TestSqlHelperPublicAPI:
     def test_extract_create_table_statements_invalid_sql(self):
         """Test extract_create_table_statements with invalid SQL."""
         sql = "SELECT * FROM users;"  # No CREATE TABLE
-        
+
         # Function returns empty list for non-CREATE TABLE statements
         tables = extract_create_table_statements(sql)
         assert tables == []
@@ -369,7 +382,7 @@ class TestSqlHelperPublicAPI:
         """Test extract_create_table_statements with malformed CREATE TABLE."""
         # Missing closing parenthesis
         sql = "CREATE TABLE users (id INTEGER"
-        
+
         # Should handle gracefully or raise SqlValidationError
         try:
             tables = extract_create_table_statements(sql)
@@ -404,12 +417,12 @@ class TestSqlHelperPublicAPI:
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         """
         columns = parse_table_columns(table_body)
-        
+
         assert "id" in columns
         assert "name" in columns
         assert "email" in columns
         assert "created_at" in columns
-        
+
         assert columns["id"] == "INTEGER"
         assert columns["name"] == "TEXT"
         assert columns["email"] == "TEXT"
@@ -426,17 +439,17 @@ class TestSqlHelperPublicAPI:
         enum_field ENUM('active', 'inactive')
         """
         columns = parse_table_columns(table_body)
-        
+
         # Check that we get the expected columns (some might be filtered out)
         assert "id" in columns
         assert "name" in columns
         assert "price" in columns
-        
+
         # Verify the types we can expect
         assert columns["id"] == "INTEGER"
         assert columns["name"] == "VARCHAR"
         assert columns["price"] == "DECIMAL"
-        
+
         # These might not be parsed depending on the implementation
         if "data" in columns:
             assert columns["data"] == "JSON"
@@ -456,7 +469,7 @@ class TestSqlHelperPublicAPI:
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         """
         columns = parse_table_columns(table_body)
-        
+
         assert columns["id"] == "INTEGER"
         assert columns["name"] == "TEXT"
         assert columns["email"] == "TEXT"
@@ -467,7 +480,7 @@ class TestSqlHelperPublicAPI:
         """Test parse_table_columns with malformed column definitions."""
         # Table body with only constraint definitions, no actual columns
         table_body = "CONSTRAINT pk_id PRIMARY KEY (id), CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id)"
-        
+
         with pytest.raises(SqlValidationError):
             parse_table_columns(table_body)
 
@@ -577,11 +590,11 @@ class TestSqlHelperPublicAPI:
         -- Second statement
         SELECT * FROM products;
         """
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
             f.write(sql_content)
             file_path = f.name
-        
+
         try:
             statements = split_sql_file(file_path)
             assert len(statements) == 2
@@ -593,11 +606,11 @@ class TestSqlHelperPublicAPI:
     def test_split_sql_file_with_pathlib(self):
         """Test split_sql_file with Path object."""
         sql_content = "SELECT * FROM users; SELECT * FROM products;"
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
             f.write(sql_content)
             file_path = Path(f.name)
-        
+
         try:
             statements = split_sql_file(file_path)
             assert len(statements) == 2
@@ -607,17 +620,17 @@ class TestSqlHelperPublicAPI:
     def test_split_sql_file_strip_semicolon_option(self):
         """Test split_sql_file with strip_semicolon option."""
         sql_content = "SELECT * FROM users; SELECT * FROM products;"
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
             f.write(sql_content)
             file_path = f.name
-        
+
         try:
             # With strip_semicolon=True (default)
             statements = split_sql_file(file_path, strip_semicolon=True)
             assert statements[0] == "SELECT * FROM users"
             assert statements[1] == "SELECT * FROM products"
-            
+
             # With strip_semicolon=False
             statements = split_sql_file(file_path, strip_semicolon=False)
             assert statements[0] == "SELECT * FROM users;"
@@ -628,15 +641,16 @@ class TestSqlHelperPublicAPI:
     def test_split_sql_file_nonexistent(self):
         """Test split_sql_file with nonexistent file."""
         from splurge_sql_generator.errors import SqlFileError
+
         with pytest.raises(SqlFileError):
             split_sql_file("nonexistent_file.sql")
 
     def test_split_sql_file_empty_content(self):
         """Test split_sql_file with empty content."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
             f.write("")
             file_path = f.name
-        
+
         try:
             statements = split_sql_file(file_path)
             assert statements == []
@@ -645,10 +659,10 @@ class TestSqlHelperPublicAPI:
 
     def test_split_sql_file_whitespace_only(self):
         """Test split_sql_file with whitespace-only content."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
             f.write("   \n\t  \n")
             file_path = f.name
-        
+
         try:
             statements = split_sql_file(file_path)
             assert statements == []
@@ -662,11 +676,11 @@ class TestSqlHelperPublicAPI:
         /* Another comment */
         -- Yet another comment
         """
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
             f.write(sql_content)
             file_path = f.name
-        
+
         try:
             statements = split_sql_file(file_path)
             assert statements == []
@@ -725,7 +739,7 @@ class TestSqlHelperPublicAPI:
         """Test extract_table_names raises SqlValidationError when sqlparse fails."""
         # SQL that doesn't contain any table references
         malformed_sql = "SELECT 1 as value"
-        
+
         with pytest.raises(SqlValidationError):
             extract_table_names(malformed_sql)
 
@@ -735,7 +749,7 @@ class TestSqlHelperPublicAPI:
         malformed_sql = """
         SELECT 1 as value, 'test' as string, NOW() as timestamp
         """
-        
+
         with pytest.raises(SqlValidationError):
             extract_table_names(malformed_sql)
 
@@ -767,26 +781,26 @@ class TestSqlHelperIntegration:
         JOIN products p ON u.id = p.user_id
         WHERE u.active = 1;
         """
-        
+
         # Remove comments
         clean_sql = remove_sql_comments(sql_content)
         assert "--" not in clean_sql
         assert "/*" not in clean_sql
-        
+
         # Parse statements
         statements = parse_sql_statements(clean_sql)
         assert len(statements) == 3
-        
+
         # Extract CREATE TABLE statements
         create_tables = extract_create_table_statements(clean_sql)
         assert len(create_tables) == 2
-        
+
         # Extract table names from the SELECT statement
         select_statement = statements[2]
         tables = extract_table_names(select_statement)
         assert "users" in tables
         assert "products" in tables
-        
+
         # Detect statement type
         statement_type = detect_statement_type(select_statement)
         assert statement_type == FETCH_STATEMENT
@@ -822,21 +836,21 @@ class TestSqlHelperIntegration:
             status ENUM('planning', 'active', 'completed', 'cancelled') DEFAULT 'planning'
         );
         """
-        
+
         # Extract CREATE TABLE statements
         tables = extract_create_table_statements(schema_sql)
         assert len(tables) == 3
-        
+
         table_names = [name for name, _ in tables]
         assert "departments" in table_names
         assert "employees" in table_names
         assert "projects" in table_names
-        
+
         # Parse columns for each table
         for table_name, table_body in tables:
             columns = parse_table_columns(table_body)
             assert len(columns) > 0
-            
+
             # Verify specific columns exist
             if table_name == "departments":
                 assert "id" in columns
@@ -845,7 +859,7 @@ class TestSqlHelperIntegration:
                 assert columns["id"] == "INTEGER"
                 assert columns["name"] == "VARCHAR"
                 assert columns["budget"] == "DECIMAL"
-            
+
             elif table_name == "employees":
                 assert "id" in columns
                 assert "name" in columns
@@ -854,7 +868,7 @@ class TestSqlHelperIntegration:
                 assert columns["email"] == "VARCHAR"
                 assert columns["salary"] == "DECIMAL"
                 assert columns["is_active"] == "BOOLEAN"
-            
+
             elif table_name == "projects":
                 assert "id" in columns
                 assert "name" in columns
@@ -868,22 +882,22 @@ class TestSqlHelperIntegration:
         """Test error handling across multiple functions."""
         # Test with malformed SQL that should cause SqlValidationError
         malformed_sql = "CREATE TABLE users (id INTEGER"  # Missing closing parenthesis
-        
+
         # The function should handle this gracefully by returning empty list
         tables = extract_create_table_statements(malformed_sql)
         assert tables == []
-        
+
         # Test with valid SQL that should work
         valid_sql = "CREATE TABLE users (id INTEGER PRIMARY KEY);"
         tables = extract_create_table_statements(valid_sql)
         assert len(tables) == 1
         assert tables[0][0] == "users"
-        
+
         # Test that parse_table_columns raises SqlValidationError for malformed input
         malformed_table_body = "CONSTRAINT pk_id PRIMARY KEY (id), CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id)"
         with pytest.raises(SqlValidationError):
             parse_table_columns(malformed_table_body)
-        
+
         # Test that extract_table_names raises SqlValidationError for malformed input
         malformed_query = "SELECT 1 as value"
         with pytest.raises(SqlValidationError):
@@ -911,14 +925,14 @@ class TestSqlHelperIntegration:
         WHERE u.active = 1
         ORDER BY us.total_amount DESC;
         """
-        
+
         # Remove comments and clean
         clean_sql = remove_sql_comments(complex_sql)
-        
+
         # Parse into statements
         statements = parse_sql_statements(clean_sql)
         assert len(statements) == 1
-        
+
         # Extract table names
         tables = extract_table_names(statements[0])
         assert "users" in tables
@@ -926,7 +940,7 @@ class TestSqlHelperIntegration:
         assert "products" in tables
         assert "user_stats" in tables
         assert "product_stats" in tables
-        
+
         # Detect statement type
         statement_type = detect_statement_type(statements[0])
         assert statement_type == FETCH_STATEMENT
@@ -952,32 +966,32 @@ class TestSqlHelperIntegration:
         -- Query data
         SELECT * FROM test_table WHERE name = 'Test'; /* End comment */
         """
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
             f.write(sql_content)
             file_path = f.name
-        
+
         try:
             # Process the file
             statements = split_sql_file(file_path)
             assert len(statements) == 3
-            
+
             # Remove comments from the content
             clean_content = remove_sql_comments(sql_content)
             assert "--" not in clean_content
             assert "/*" not in clean_content
             assert "*/" not in clean_content
-            
+
             # Extract CREATE TABLE
             create_tables = extract_create_table_statements(clean_content)
             assert len(create_tables) == 1
             assert create_tables[0][0] == "test_table"
-            
+
             # Extract table names from SELECT
             select_statement = statements[2]
             tables = extract_table_names(select_statement)
             assert "test_table" in tables
-            
+
         finally:
             os.unlink(file_path)
 
@@ -1071,6 +1085,7 @@ def test_extract_table_names_update_with_from():
 def test_extract_table_names_quoted_identifiers_raise():
     """Quoted-only identifiers are not supported; expect validation error."""
     from splurge_sql_generator.errors import SqlValidationError
+
     sql = 'SELECT * FROM "Users"'
     with pytest.raises(SqlValidationError):
         extract_table_names(sql)

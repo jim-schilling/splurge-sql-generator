@@ -14,5 +14,3 @@ class SqlFileError(Exception):
 
 class SqlValidationError(ValueError):
     """Raised when provided SQL-related input arguments are invalid."""
-
-

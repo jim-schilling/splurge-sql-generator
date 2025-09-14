@@ -13,10 +13,7 @@ from pathlib import Path
 import pytest
 
 from splurge_sql_generator.cli import main as cli_main
-from tests.unit.test_utils import (
-    temp_sql_files,
-    create_basic_schema
-)
+from tests.unit.test_utils import temp_sql_files, create_basic_schema
 
 
 class TestCLIIntegration:
@@ -35,18 +32,27 @@ class TestCLIIntegration:
 # get_data
 SELECT * FROM test_table WHERE id = :id;
 """
-        
-        with temp_sql_files(sql_content, create_basic_schema("test_table")) as (sql_file, schema_file):
+
+        with temp_sql_files(sql_content, create_basic_schema("test_table")) as (
+            sql_file,
+            schema_file,
+        ):
             # Test dry run
             # Capture stdout
             old_stdout = sys.stdout
             sys.stdout = StringIO()
-            
+
             try:
                 # Simulate CLI call with explicit schema file
-                sys.argv = ['cli.py', sql_file, '--dry-run', '--schema', str(schema_file)]
+                sys.argv = [
+                    "cli.py",
+                    sql_file,
+                    "--dry-run",
+                    "--schema",
+                    str(schema_file),
+                ]
                 cli_main()
-                
+
                 output = sys.stdout.getvalue()
                 assert "class TestRepository:" in output
                 assert "def get_data(" in output
@@ -59,22 +65,32 @@ SELECT * FROM test_table WHERE id = :id;
 # get_user
 SELECT * FROM users WHERE id = :user_id;
 """
-        
-        with temp_sql_files(sql_content, create_basic_schema()) as (sql_file, schema_file):
+
+        with temp_sql_files(sql_content, create_basic_schema()) as (
+            sql_file,
+            schema_file,
+        ):
             output_dir = Path(self.temp_dir) / "output"
-            
+
             # Test CLI with output directory
             old_stdout = sys.stdout
             sys.stdout = StringIO()
-            
+
             try:
-                sys.argv = ['cli.py', sql_file, '-o', str(output_dir), '--schema', str(schema_file)]
+                sys.argv = [
+                    "cli.py",
+                    sql_file,
+                    "-o",
+                    str(output_dir),
+                    "--schema",
+                    str(schema_file),
+                ]
                 cli_main()
-                
+
                 # Validate output
                 expected_file = output_dir / "user_service.py"
                 assert expected_file.exists()
-                
+
                 content = expected_file.read_text()
                 assert "class UserService:" in content
                 assert "def get_user(" in content

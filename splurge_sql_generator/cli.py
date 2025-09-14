@@ -17,12 +17,12 @@ from splurge_sql_generator.utils import to_snake_case, find_files_by_extension
 def _find_schema_files(sql_files: list[str]) -> str | None:
     """
     Find schema files when no --schema option is specified.
-    
+
     Looks for *.schema files in the current directory and directories containing SQL files.
-    
+
     Args:
         sql_files: List of SQL file paths
-        
+
     Returns:
         Path to the first found schema file, or None if no schema files found
     """
@@ -30,14 +30,14 @@ def _find_schema_files(sql_files: list[str]) -> str | None:
     sql_dirs = {Path(sql_file).parent for sql_file in sql_files}
     # Add current directory
     search_dirs = {Path.cwd()} | sql_dirs
-    
+
     # Look for *.schema files in each directory
     for search_dir in search_dirs:
         schema_files = find_files_by_extension(search_dir, ".schema")
         if schema_files:
             # Return the first schema file found
             return str(schema_files[0])
-    
+
     return None
 
 
@@ -48,19 +48,19 @@ def _expand_and_validate_inputs(
 ) -> list[str]:
     """
     Expand directories and validate SQL files.
-    
+
     Args:
         input_paths: List of file paths or directories to process
         strict: Whether to treat warnings as errors
-        
+
     Returns:
         List of validated SQL file paths
-        
+
     Raises:
         SystemExit: If strict mode is enabled and validation fails
     """
     sql_files: list[str] = []
-    
+
     for file_path in input_paths:
         path = Path(file_path)
         if not path.exists():
@@ -87,7 +87,7 @@ def _expand_and_validate_inputs(
                     sys.exit(1)
                 print(msg, file=sys.stderr)
             sql_files.append(str(path))
-    
+
     return sql_files
 
 
@@ -97,34 +97,37 @@ def _discover_schema_file(
 ) -> str | None:
     """
     Determine which schema file to use for generation.
-    
+
     Args:
         sql_files: List of SQL file paths
         schema_arg: Schema file path from command line argument
-        
+
     Returns:
         Path to the schema file to use, or None if no SQL files to process
-        
+
     Raises:
         SystemExit: If schema file is required but not found
     """
     if schema_arg is not None:
         return schema_arg
-        
+
     if not sql_files:
         # No SQL files to process, so no schema file needed
         return None
-        
+
     schema_file = _find_schema_files(sql_files)
     if schema_file is None:
-        print("Error: No schema file specified and no *.schema files found in current directory or SQL file directories", file=sys.stderr)
-        print("Use --schema to specify a schema file or ensure *.schema files exist", file=sys.stderr)
+        print(
+            "Error: No schema file specified and no *.schema files found in current directory or SQL file directories",
+            file=sys.stderr,
+        )
+        print(
+            "Use --schema to specify a schema file or ensure *.schema files exist",
+            file=sys.stderr,
+        )
         sys.exit(1)
-        
+
     return schema_file
-
-
-
 
 
 def _report_generated_classes(
@@ -135,7 +138,7 @@ def _report_generated_classes(
 ) -> None:
     """
     Report generated classes to the user.
-    
+
     Args:
         generated_classes: Dictionary mapping class names to generated code
         output_dir: Output directory path (None for current directory)
@@ -163,10 +166,10 @@ def _report_generated_classes(
 def main() -> None:
     """
     Main CLI entry point for the SQL code generator.
-    
+
     Parses command line arguments and generates Python SQLAlchemy classes from SQL template files.
     Supports single file generation, multiple file processing, and custom output directories.
-    
+
     Command line options:
         sql_files: One or more SQL template files to process
         -o, --output: Output directory for generated Python files
@@ -218,7 +221,8 @@ Examples:
     )
 
     parser.add_argument(
-        "-t", "--types",
+        "-t",
+        "--types",
         help="Path to custom SQL type mapping YAML file (default: types.yaml)",
     )
 
@@ -241,10 +245,15 @@ Examples:
     if args.generate_types is not None:
         try:
             from splurge_sql_generator.schema_parser import SchemaParser
+
             schema_parser = SchemaParser()
-            output_path = schema_parser.generate_types_file(output_path=args.generate_types)
+            output_path = schema_parser.generate_types_file(
+                output_path=args.generate_types
+            )
             print(f"Generated SQL type mapping file: {output_path}")
-            print("You can now customize this file for your specific database requirements.")
+            print(
+                "You can now customize this file for your specific database requirements."
+            )
             return
         except OSError as e:
             print(f"Error generating types file: {e}", file=sys.stderr)
@@ -252,7 +261,9 @@ Examples:
 
     # Check if SQL files are provided (required unless --generate-types is used)
     if not args.sql_files:
-        parser.error("the following arguments are required: sql_files (unless using --generate-types)")
+        parser.error(
+            "the following arguments are required: sql_files (unless using --generate-types)"
+        )
 
     # Expand and validate input files
     sql_files = _expand_and_validate_inputs(args.sql_files, strict=args.strict)
@@ -285,9 +296,11 @@ Examples:
                 output_dir=args.output if not args.dry_run else None,
                 schema_file_path=schema_file,
             )
-            
+
             # Report generated classes
-            _report_generated_classes(generated_classes, output_dir, dry_run=args.dry_run)
+            _report_generated_classes(
+                generated_classes, output_dir, dry_run=args.dry_run
+            )
 
     except (OSError, IOError, FileNotFoundError) as e:
         print(f"Error accessing files: {e}", file=sys.stderr)

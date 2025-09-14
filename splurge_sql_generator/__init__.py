@@ -105,7 +105,11 @@ def generate_class(
         Generated Python code as string
     """
     generator = PythonCodeGenerator()
-    return generator.generate_class(sql_file_path, output_file_path=output_file_path, schema_file_path=schema_file_path)
+    return generator.generate_class(
+        sql_file_path,
+        output_file_path=output_file_path,
+        schema_file_path=schema_file_path,
+    )
 
 
 def generate_multiple_classes(
@@ -126,7 +130,9 @@ def generate_multiple_classes(
         Dictionary mapping class names to generated code
     """
     generator = PythonCodeGenerator()
-    return generator.generate_multiple_classes(sql_files, output_dir=output_dir, schema_file_path=schema_file_path)
+    return generator.generate_multiple_classes(
+        sql_files, output_dir=output_dir, schema_file_path=schema_file_path
+    )
 
 
 def generate_types_file(*, output_path: str | None = None) -> str:

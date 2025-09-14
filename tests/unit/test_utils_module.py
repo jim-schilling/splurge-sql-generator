@@ -89,6 +89,7 @@ def test_validate_python_identifier():
 
 def test_format_error_context():
     import tempfile
+
     assert format_error_context(None) == ""
     # Use tempfile.TemporaryDirectory() for truly cross-platform temporary paths
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -110,5 +111,3 @@ def test_normalize_string_and_is_empty_or_whitespace():
     assert is_empty_or_whitespace("") is True
     assert is_empty_or_whitespace("   ") is True
     assert is_empty_or_whitespace("x") is False
-
-

@@ -15,9 +15,9 @@ from sqlalchemy.engine.row import Row
 class State:
     """
     State with SQLAlchemy-based database operations.
-    
+
     This class provides only class methods (for explicit connection and transaction control).
-    
+
     Attributes:
         logger: Class-level logger used by default for all operations.
     """
@@ -43,9 +43,9 @@ class State:
             SQLAlchemy Result object
         """
         logger = cls.logger
-        
+
         logger.debug("Executing create_table operation")
-        
+
         sql = """
         CREATE TABLE IF NOT EXISTS state (
             id VARCHAR(36) PRIMARY KEY NOT NULL,
@@ -90,9 +90,9 @@ class State:
             SQLAlchemy Result object
         """
         logger = cls.logger
-        
+
         logger.debug("Executing insert_state operation")
-        
+
         sql = """
         INSERT INTO state (id, name, alias, created_at, updated_at) 
         VALUES (
@@ -145,9 +145,9 @@ class State:
             SQLAlchemy Result object
         """
         logger = cls.logger
-        
+
         logger.debug("Executing update_state operation")
-        
+
         sql = """
         UPDATE state 
         SET 
@@ -194,9 +194,9 @@ class State:
             List of result rows
         """
         logger = cls.logger
-        
+
         logger.debug("Executing get_state_by_id operation")
-        
+
         sql = """
         SELECT * 
         FROM state 
@@ -239,9 +239,9 @@ class State:
             List of result rows
         """
         logger = cls.logger
-        
+
         logger.debug("Executing get_state_by_alias operation")
-        
+
         sql = """
         SELECT * 
         FROM state 
@@ -282,9 +282,9 @@ class State:
             List of result rows
         """
         logger = cls.logger
-        
+
         logger.debug("Executing get_all_states operation")
-        
+
         sql = """
         SELECT * 
         FROM state
@@ -302,5 +302,3 @@ class State:
         except Exception as e:
             logger.error("Error in get_all_states operation: %s", str(e))
             raise
-
- 

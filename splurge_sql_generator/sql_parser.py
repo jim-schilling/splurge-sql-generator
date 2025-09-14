@@ -19,7 +19,11 @@ from splurge_sql_generator.sql_helper import (
     remove_sql_comments,
     extract_table_names,
 )
-from splurge_sql_generator.utils import validate_python_identifier, format_error_context, safe_read_file
+from splurge_sql_generator.utils import (
+    validate_python_identifier,
+    format_error_context,
+    safe_read_file,
+)
 
 
 class SqlParser:
@@ -58,7 +62,7 @@ class SqlParser:
     def __init__(self) -> None:
         """
         Initialize the SQL parser.
-        
+
         No initialization required as patterns are compiled at module level.
         """
         pass  # No need to compile pattern in __init__
@@ -72,7 +76,7 @@ class SqlParser:
 
         Returns:
             Tuple of (class_name, method_queries_dict)
-            
+
         Raises:
             FileNotFoundError: If the SQL file does not exist
             OSError: If there are I/O errors reading the file
@@ -82,7 +86,9 @@ class SqlParser:
         content = safe_read_file(file_path)
         return self.parse_string(content, file_path)
 
-    def parse_string(self, content: str, file_path: str | Path | None = None) -> tuple[str, dict[str, str]]:
+    def parse_string(
+        self, content: str, file_path: str | Path | None = None
+    ) -> tuple[str, dict[str, str]]:
         """
         Parse SQL content string and extract class name and method-query mappings.
 
@@ -92,7 +98,7 @@ class SqlParser:
 
         Returns:
             Tuple of (class_name, method_queries_dict)
-            
+
         Raises:
             SqlValidationError: If the content format is invalid
         """
@@ -113,10 +119,12 @@ class SqlParser:
 
         class_comment = lines[0].strip()
         class_name = class_comment[1:].strip()  # Remove '#' prefix
-        
+
         # Validate class name using utility function
         try:
-            validate_python_identifier(class_name, context="class name", file_path=file_path)
+            validate_python_identifier(
+                class_name, context="class name", file_path=file_path
+            )
         except ValueError as e:
             raise SqlValidationError(str(e))
 
@@ -125,7 +133,9 @@ class SqlParser:
 
         return class_name, method_queries
 
-    def _extract_methods_and_queries(self, content: str, file_path: str | Path | None = None) -> dict[str, str]:
+    def _extract_methods_and_queries(
+        self, content: str, file_path: str | Path | None = None
+    ) -> dict[str, str]:
         """
         Extract method names and their corresponding SQL queries.
 
@@ -135,7 +145,7 @@ class SqlParser:
 
         Returns:
             Dictionary mapping method names to SQL queries
-            
+
         Raises:
             SqlValidationError: If method names are invalid
         """
@@ -157,14 +167,18 @@ class SqlParser:
                 # Check for valid Python identifier and not a reserved keyword
                 if method_name and sql_query:
                     try:
-                        validate_python_identifier(method_name, context="method name", file_path=file_path)
+                        validate_python_identifier(
+                            method_name, context="method name", file_path=file_path
+                        )
                         method_queries[method_name] = sql_query
                     except ValueError as e:
                         raise SqlValidationError(str(e))
 
         return method_queries
 
-    def get_method_info(self, sql_query: str, file_path: str | Path | None = None) -> dict[str, Any]:
+    def get_method_info(
+        self, sql_query: str, file_path: str | Path | None = None
+    ) -> dict[str, Any]:
         """
         Analyze SQL query to determine method type and parameters.
         Uses sql_helper.detect_statement_type() for accurate statement type detection.
@@ -175,7 +189,7 @@ class SqlParser:
 
         Returns:
             Dictionary with method analysis info
-            
+
         Raises:
             SqlValidationError: If parameter names are invalid
         """
@@ -198,7 +212,7 @@ class SqlParser:
         # Remove comments first for more accurate analysis
         clean_sql = remove_sql_comments(sql_query)
         sql_upper = clean_sql.upper().strip()
-        
+
         # Use statement_type to determine query type more accurately
         if statement_type == FETCH_STATEMENT:
             if sql_upper.startswith(self._KW_SELECT):
@@ -209,7 +223,9 @@ class SqlParser:
                 query_type = self._TYPE_SHOW
             elif sql_upper.startswith(self._KW_EXPLAIN):
                 query_type = self._TYPE_EXPLAIN
-            elif sql_upper.startswith(self._KW_DESC) or sql_upper.startswith(self._KW_DESCRIBE):
+            elif sql_upper.startswith(self._KW_DESC) or sql_upper.startswith(
+                self._KW_DESCRIBE
+            ):
                 query_type = self._TYPE_DESCRIBE
             elif sql_upper.startswith(self._KW_WITH):
                 query_type = self._TYPE_CTE
@@ -273,11 +289,15 @@ class SqlParser:
                                     parameters.append(name)
         except Exception:
             # Fallback to regex on comment-stripped SQL if sqlparse fails
-            parameters = list(dict.fromkeys(self._PARAM_PATTERN.findall(param_scan_sql)))
+            parameters = list(
+                dict.fromkeys(self._PARAM_PATTERN.findall(param_scan_sql))
+            )
         # Check for reserved keywords in parameters
         for param in parameters:
             try:
-                validate_python_identifier(param, context="parameter name", file_path=file_path)
+                validate_python_identifier(
+                    param, context="parameter name", file_path=file_path
+                )
             except ValueError as e:
                 raise SqlValidationError(str(e))
 
@@ -292,10 +312,10 @@ class SqlParser:
     def get_table_names(self, sql_query: str) -> list[str]:
         """
         Extract table names from SQL query using sql_helper.
-        
+
         Args:
             sql_query: SQL query string
-            
+
         Returns:
             List of table names referenced in the query
         """

@@ -15,9 +15,9 @@ from sqlalchemy.engine.row import Row
 class County:
     """
     County with SQLAlchemy-based database operations.
-    
+
     This class provides only class methods (for explicit connection and transaction control).
-    
+
     Attributes:
         logger: Class-level logger used by default for all operations.
     """
@@ -43,9 +43,9 @@ class County:
             SQLAlchemy Result object
         """
         logger = cls.logger
-        
+
         logger.debug("Executing create_table operation")
-        
+
         sql = """
         CREATE TABLE IF NOT EXISTS county (
             id VARCHAR(36) PRIMARY KEY NOT NULL,
@@ -95,9 +95,9 @@ class County:
             SQLAlchemy Result object
         """
         logger = cls.logger
-        
+
         logger.debug("Executing insert_county operation")
-        
+
         sql = """
         INSERT INTO county (id, name, alias, state_alias, created_at, updated_at) 
         VALUES (
@@ -154,9 +154,9 @@ class County:
             SQLAlchemy Result object
         """
         logger = cls.logger
-        
+
         logger.debug("Executing update_county operation")
-        
+
         sql = """
         UPDATE county 
         SET 
@@ -205,9 +205,9 @@ class County:
             List of result rows
         """
         logger = cls.logger
-        
+
         logger.debug("Executing get_county_by_id operation")
-        
+
         sql = """
         SELECT * 
         FROM county 
@@ -252,9 +252,9 @@ class County:
             List of result rows
         """
         logger = cls.logger
-        
+
         logger.debug("Executing get_county_by_alias_and_state_alias operation")
-        
+
         sql = """
         SELECT * 
         FROM county 
@@ -278,7 +278,9 @@ class County:
             logger.debug("Fetched %d rows", len(rows))
             return rows
         except Exception as e:
-            logger.error("Error in get_county_by_alias_and_state_alias operation: %s", str(e))
+            logger.error(
+                "Error in get_county_by_alias_and_state_alias operation: %s", str(e)
+            )
             raise
 
     @classmethod
@@ -301,9 +303,9 @@ class County:
             List of result rows
         """
         logger = cls.logger
-        
+
         logger.debug("Executing get_county_by_name_and_state_alias operation")
-        
+
         sql = """
         SELECT * 
         FROM county 
@@ -327,7 +329,9 @@ class County:
             logger.debug("Fetched %d rows", len(rows))
             return rows
         except Exception as e:
-            logger.error("Error in get_county_by_name_and_state_alias operation: %s", str(e))
+            logger.error(
+                "Error in get_county_by_name_and_state_alias operation: %s", str(e)
+            )
             raise
 
     @classmethod
@@ -348,9 +352,9 @@ class County:
             List of result rows
         """
         logger = cls.logger
-        
+
         logger.debug("Executing get_all_counties_by_state_alias operation")
-        
+
         sql = """
         SELECT * 
         FROM county 
@@ -373,7 +377,9 @@ class County:
             logger.debug("Fetched %d rows", len(rows))
             return rows
         except Exception as e:
-            logger.error("Error in get_all_counties_by_state_alias operation: %s", str(e))
+            logger.error(
+                "Error in get_all_counties_by_state_alias operation: %s", str(e)
+            )
             raise
 
     @classmethod
@@ -392,9 +398,9 @@ class County:
             List of result rows
         """
         logger = cls.logger
-        
+
         logger.debug("Executing get_all_counties operation")
-        
+
         sql = """
         SELECT * 
         FROM county
@@ -412,5 +418,3 @@ class County:
         except Exception as e:
             logger.error("Error in get_all_counties operation: %s", str(e))
             raise
-
- 

@@ -15,9 +15,9 @@ from sqlalchemy.engine.row import Row
 class City:
     """
     City with SQLAlchemy-based database operations.
-    
+
     This class provides only class methods (for explicit connection and transaction control).
-    
+
     Attributes:
         logger: Class-level logger used by default for all operations.
     """
@@ -43,9 +43,9 @@ class City:
             SQLAlchemy Result object
         """
         logger = cls.logger
-        
+
         logger.debug("Executing create_table operation")
-        
+
         sql = """
         CREATE TABLE IF NOT EXISTS city (
             id VARCHAR(36) PRIMARY KEY NOT NULL,
@@ -99,9 +99,9 @@ class City:
             SQLAlchemy Result object
         """
         logger = cls.logger
-        
+
         logger.debug("Executing insert_city operation")
-        
+
         sql = """
         INSERT INTO city (id, name, alias, county_alias, state_alias, created_at, updated_at) 
         VALUES (
@@ -162,9 +162,9 @@ class City:
             SQLAlchemy Result object
         """
         logger = cls.logger
-        
+
         logger.debug("Executing update_city operation")
-        
+
         sql = """
         UPDATE city 
         SET 
@@ -215,9 +215,9 @@ class City:
             List of result rows
         """
         logger = cls.logger
-        
+
         logger.debug("Executing get_city_by_id operation")
-        
+
         sql = """
         SELECT * 
         FROM city 
@@ -264,9 +264,11 @@ class City:
             List of result rows
         """
         logger = cls.logger
-        
-        logger.debug("Executing get_city_by_alias_and_county_alias_and_state_alias operation")
-        
+
+        logger.debug(
+            "Executing get_city_by_alias_and_county_alias_and_state_alias operation"
+        )
+
         sql = """
         SELECT * 
         FROM city 
@@ -293,7 +295,10 @@ class City:
             logger.debug("Fetched %d rows", len(rows))
             return rows
         except Exception as e:
-            logger.error("Error in get_city_by_alias_and_county_alias_and_state_alias operation: %s", str(e))
+            logger.error(
+                "Error in get_city_by_alias_and_county_alias_and_state_alias operation: %s",
+                str(e),
+            )
             raise
 
     @classmethod
@@ -316,9 +321,9 @@ class City:
             List of result rows
         """
         logger = cls.logger
-        
+
         logger.debug("Executing get_cities_by_county_alias_and_state_alias operation")
-        
+
         sql = """
         SELECT * 
         FROM city 
@@ -344,7 +349,10 @@ class City:
             logger.debug("Fetched %d rows", len(rows))
             return rows
         except Exception as e:
-            logger.error("Error in get_cities_by_county_alias_and_state_alias operation: %s", str(e))
+            logger.error(
+                "Error in get_cities_by_county_alias_and_state_alias operation: %s",
+                str(e),
+            )
             raise
 
     @classmethod
@@ -365,9 +373,9 @@ class City:
             List of result rows
         """
         logger = cls.logger
-        
+
         logger.debug("Executing get_cities_by_state_alias operation")
-        
+
         sql = """
         SELECT * 
         FROM city 
@@ -409,9 +417,9 @@ class City:
             List of result rows
         """
         logger = cls.logger
-        
+
         logger.debug("Executing get_all_cities operation")
-        
+
         sql = """
         SELECT * 
         FROM city 
@@ -429,5 +437,3 @@ class City:
         except Exception as e:
             logger.error("Error in get_all_cities operation: %s", str(e))
             raise
-
- 

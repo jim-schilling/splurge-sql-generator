@@ -39,7 +39,9 @@ def _ensure_generated_classes() -> None:
     if not os.path.exists(user_module_path):
         sql_path = os.path.join(PROJECT_ROOT, "examples", "User.sql")
         schema_path = os.path.join(PROJECT_ROOT, "examples", "User.schema")
-        generate_class(sql_path, output_file_path=user_module_path, schema_file_path=schema_path)
+        generate_class(
+            sql_path, output_file_path=user_module_path, schema_file_path=schema_path
+        )
 
 
 def setup_logging():

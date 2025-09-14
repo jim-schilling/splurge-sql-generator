@@ -20,7 +20,7 @@ class TestSplitSqlFile:
     @pytest.fixture
     def temp_sql_file(self):
         """Create a temporary SQL file for testing."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
             f.write("""
             -- Create users table
             CREATE TABLE users (
@@ -35,9 +35,9 @@ class TestSplitSqlFile:
             SELECT * FROM users;
             """)
             temp_file = f.name
-        
+
         yield temp_file
-        
+
         # Cleanup
         try:
             os.unlink(temp_file)
@@ -92,15 +92,17 @@ class TestSplitSqlFile:
 
     def test_split_sql_file_invalid_type(self):
         """Test splitting with invalid file path type."""
-        with pytest.raises(SqlValidationError, match="file_path must be a string or Path object"):
+        with pytest.raises(
+            SqlValidationError, match="file_path must be a string or Path object"
+        ):
             split_sql_file(123)
 
     def test_split_sql_file_empty_content(self):
         """Test splitting SQL file with empty content."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
             f.write("")
             temp_file = f.name
-        
+
         try:
             result = split_sql_file(temp_file)
             assert result == []
@@ -109,14 +111,14 @@ class TestSplitSqlFile:
 
     def test_split_sql_file_comments_only(self):
         """Test splitting SQL file with only comments."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
             f.write("""
             -- This is a comment
             /* This is a multi-line comment
                that spans multiple lines */
             """)
             temp_file = f.name
-        
+
         try:
             result = split_sql_file(temp_file)
             assert result == []
@@ -125,10 +127,10 @@ class TestSplitSqlFile:
 
     def test_split_sql_file_whitespace_only(self):
         """Test splitting SQL file with only whitespace."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
             f.write("   \n\t  \n  ")
             temp_file = f.name
-        
+
         try:
             result = split_sql_file(temp_file)
             assert result == []
@@ -137,7 +139,7 @@ class TestSplitSqlFile:
 
     def test_split_sql_file_complex_statements(self):
         """Test splitting SQL file with complex statements."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
             f.write("""
             -- Complex SQL file with various statement types
             
@@ -167,7 +169,7 @@ class TestSplitSqlFile:
             HAVING COUNT(p.id) > 0;
             """)
             temp_file = f.name
-        
+
         try:
             result = split_sql_file(temp_file)
             assert len(result) == 5
@@ -181,7 +183,7 @@ class TestSplitSqlFile:
 
     def test_split_sql_file_with_string_literals(self):
         """Test splitting SQL file with string literals containing special characters."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False) as f:
             f.write("""
             INSERT INTO messages (content) VALUES 
                 ('Hello; this is a message with semicolon'),
@@ -191,7 +193,7 @@ class TestSplitSqlFile:
             SELECT * FROM messages WHERE content LIKE '%;%';
             """)
             temp_file = f.name
-        
+
         try:
             result = split_sql_file(temp_file)
             assert len(result) == 2
