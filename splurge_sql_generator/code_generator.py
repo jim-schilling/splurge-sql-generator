@@ -87,6 +87,10 @@ class PythonCodeGenerator:
         # Parse the SQL file first (this will catch validation errors like invalid class names)
         class_name, method_queries = self.parser.parse_file(sql_file_path)
 
+        # Validate schema_file_path is provided
+        if schema_file_path is None:
+            raise TypeError("Schema file path must be provided and cannot be None")
+
         try:
             # Load schema
             schema_path = Path(schema_file_path)
