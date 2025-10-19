@@ -1,9 +1,13 @@
 # splurge-sql-generator
 
-![PyPI](https://img.shields.io/pypi/v/splurge-sql-generator.svg)
-![Build Status](https://img.shields.io/github/actions/workflow/status/jim-schilling/splurge-sql-generator/ci.yml?branch=main)
-![Coverage Status](https://img.shields.io/codecov/c/github/jim-schilling/splurge-sql-generator?branch=main)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
+[![PyPI version](https://badge.fury.io/py/splurge-sql-generator.svg)](https://pypi.org/project/splurge-sql-generator/)
+[![Python versions](https://img.shields.io/pypi/pyversions/splurge-sql-generator.svg)](https://pypi.org/project/splurge-sql-generator/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+[![CI](https://github.com/jim-schilling/splurge-sql-generator/actions/workflows/ci-quick-test.yml/badge.svg)](https://github.com/jim-schilling/splurge-sql-generator/actions/workflows/ci-quick-test.yml)
+[![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen.svg)](https://github.com/jim-schilling/splurge-sql-generator/actions/workflows/ci-coverage.yml)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![mypy](https://img.shields.io/badge/mypy-checked-black)](https://mypy-lang.org/)
 
 A compact summary of splurge-sql-generator — a tool to generate Python (SQLAlchemy-friendly) classes from SQL template files with schema-aware type inference.
 

@@ -10,6 +10,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from splurge_sql_generator import __version__
 from splurge_sql_generator.code_generator import PythonCodeGenerator
 from splurge_sql_generator.utils import find_files_by_extension, to_snake_case
 
@@ -205,6 +206,14 @@ Examples:
     )
 
     parser.add_argument("sql_files", nargs="*", help="SQL template file(s) to process")
+
+    # Version flag
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"splurge-sql-generator {__version__}",
+        help="Print version and exit",
+    )
 
     parser.add_argument("-o", "--output", help="Output directory for generated Python files")
 
