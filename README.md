@@ -10,6 +10,8 @@ A compact summary of splurge-sql-generator — a tool to generate Python (SQLAlc
 See the full documentation and details in the repository:
 
 - Detailed docs: `docs/README-DETAILS.md`
+- API reference: `docs/api/API-REFERENCE.md`
+- CLI reference: `docs/cli/CLI-REFERENCE.md`
 - Full changelog: `CHANGELOG.md`
 
 Key features
@@ -27,6 +29,12 @@ Getting started
 
 For examples and advanced usage see `examples/` in the repository.
 Parse column definitions from table body using sqlparse tokens. Raises `SqlValidationError` if parsing fails or no valid columns are found.
+
+## What's new (2025.5.0)
+
+- Centralized Safe I/O adapter (`SafeTextFileIoAdapter`) for consistent file error handling and simplified I/O usage across the library.
+- Stabilized cross-version error messages and improved validation for schema file arguments.
+- Documentation: comprehensive API and CLI reference files added to `docs/`.
 
 #### `extract_table_names(sql_query: str) -> list[str]`
 Extract table names from SQL query using sqlparse. Raises `SqlValidationError` if parsing fails or no table names are found.
