@@ -9,9 +9,12 @@ Copyright (c) 2025, Jim Schilling
 This module is licensed under the MIT License.
 """
 
+import keyword
 import re
 from pathlib import Path
 from typing import Any
+
+from splurge_sql_generator.exceptions import SqlValidationError
 
 DOMAINS = ["util"]
 
@@ -115,8 +118,6 @@ def validate_python_identifier(name: str, *, context: str = "identifier", file_p
     Raises:
         ValueError: If name is not a valid Python identifier
     """
-    import keyword
-
     if not name:
         file_context = f" in {file_path}" if file_path else ""
         raise ValueError(f"{context.capitalize()} cannot be empty{file_context}")
@@ -128,6 +129,78 @@ def validate_python_identifier(name: str, *, context: str = "identifier", file_p
     if keyword.iskeyword(name):
         file_context = f" in {file_path}" if file_path else ""
         raise ValueError(f"{context.capitalize()} cannot be a reserved keyword{file_context}: {name}")
+
+
+class InputValidator:
+    """Centralized input validation with fail-fast approach."""
+
+    @staticmethod
+    def sql_file_path(path: str | Path, context: str = "SQL file") -> Path:
+        """
+        Validate SQL file path.
+
+        Args:
+            path: File path to validate
+            context: Context description for error messages
+
+        Returns:
+            Validated Path object
+
+        Raises:
+            ValueError: If path is not a .sql file
+            FileNotFoundError: If file doesn't exist
+        """
+        p = Path(path)
+        if p.suffix.lower() != ".sql":
+            raise ValueError(f"{context} must have .sql extension, got: {path}")
+        if not p.exists():
+            raise FileNotFoundError(f"{context} not found: {path}")
+        return p
+
+    @staticmethod
+    def sql_content(content: str, context: str = "SQL content") -> str:
+        """
+        Validate SQL content is non-empty.
+
+        Args:
+            content: SQL content to validate
+            context: Context description for error messages
+
+        Returns:
+            Stripped SQL content
+
+        Raises:
+            SqlValidationError: If content is empty or whitespace-only
+        """
+        if not content or not content.strip():
+            raise SqlValidationError(f"{context} cannot be empty or whitespace-only")
+        return content.strip()
+
+    @staticmethod
+    def identifier(name: str, context: str = "identifier") -> str:
+        """
+        Validate Python identifier.
+
+        Args:
+            name: Name to validate
+            context: Context description for error messages (e.g., "class name", "method name")
+
+        Returns:
+            Validated identifier
+
+        Raises:
+            ValueError: If name is not a valid Python identifier
+        """
+        if not name:
+            raise ValueError(f"{context.capitalize()} cannot be empty")
+
+        if not name.isidentifier():
+            raise ValueError(f"{context.capitalize()} must be valid Python identifier: {name}")
+
+        if keyword.iskeyword(name):
+            raise ValueError(f"{context.capitalize()} cannot be reserved keyword: {name}")
+
+        return name
 
 
 def format_error_context(file_path: str | Path | None = None) -> str:

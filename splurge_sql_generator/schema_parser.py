@@ -13,7 +13,7 @@ import logging
 from pathlib import Path
 
 import splurge_safe_io.exceptions as safe_io_exc
-import yaml  # type: ignore
+import yaml  # type: ignore[import-untyped]
 from splurge_safe_io.safe_text_file_reader import SafeTextFileReader, open_safe_text_reader
 from splurge_safe_io.safe_text_file_writer import open_safe_text_writer
 
@@ -25,6 +25,70 @@ from splurge_sql_generator.sql_helper import (
 from splurge_sql_generator.utils import clean_sql_type
 
 DOMAINS = ["schema", "parser"]
+
+
+# Module-level constant: Default SQL type to Python type mapping
+_DEFAULT_SQL_TYPE_MAPPING: dict[str, str] = {
+    # SQLite types
+    "INTEGER": "int",
+    "INT": "int",
+    "BIGINT": "int",
+    "TEXT": "str",
+    "VARCHAR": "str",
+    "CHAR": "str",
+    "DECIMAL": "float",
+    "REAL": "float",
+    "FLOAT": "float",
+    "DOUBLE": "float",
+    "BOOLEAN": "bool",
+    "BOOL": "bool",
+    "TIMESTAMP": "str",
+    "DATETIME": "str",
+    "DATE": "str",
+    "BLOB": "bytes",
+    # PostgreSQL types
+    "JSON": "dict",
+    "JSONB": "dict",
+    "UUID": "str",
+    "SERIAL": "int",
+    "BIGSERIAL": "int",
+    # MySQL types
+    "TINYINT": "int",
+    "SMALLINT": "int",
+    "MEDIUMINT": "int",
+    "LONGTEXT": "str",
+    "ENUM": "str",
+    # MSSQL types
+    "BIT": "bool",
+    "NUMERIC": "float",
+    "MONEY": "float",
+    "SMALLMONEY": "float",
+    "NCHAR": "str",
+    "NVARCHAR": "str",
+    "NTEXT": "str",
+    "BINARY": "bytes",
+    "VARBINARY": "bytes",
+    "IMAGE": "bytes",
+    "DATETIME2": "str",
+    "SMALLDATETIME": "str",
+    "TIME": "str",
+    "DATETIMEOFFSET": "str",
+    "ROWVERSION": "str",
+    "UNIQUEIDENTIFIER": "str",
+    "XML": "str",
+    "SQL_VARIANT": "Any",
+    # Oracle types
+    "NUMBER": "float",
+    "VARCHAR2": "str",
+    "NVARCHAR2": "str",
+    "CLOB": "str",
+    "NCLOB": "str",
+    "LONG": "str",
+    "RAW": "bytes",
+    "ROWID": "str",
+    "INTERVAL": "str",
+    "DEFAULT": "Any",
+}
 
 
 class SchemaParser:
@@ -135,69 +199,9 @@ class SchemaParser:
         Get default SQL type to Python type mapping.
 
         Returns:
-            Default mapping dictionary
+            Copy of default mapping dictionary to prevent external mutation
         """
-        return {
-            # SQLite types
-            "INTEGER": "int",
-            "INT": "int",
-            "BIGINT": "int",
-            "TEXT": "str",
-            "VARCHAR": "str",
-            "CHAR": "str",
-            "DECIMAL": "float",
-            "REAL": "float",
-            "FLOAT": "float",
-            "DOUBLE": "float",
-            "BOOLEAN": "bool",
-            "BOOL": "bool",
-            "TIMESTAMP": "str",
-            "DATETIME": "str",
-            "DATE": "str",
-            "BLOB": "bytes",
-            # PostgreSQL types
-            "JSON": "dict",
-            "JSONB": "dict",
-            "UUID": "str",
-            "SERIAL": "int",
-            "BIGSERIAL": "int",
-            # MySQL types
-            "TINYINT": "int",
-            "SMALLINT": "int",
-            "MEDIUMINT": "int",
-            "LONGTEXT": "str",
-            "ENUM": "str",
-            # MSSQL types
-            "BIT": "bool",
-            "NUMERIC": "float",
-            "MONEY": "float",
-            "SMALLMONEY": "float",
-            "NCHAR": "str",
-            "NVARCHAR": "str",
-            "NTEXT": "str",
-            "BINARY": "bytes",
-            "VARBINARY": "bytes",
-            "IMAGE": "bytes",
-            "DATETIME2": "str",
-            "SMALLDATETIME": "str",
-            "TIME": "str",
-            "DATETIMEOFFSET": "str",
-            "ROWVERSION": "str",
-            "UNIQUEIDENTIFIER": "str",
-            "XML": "str",
-            "SQL_VARIANT": "Any",
-            # Oracle types
-            "NUMBER": "float",
-            "VARCHAR2": "str",
-            "NVARCHAR2": "str",
-            "CLOB": "str",
-            "NCLOB": "str",
-            "LONG": "str",
-            "RAW": "bytes",
-            "ROWID": "str",
-            "INTERVAL": "str",
-            "DEFAULT": "Any",
-        }
+        return _DEFAULT_SQL_TYPE_MAPPING.copy()
 
     def _parse_schema_file(self, schema_file_path: Path | str) -> dict[str, dict[str, str]]:
         """
@@ -347,27 +351,37 @@ class SchemaParser:
 
     def load_schema(self, schema_file_path: Path | str) -> None:
         """
-        Load a schema file and populate the internal table schemas.
+        Load a schema file and populate the internal table schemas with error recovery.
 
         Args:
             schema_file_path: Path to the schema file to load
 
         Raises:
-            FileError: If the schema file cannot be read
-            SqlValidationError: If the SQL content is malformed and cannot be parsed
+            FileError: If the schema file cannot be read (re-raised after logging)
+            SqlValidationError: If the SQL content is malformed and cannot be parsed (re-raised after logging)
 
         Note:
             If the schema file does not exist, an empty schema will be loaded.
+            Non-fatal errors will be logged as warnings with graceful degradation.
         """
-
         try:
             self._table_schemas = dict[str, dict[str, str]]()
             self._table_schemas = self._parse_schema_file(schema_file_path)
             self._logger.info(
                 f"Successfully loaded schema from '{str(schema_file_path)}' with {len(self._table_schemas)} tables"
             )
-        except (FileError, SqlValidationError) as e:
+        except FileError as e:
             self._logger.error(f"Failed to load schema from '{str(schema_file_path)}': {str(e)}")
+            # Preserve empty schema and re-raise for explicit error handling
+            raise
+        except SqlValidationError as e:
+            self._logger.error(f"SQL validation error in schema file '{str(schema_file_path)}': {str(e)}")
+            # Re-raise validation errors - they indicate malformed SQL that needs attention
+            raise
+        except Exception as e:
+            self._logger.error(
+                f"Unexpected error loading schema from '{str(schema_file_path)}': {type(e).__name__}: {str(e)}"
+            )
             raise
 
     def generate_types_file(self, *, output_path: Path | str | None = None) -> str:
@@ -398,7 +412,7 @@ class SchemaParser:
 
 """
 
-        # Group types by database for better organization
+        # Group types by database for better organization (derived from _DEFAULT_SQL_TYPE_MAPPING)
         sqlite_types = {
             "INTEGER": "int",
             "INT": "int",

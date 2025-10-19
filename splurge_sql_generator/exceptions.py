@@ -25,3 +25,34 @@ class FileError(SplurgeSqlGeneratorError):
 
 class SqlValidationError(SplurgeSqlGeneratorError):
     """Raised when provided SQL-related input arguments are invalid."""
+
+
+# Parsing-specific exceptions
+class ParsingError(SplurgeSqlGeneratorError):
+    """Base exception for parsing-related errors."""
+
+
+class SqlParsingError(ParsingError):
+    """Raised when SQL parsing via sqlparse fails."""
+
+
+class TokenizationError(ParsingError):
+    """Raised when token processing or traversal fails."""
+
+
+# Schema-specific exceptions
+class SchemaError(SplurgeSqlGeneratorError):
+    """Base exception for schema processing errors."""
+
+
+class ColumnDefinitionError(SchemaError):
+    """Raised when column definition parsing fails."""
+
+
+class TypeInferenceError(SchemaError):
+    """Raised when type inference fails."""
+
+
+# Configuration exceptions
+class ConfigurationError(SplurgeSqlGeneratorError):
+    """Raised when configuration is invalid or missing."""

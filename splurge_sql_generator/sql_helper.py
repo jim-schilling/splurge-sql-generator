@@ -8,6 +8,7 @@ Please keep this header when you use this code.
 This module is licensed under the MIT License.
 """
 
+import logging
 import re
 from functools import lru_cache
 from pathlib import Path
@@ -23,6 +24,9 @@ from splurge_sql_generator.exceptions import (
     SqlValidationError,
 )
 from splurge_sql_generator.utils import clean_sql_type, is_empty_or_whitespace, normalize_string
+
+DOMAINS = ["sql", "helper"]
+_LOGGER = logging.getLogger(__name__)
 
 # Private constants for SQL statement types
 _FETCH_KEYWORDS: set[str] = {
@@ -108,6 +112,51 @@ def normalize_token(token: Token) -> str:
     Return the uppercased, stripped value of a token.
     """
     return str(token.value).strip().upper() if hasattr(token, "value") and token.value else ""
+
+
+def filter_significant_tokens(tokens: list[Token]) -> list[Token]:
+    """
+    Filter out whitespace and comment tokens from token list.
+
+    Args:
+        tokens: List of tokens to filter
+
+    Returns:
+        List containing only significant tokens (non-whitespace, non-comment)
+    """
+    return [t for t in tokens if not t.is_whitespace and t.ttype not in Comment]
+
+
+def extract_identifier_name(token: Token) -> str:
+    """
+    Extract name from quoted or unquoted identifier token.
+
+    Handles various quoting styles:
+    - [identifier] (MSSQL)
+    - `identifier` (MySQL)
+    - "identifier" (PostgreSQL)
+    - identifier (unquoted)
+
+    Args:
+        token: Identifier token
+
+    Returns:
+        Extracted identifier name without quotes
+    """
+    value = str(token.value).strip()
+
+    # Define quote pairs to handle
+    quote_pairs = [
+        ("[", "]"),
+        ("`", "`"),
+        ('"', '"'),
+    ]
+
+    for open_quote, close_quote in quote_pairs:
+        if value.startswith(open_quote) and value.endswith(close_quote):
+            return value[len(open_quote) : -len(close_quote)]
+
+    return value
 
 
 def _next_significant_token(
@@ -1116,6 +1165,14 @@ def parse_sql_file(
     try:
         reader = SafeTextFileReader(file_path, encoding="utf-8")
         sql_content = reader.read()
+
+        # Check file size for large file handling
+        content_size_mb = len(sql_content.encode("utf-8")) / (1024 * 1024)
+        if content_size_mb > MAX_MEMORY_MB:
+            _LOGGER.warning(
+                f"SQL file '{file_path}' is {content_size_mb:.2f}MB, exceeds "
+                f"MAX_MEMORY_MB ({MAX_MEMORY_MB}MB). Using optimized parsing."
+            )
 
         return parse_sql_statements(sql_content, strip_semicolon=strip_semicolon)
 
