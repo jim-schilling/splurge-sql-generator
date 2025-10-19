@@ -10,9 +10,9 @@ import pytest
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
 from tests.unit.test_utils import (
-    temp_sql_files,
     assert_generated_code_structure,
     assert_method_parameters,
+    temp_sql_files,
 )
 
 
@@ -56,9 +56,7 @@ WHERE id IN (:user_ids);
 
         with temp_sql_files(sql_content, schema_content) as (sql_file, schema_file):
             # Generate code
-            generated_code = generator.generate_class(
-                sql_file, schema_file_path=schema_file
-            )
+            generated_code = generator.generate_class(sql_file, schema_file_path=schema_file)
 
             # Validate template rendering
             assert_generated_code_structure(
@@ -78,9 +76,7 @@ WHERE id IN (:user_ids);
                 "create_user_with_profile",
                 ["username", "email", "password_hash"],
             )
-            assert_method_parameters(
-                generated_code, "update_user_batch", ["new_status", "user_ids"]
-            )
+            assert_method_parameters(generated_code, "update_user_batch", ["new_status", "user_ids"])
 
             # Validate SQL formatting
             assert "ORDER BY created_at DESC" in generated_code

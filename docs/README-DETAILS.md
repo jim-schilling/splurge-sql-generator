@@ -345,7 +345,7 @@ The library provides robust error handling with a fail-fast approach to ensure d
 
 ### Example Error Handling
 ```python
-from splurge_sql_generator.errors import SqlValidationError, SqlFileError
+from splurge_sql_generator.exceptions import SqlValidationError, SqlFileError
 
 try:
     # This will raise SqlValidationError if no valid columns are found

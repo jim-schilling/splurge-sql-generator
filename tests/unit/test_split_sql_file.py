@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
+from splurge_sql_generator.exceptions import FileError, SqlValidationError
 from splurge_sql_generator.sql_helper import split_sql_file
-from splurge_sql_generator.errors import SqlFileError, SqlValidationError
 
 
 class TestSplitSqlFile:
@@ -77,7 +77,7 @@ class TestSplitSqlFile:
 
     def test_split_sql_file_nonexistent(self):
         """Test splitting non-existent SQL file."""
-        with pytest.raises(SqlFileError, match="SQL file not found"):
+        with pytest.raises(FileError, match="SQL file not found"):
             split_sql_file("nonexistent.sql")
 
     def test_split_sql_file_none_path(self):
@@ -92,9 +92,7 @@ class TestSplitSqlFile:
 
     def test_split_sql_file_invalid_type(self):
         """Test splitting with invalid file path type."""
-        with pytest.raises(
-            SqlValidationError, match="file_path must be a string or Path object"
-        ):
+        with pytest.raises(SqlValidationError, match="file_path must be a string or Path object"):
             split_sql_file(123)
 
     def test_split_sql_file_empty_content(self):

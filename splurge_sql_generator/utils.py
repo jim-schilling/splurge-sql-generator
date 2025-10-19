@@ -13,6 +13,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+DOMAINS = ["util"]
+
 
 # Private constants for common operations
 _SNAKE_CASE_PATTERN = re.compile(r"(?<!^)(?=[A-Z])")
@@ -83,107 +85,6 @@ def clean_sql_type(sql_type: str) -> str:
     return cleaned
 
 
-def validate_file_path(
-    file_path: str | Path, *, must_exist: bool = True, extension: str | None = None
-) -> Path:
-    """
-    Validate and normalize a file path.
-
-    Args:
-        file_path: File path to validate
-        must_exist: Whether the file must exist (default: True)
-        extension: Expected file extension (e.g., '.sql', '.schema')
-
-    Returns:
-        Normalized Path object
-
-    Raises:
-        FileNotFoundError: If must_exist is True and file doesn't exist
-        ValueError: If extension doesn't match expected extension
-    """
-    path = Path(file_path)
-
-    if must_exist and not path.exists():
-        raise FileNotFoundError(f"File not found: {path}")
-
-    if extension and path.suffix.lower() != extension.lower():
-        raise ValueError(f"File must have {extension} extension: {path}")
-
-    return path
-
-
-def safe_read_file(file_path: str | Path, *, encoding: str = _DEFAULT_ENCODING) -> str:
-    """
-    Safely read a file with proper error handling.
-
-    Args:
-        file_path: Path to the file to read
-        encoding: File encoding (default: utf-8)
-
-    Returns:
-        File content as string
-
-    Raises:
-        FileNotFoundError: If file doesn't exist
-        PermissionError: If file cannot be read due to permissions
-        UnicodeDecodeError: If file contains invalid encoding
-        OSError: For other I/O errors
-    """
-    path = Path(file_path)
-
-    if not path.exists():
-        raise FileNotFoundError(f"File not found: {path}")
-
-    try:
-        return path.read_text(encoding=encoding)
-    except PermissionError as e:
-        raise PermissionError(f"Permission denied reading file '{path}': {e}") from e
-    except UnicodeDecodeError as e:
-        # Re-raise with proper UnicodeDecodeError signature while preserving context
-        raise UnicodeDecodeError(
-            encoding,
-            e.object,
-            e.start,
-            e.end,
-            f"Invalid {encoding} encoding in file '{path}': {e.reason}",
-        ) from e
-    except OSError as e:
-        raise OSError(f"Error reading file '{path}': {e}") from e
-
-
-def safe_write_file(
-    file_path: str | Path,
-    content: str,
-    *,
-    encoding: str = _DEFAULT_ENCODING,
-    create_parents: bool = True,
-) -> None:
-    """
-    Safely write content to a file with proper error handling.
-
-    Args:
-        file_path: Path to the file to write
-        content: Content to write to the file
-        encoding: File encoding (default: utf-8)
-        create_parents: Whether to create parent directories (default: True)
-
-    Raises:
-        PermissionError: If file cannot be written due to permissions
-        OSError: For other I/O errors
-    """
-    path = Path(file_path)
-
-    if create_parents:
-        path.parent.mkdir(parents=True, exist_ok=True)
-
-    try:
-        path.write_text(content, encoding=encoding)
-    except PermissionError as e:
-        raise PermissionError(f"Permission denied writing file '{path}': {e}") from e
-    except OSError as e:
-        raise OSError(f"Error writing file '{path}': {e}") from e
-
-
 def find_files_by_extension(directory: str | Path, extension: str) -> list[Path]:
     """
     Find all files with a specific extension in a directory.
@@ -202,9 +103,7 @@ def find_files_by_extension(directory: str | Path, extension: str) -> list[Path]
     return list(path.glob(f"*{extension}"))
 
 
-def validate_python_identifier(
-    name: str, *, context: str = "identifier", file_path: str | Path | None = None
-) -> None:
+def validate_python_identifier(name: str, *, context: str = "identifier", file_path: str | Path | None = None) -> None:
     """
     Validate that a string is a valid Python identifier.
 
@@ -224,15 +123,11 @@ def validate_python_identifier(
 
     if not name.isidentifier():
         file_context = f" in {file_path}" if file_path else ""
-        raise ValueError(
-            f"{context.capitalize()} must be a valid Python identifier{file_context}: {name}"
-        )
+        raise ValueError(f"{context.capitalize()} must be a valid Python identifier{file_context}: {name}")
 
     if keyword.iskeyword(name):
         file_context = f" in {file_path}" if file_path else ""
-        raise ValueError(
-            f"{context.capitalize()} cannot be a reserved keyword{file_context}: {name}"
-        )
+        raise ValueError(f"{context.capitalize()} cannot be a reserved keyword{file_context}: {name}")
 
 
 def format_error_context(file_path: str | Path | None = None) -> str:

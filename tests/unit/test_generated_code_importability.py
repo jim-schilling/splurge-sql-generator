@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
-from tests.unit.test_utils import temp_sql_files, create_basic_schema
+from tests.unit.test_utils import create_basic_schema, temp_sql_files
 
 
 class TestGeneratedCodeImportability:
@@ -28,9 +28,7 @@ class TestGeneratedCodeImportability:
         yield
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def _create_and_import_module(
-        self, sql_content: str, schema_content: str | None = None
-    ) -> Any:
+    def _create_and_import_module(self, sql_content: str, schema_content: str | None = None) -> Any:
         """
         Create SQL file, generate Python code, and import the generated module.
 
@@ -43,9 +41,7 @@ class TestGeneratedCodeImportability:
         """
         with temp_sql_files(sql_content, schema_content) as (sql_file, schema_file):
             # Generate Python code
-            generated_code = self.generator.generate_class(
-                sql_file, schema_file_path=schema_file
-            )
+            generated_code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
 
             # Write generated code to file
             py_file = Path(self.temp_dir) / "generated_module.py"
@@ -163,9 +159,7 @@ SELECT * FROM test_table WHERE id = :id;
 """
 
         with temp_sql_files(sql_content, schema_content) as (sql_file, schema_file):
-            generated_code = self.generator.generate_class(
-                sql_file, schema_file_path=schema_file
-            )
+            generated_code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
 
             # Validate required imports
             required_imports = [

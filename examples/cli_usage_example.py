@@ -95,7 +95,7 @@ def demonstrate_output_directory():
             for file_path in output_files:
                 print(f"  - {file_path.name}")
                 # Show first few lines of generated file
-                with open(file_path, "r") as f:
+                with open(file_path) as f:
                     lines = f.readlines()[:10]
                     print("    First 10 lines:")
                     for line in lines:
@@ -166,9 +166,7 @@ SELECT id, name, is_active, data FROM custom_table WHERE type = :type;
 
         # Create a temporary directory for output
         with tempfile.TemporaryDirectory() as temp_dir:
-            return_code, stdout, stderr = run_cli_command(
-                [sql_file, "-o", temp_dir, "--types", custom_types_file]
-            )
+            return_code, stdout, stderr = run_cli_command([sql_file, "-o", temp_dir, "--types", custom_types_file])
 
             print(f"Return code: {return_code}")
             if return_code == 0:
@@ -289,7 +287,7 @@ def demonstrate_integration_with_generated_code():
 
             except ImportError as e:
                 print(f"Failed to import generated class: {e}")
-            except (OSError, IOError) as e:
+            except OSError as e:
                 print(f"Error accessing files: {e}")
             except Exception as e:
                 print(f"Unexpected error using generated class: {e}")

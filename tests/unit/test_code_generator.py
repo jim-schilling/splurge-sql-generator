@@ -3,21 +3,20 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from tests.unit.test_utils import (
-    temp_sql_files,
-    temp_multiple_sql_files,
-    create_basic_schema,
-    create_dummy_schema,
-    create_complex_schema,
-    assert_generated_code_structure,
-    assert_method_parameters,
-)
 
 import pytest
 
-
 from splurge_sql_generator.code_generator import PythonCodeGenerator
 from splurge_sql_generator.sql_parser import SqlParser
+from tests.unit.test_utils import (
+    assert_generated_code_structure,
+    assert_method_parameters,
+    create_basic_schema,
+    create_complex_schema,
+    create_dummy_schema,
+    temp_multiple_sql_files,
+    temp_sql_files,
+)
 
 
 @pytest.fixture
@@ -63,11 +62,9 @@ SELECT 1;
     py_fd, py_fname = tempfile.mkstemp(suffix=".py")
     os.close(py_fd)
     try:
-        generator.generate_class(
-            sql_fname, output_file_path=py_fname, schema_file_path=schema_fname
-        )
+        generator.generate_class(sql_fname, output_file_path=py_fname, schema_file_path=schema_fname)
         assert os.path.exists(py_fname)
-        with open(py_fname, "r") as f:
+        with open(py_fname) as f:
             content = f.read()
             assert "class TestClass" in content
             assert "def get_one" in content
@@ -99,9 +96,7 @@ SELECT 2;
         sql_file_paths = [sql_path for sql_path, _ in file_paths]
         schema_file_paths = [schema_path for _, schema_path in file_paths]
         # Use the first schema file as the shared schema
-        result = generator.generate_multiple_classes(
-            sql_file_paths, schema_file_path=schema_file_paths[0]
-        )
+        result = generator.generate_multiple_classes(sql_file_paths, schema_file_path=schema_file_paths[0])
 
         assert len(result) == 2
         assert "ClassA" in result
@@ -111,10 +106,10 @@ SELECT 2;
 
 
 def test_generate_class_invalid_file(generator, parser):
-    with pytest.raises(FileNotFoundError):
-        generator.generate_class(
-            "nonexistent_file.sql", schema_file_path="nonexistent.schema"
-        )
+    from splurge_sql_generator.exceptions import FileError
+
+    with pytest.raises(FileError):
+        generator.generate_class("nonexistent_file.sql", schema_file_path="nonexistent.schema")
 
 
 def test_method_docstring_generation(generator, parser):

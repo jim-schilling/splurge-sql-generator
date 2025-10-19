@@ -11,7 +11,9 @@ import sys
 from pathlib import Path
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
-from splurge_sql_generator.utils import to_snake_case, find_files_by_extension
+from splurge_sql_generator.utils import find_files_by_extension, to_snake_case
+
+DOMAINS = ["cli"]
 
 
 def _find_schema_files(sql_files: list[str]) -> str | None:
@@ -204,9 +206,7 @@ Examples:
 
     parser.add_argument("sql_files", nargs="*", help="SQL template file(s) to process")
 
-    parser.add_argument(
-        "-o", "--output", help="Output directory for generated Python files"
-    )
+    parser.add_argument("-o", "--output", help="Output directory for generated Python files")
 
     parser.add_argument(
         "--dry-run",
@@ -247,13 +247,9 @@ Examples:
             from splurge_sql_generator.schema_parser import SchemaParser
 
             schema_parser = SchemaParser()
-            output_path = schema_parser.generate_types_file(
-                output_path=args.generate_types
-            )
+            output_path = schema_parser.generate_types_file(output_path=args.generate_types)
             print(f"Generated SQL type mapping file: {output_path}")
-            print(
-                "You can now customize this file for your specific database requirements."
-            )
+            print("You can now customize this file for your specific database requirements.")
             return
         except OSError as e:
             print(f"Error generating types file: {e}", file=sys.stderr)
@@ -261,9 +257,7 @@ Examples:
 
     # Check if SQL files are provided (required unless --generate-types is used)
     if not args.sql_files:
-        parser.error(
-            "the following arguments are required: sql_files (unless using --generate-types)"
-        )
+        parser.error("the following arguments are required: sql_files (unless using --generate-types)")
 
     # Expand and validate input files
     sql_files = _expand_and_validate_inputs(args.sql_files, strict=args.strict)
@@ -287,22 +281,22 @@ Examples:
     try:
         if len(sql_files) == 1 and args.dry_run:
             # Single file, print to stdout
-            code = generator.generate_class(sql_files[0], schema_file_path=schema_file)
+            code = generator.generate_class(
+                sql_files[0], schema_file_path=schema_file if schema_file is not None else ""
+            )
             print(code)
         else:
             # Multiple files or save to directory
             generated_classes = generator.generate_multiple_classes(
                 sql_files,
                 output_dir=args.output if not args.dry_run else None,
-                schema_file_path=schema_file,
+                schema_file_path=schema_file if schema_file is not None else "",
             )
 
             # Report generated classes
-            _report_generated_classes(
-                generated_classes, output_dir, dry_run=args.dry_run
-            )
+            _report_generated_classes(generated_classes, output_dir, dry_run=args.dry_run)
 
-    except (OSError, IOError, FileNotFoundError) as e:
+    except (OSError, FileNotFoundError) as e:
         print(f"Error accessing files: {e}", file=sys.stderr)
         sys.exit(1)
     except ValueError as e:

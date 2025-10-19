@@ -10,9 +10,9 @@ import pytest
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
 from tests.unit.test_utils import (
-    temp_sql_files,
     assert_generated_code_structure,
     assert_method_parameters,
+    temp_sql_files,
 )
 
 
@@ -78,9 +78,7 @@ CREATE TABLE categories (
         with temp_sql_files(sql_content, schema_content) as (sql_file, schema_file):
             # Generate code
             generator = PythonCodeGenerator()
-            generated_code = generator.generate_class(
-                sql_file, schema_file_path=schema_file
-            )
+            generated_code = generator.generate_class(sql_file, schema_file_path=schema_file)
 
             # Validate complete class structure
             expected_methods = [
@@ -92,25 +90,17 @@ CREATE TABLE categories (
                 "get_product_stats",
             ]
 
-            assert_generated_code_structure(
-                generated_code, "ProductRepository", expected_methods
-            )
+            assert_generated_code_structure(generated_code, "ProductRepository", expected_methods)
 
             # Validate method parameters
-            assert_method_parameters(
-                generated_code, "get_product_by_id", ["product_id"]
-            )
-            assert_method_parameters(
-                generated_code, "get_products_by_category", ["category_id"]
-            )
+            assert_method_parameters(generated_code, "get_product_by_id", ["product_id"])
+            assert_method_parameters(generated_code, "get_products_by_category", ["category_id"])
             assert_method_parameters(
                 generated_code,
                 "create_product",
                 ["name", "price", "category_id", "description"],
             )
-            assert_method_parameters(
-                generated_code, "update_product_price", ["new_price", "product_id"]
-            )
+            assert_method_parameters(generated_code, "update_product_price", ["new_price", "product_id"])
             assert_method_parameters(generated_code, "delete_product", ["product_id"])
             assert_method_parameters(generated_code, "get_product_stats", [])
 
@@ -125,16 +115,12 @@ CREATE TABLE categories (
                 tree = ast.parse(generated_code)
 
                 # Validate class definition
-                class_defs = [
-                    node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)
-                ]
+                class_defs = [node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)]
                 assert len(class_defs) == 1
                 assert class_defs[0].name == "ProductRepository"
 
                 # Validate method definitions
-                method_defs = [
-                    node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)
-                ]
+                method_defs = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
                 assert len(method_defs) == len(expected_methods)
 
             except SyntaxError as e:

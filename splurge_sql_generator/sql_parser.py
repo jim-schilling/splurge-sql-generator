@@ -8,22 +8,26 @@ This module is licensed under the MIT License.
 
 import re
 from pathlib import Path
-import sqlparse
-from sqlparse import tokens as T
 from typing import Any
 
-from splurge_sql_generator.errors import SqlValidationError
+import splurge_safe_io.exceptions as safe_io_exc
+import sqlparse
+from splurge_safe_io.safe_text_file_reader import SafeTextFileReader
+from sqlparse import tokens as T
+
+from splurge_sql_generator.exceptions import FileError, SqlValidationError
 from splurge_sql_generator.sql_helper import (
     FETCH_STATEMENT,
     detect_statement_type,
-    remove_sql_comments,
     extract_table_names,
+    remove_sql_comments,
 )
 from splurge_sql_generator.utils import (
-    validate_python_identifier,
     format_error_context,
-    safe_read_file,
+    validate_python_identifier,
 )
+
+DOMAINS = ["parser", "sql"]
 
 
 class SqlParser:
@@ -82,13 +86,28 @@ class SqlParser:
             OSError: If there are I/O errors reading the file
             SqlValidationError: If the file format is invalid
         """
-        # Use safe file reading utility
-        content = safe_read_file(file_path)
-        return self.parse_string(content, file_path)
+        try:
+            reader = SafeTextFileReader(file_path)
+            content = reader.read()
+            return self.parse_string(content, file_path)
+        except safe_io_exc.SplurgeSafeIoPathValidationError as e:
+            raise FileError(message=f"SQL file path is invalid: {str(file_path)}.", details=str(e.message)) from e
+        except safe_io_exc.SplurgeSafeIoFileNotFoundError as e:
+            raise FileError(message=f"SQL file not found: '{str(file_path)}'.", details=str(e.message)) from e
+        except safe_io_exc.SplurgeSafeIoFilePermissionError as e:
+            raise FileError(
+                message=f"Permission denied reading SQL file: {str(file_path)}.", details=str(e.message)
+            ) from e
+        except safe_io_exc.SplurgeSafeIoFileDecodingError as e:
+            raise FileError(
+                message=f"Decoding error reading SQL file: {str(file_path)}.", details=str(e.message)
+            ) from e
+        except safe_io_exc.SplurgeSafeIoOsError as e:
+            raise FileError(message=f"OS error reading SQL file: {str(file_path)}.", details=str(e.message)) from e
+        except safe_io_exc.SplurgeSafeIoUnknownError as e:
+            raise FileError(message=f"Unknown error reading SQL file: {str(file_path)}.", details=str(e.message)) from e
 
-    def parse_string(
-        self, content: str, file_path: str | Path | None = None
-    ) -> tuple[str, dict[str, str]]:
+    def parse_string(self, content: str, file_path: str | Path | None = None) -> tuple[str, dict[str, str]]:
         """
         Parse SQL content string and extract class name and method-query mappings.
 
@@ -106,36 +125,28 @@ class SqlParser:
         lines = content.split("\n")
         if not lines or not lines[0].strip().startswith("#"):
             file_context = format_error_context(file_path)
-            raise SqlValidationError(
-                f"First line must be a class comment starting with #{file_context}"
-            )
+            raise SqlValidationError(f"First line must be a class comment starting with #{file_context}")
 
         # Check if first line starts with "#" (before stripping)
         if not lines[0].startswith("#"):
             file_context = format_error_context(file_path)
-            raise SqlValidationError(
-                f"First line must be a class comment starting with #{file_context}"
-            )
+            raise SqlValidationError(f"First line must be a class comment starting with #{file_context}")
 
         class_comment = lines[0].strip()
         class_name = class_comment[1:].strip()  # Remove '#' prefix
 
         # Validate class name using utility function
         try:
-            validate_python_identifier(
-                class_name, context="class name", file_path=file_path
-            )
+            validate_python_identifier(class_name, context="class name", file_path=file_path)
         except ValueError as e:
-            raise SqlValidationError(str(e))
+            raise SqlValidationError(str(e)) from e
 
         # Parse methods and queries
         method_queries = self._extract_methods_and_queries(content, file_path)
 
         return class_name, method_queries
 
-    def _extract_methods_and_queries(
-        self, content: str, file_path: str | Path | None = None
-    ) -> dict[str, str]:
+    def _extract_methods_and_queries(self, content: str, file_path: str | Path | None = None) -> dict[str, str]:
         """
         Extract method names and their corresponding SQL queries.
 
@@ -167,18 +178,14 @@ class SqlParser:
                 # Check for valid Python identifier and not a reserved keyword
                 if method_name and sql_query:
                     try:
-                        validate_python_identifier(
-                            method_name, context="method name", file_path=file_path
-                        )
+                        validate_python_identifier(method_name, context="method name", file_path=file_path)
                         method_queries[method_name] = sql_query
                     except ValueError as e:
-                        raise SqlValidationError(str(e))
+                        raise SqlValidationError(str(e)) from e
 
         return method_queries
 
-    def get_method_info(
-        self, sql_query: str, file_path: str | Path | None = None
-    ) -> dict[str, Any]:
+    def get_method_info(self, sql_query: str, file_path: str | Path | None = None) -> dict[str, Any]:
         """
         Analyze SQL query to determine method type and parameters.
         Uses sql_helper.detect_statement_type() for accurate statement type detection.
@@ -223,9 +230,7 @@ class SqlParser:
                 query_type = self._TYPE_SHOW
             elif sql_upper.startswith(self._KW_EXPLAIN):
                 query_type = self._TYPE_EXPLAIN
-            elif sql_upper.startswith(self._KW_DESC) or sql_upper.startswith(
-                self._KW_DESCRIBE
-            ):
+            elif sql_upper.startswith(self._KW_DESC) or sql_upper.startswith(self._KW_DESCRIBE):
                 query_type = self._TYPE_DESCRIBE
             elif sql_upper.startswith(self._KW_WITH):
                 query_type = self._TYPE_CTE
@@ -254,7 +259,7 @@ class SqlParser:
             if parsed_params:
                 tokens = list(parsed_params[0].flatten())
 
-                def next_non_ws(idx: int) -> tuple[int | None, any]:
+                def next_non_ws(idx: int) -> tuple[int | None, Any]:
                     j = idx + 1
                     while j < len(tokens):
                         t = tokens[j]
@@ -289,17 +294,13 @@ class SqlParser:
                                     parameters.append(name)
         except Exception:
             # Fallback to regex on comment-stripped SQL if sqlparse fails
-            parameters = list(
-                dict.fromkeys(self._PARAM_PATTERN.findall(param_scan_sql))
-            )
+            parameters = list(dict.fromkeys(self._PARAM_PATTERN.findall(param_scan_sql)))
         # Check for reserved keywords in parameters
         for param in parameters:
             try:
-                validate_python_identifier(
-                    param, context="parameter name", file_path=file_path
-                )
+                validate_python_identifier(param, context="parameter name", file_path=file_path)
             except ValueError as e:
-                raise SqlValidationError(str(e))
+                raise SqlValidationError(str(e)) from e
 
         return {
             "type": query_type,

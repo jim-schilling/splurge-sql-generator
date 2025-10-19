@@ -10,9 +10,8 @@ from pathlib import Path
 
 import pytest
 
-
-from splurge_sql_generator.schema_parser import SchemaParser
 from splurge_sql_generator import generate_types_file
+from splurge_sql_generator.schema_parser import SchemaParser
 
 
 def test_generate_types_file_default_path():
@@ -108,10 +107,7 @@ def test_generate_types_file_content_structure():
         # Check header
         assert "# SQL Type to Python Type Mapping" in content
         assert "# This file maps SQL column types to Python type annotations" in content
-        assert (
-            "# Customize this file for your specific database and requirements"
-            in content
-        )
+        assert "# Customize this file for your specific database and requirements" in content
 
         # Check database sections
         assert "# SQLite types" in content
@@ -160,7 +156,9 @@ def test_generate_types_file_directory_creation():
 
 def test_generate_types_file_error_handling():
     """Test error handling when file cannot be written."""
+    from splurge_sql_generator.exceptions import FileError
+
     # Try to write to a directory (which should fail)
     with tempfile.TemporaryDirectory() as temp_dir:
-        with pytest.raises(OSError):
+        with pytest.raises(FileError):
             generate_types_file(output_path=temp_dir)

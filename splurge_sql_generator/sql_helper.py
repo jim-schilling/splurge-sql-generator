@@ -8,21 +8,21 @@ Please keep this header when you use this code.
 This module is licensed under the MIT License.
 """
 
-from pathlib import Path
 import re
+from functools import lru_cache
+from pathlib import Path
+
+import splurge_safe_io.exceptions as safe_io_exc
 import sqlparse
-from sqlparse.tokens import Comment, Name, Literal
+from splurge_safe_io.safe_text_file_reader import SafeTextFileReader
 from sqlparse.sql import Statement, Token
-from splurge_sql_generator.errors import (
-    SqlFileError,
+from sqlparse.tokens import Comment, Literal, Name
+
+from splurge_sql_generator.exceptions import (
+    FileError,
     SqlValidationError,
 )
-from splurge_sql_generator.utils import (
-    clean_sql_type,
-    normalize_string,
-    is_empty_or_whitespace,
-)
-
+from splurge_sql_generator.utils import clean_sql_type, is_empty_or_whitespace, normalize_string
 
 # Private constants for SQL statement types
 _FETCH_KEYWORDS: set[str] = {
@@ -39,7 +39,6 @@ _MODIFY_DML_KEYWORDS: set[str] = {"INSERT", "UPDATE", "DELETE"}
 # Private constants for SQL keywords and symbols
 _WITH_KEYWORD: str = "WITH"
 _AS_KEYWORD: str = "AS"
-_SELECT_KEYWORD: str = "SELECT"
 _SEMICOLON: str = ";"
 _COMMA: str = ","
 _PAREN_OPEN: str = "("
@@ -69,8 +68,22 @@ _TYPE_SUFFIX_LENGTH: int = 5
 EXECUTE_STATEMENT: str = "execute"
 FETCH_STATEMENT: str = "fetch"
 
+# Memory limits for processing (simplified without external dependencies)
+MAX_MEMORY_MB: int = 512  # Maximum memory usage before chunking
+CHUNK_SIZE_MB: int = 50  # Size of chunks for large file processing
 
-def remove_sql_comments(sql_text: str) -> str:
+
+def get_memory_usage_mb() -> float:
+    """Get current memory usage in MB (simplified implementation)."""
+    return 0.0  # Simplified - no external memory monitoring
+
+
+def should_use_chunked_processing(file_size_mb: float, current_memory_mb: float) -> bool:
+    """Determine if chunked processing should be used based on file size."""
+    return file_size_mb > CHUNK_SIZE_MB  # Only check file size
+
+
+def remove_sql_comments(sql_text: str | None) -> str:
     """
     Remove SQL comments from a SQL string using sqlparse.
     Handles:
@@ -83,7 +96,7 @@ def remove_sql_comments(sql_text: str) -> str:
     Returns:
         SQL string with comments removed
     """
-    if is_empty_or_whitespace(sql_text):
+    if sql_text is None:
         return ""
 
     result = sqlparse.format(sql_text, strip_comments=True)
@@ -94,7 +107,7 @@ def normalize_token(token: Token) -> str:
     """
     Return the uppercased, stripped value of a token.
     """
-    return normalize_string(_safe_token_value(token)).upper()
+    return str(token.value).strip().upper() if hasattr(token, "value") and token.value else ""
 
 
 def _next_significant_token(
@@ -107,7 +120,7 @@ def _next_significant_token(
     """
     for i in range(start, len(tokens)):
         token = tokens[i]
-        if not _is_whitespace_or_comment(token):
+        if not token.is_whitespace and token.ttype not in Comment:
             return i, token
     return None, None
 
@@ -135,7 +148,7 @@ def find_main_statement_after_with(tokens: list[Token]) -> str | None:
         token_value = normalize_token(token)
 
         # Skip whitespace and comments
-        if _is_whitespace_or_comment(token):
+        if token.is_whitespace or token.ttype in Comment:
             i += 1
             continue
 
@@ -151,10 +164,7 @@ def find_main_statement_after_with(tokens: list[Token]) -> str | None:
             i = next_i
 
             # Check if next token is opening parenthesis (CTE body)
-            if (
-                tokens[i].ttype == sqlparse.tokens.Punctuation
-                and tokens[i].value == _PAREN_OPEN
-            ):
+            if tokens[i].ttype == sqlparse.tokens.Punctuation and tokens[i].value == _PAREN_OPEN:
                 # Consume the entire CTE body by tracking parentheses
                 paren_level = 1
                 i += 1
@@ -174,10 +184,7 @@ def find_main_statement_after_with(tokens: list[Token]) -> str | None:
                 i = next_i
 
                 # Check if next token is comma (more CTEs to follow)
-                if (
-                    tokens[i].ttype == sqlparse.tokens.Punctuation
-                    and tokens[i].value == _COMMA
-                ):
+                if tokens[i].ttype == sqlparse.tokens.Punctuation and tokens[i].value == _COMMA:
                     i += 1  # Skip comma and continue to next CTE
                     continue
                 else:
@@ -201,6 +208,7 @@ def find_main_statement_after_with(tokens: list[Token]) -> str | None:
     return None
 
 
+@lru_cache(maxsize=512)
 def detect_statement_type(sql: str) -> str:
     """
     Detect if a SQL statement returns rows using advanced sqlparse analysis.
@@ -432,12 +440,12 @@ def extract_create_table_statements(sql_content: str) -> list[tuple[str, str]]:
                 # Check for CREATE keyword
                 if normalize_token(token) == "CREATE":
                     # Look for TABLE keyword next
-                    j, next_token = _next_significant_token(tokens, start=i + 1)
-                    if next_token and normalize_token(next_token) == "TABLE":
+                    next_res = _next_significant_token(tokens, start=i + 1)
+                    j = next_res[0]
+                    next_token = next_res[1]
+                    if j is not None and next_token and normalize_token(next_token) == "TABLE":
                         # Found CREATE TABLE, now extract table name and body
-                        table_name, table_body = _extract_create_table_components(
-                            tokens, j + 1
-                        )
+                        table_name, table_body = _extract_create_table_components(tokens, j + 1)
                         if table_name and table_body:
                             create_tables.append((table_name.lower(), table_body))
 
@@ -543,9 +551,7 @@ def _extract_identifier_name(token: Token) -> str:
         return value  # No quotes
 
 
-def _extract_create_table_components(
-    tokens: list[Token], start_index: int
-) -> tuple[str, str]:
+def _extract_create_table_components(tokens: list[Token], start_index: int) -> tuple[str | None, str | None]:
     """
     Extract table name and body from CREATE TABLE statement tokens.
 
@@ -557,11 +563,7 @@ def _extract_create_table_components(
         Tuple of (table_name, table_body) or (None, None) if not found
     """
     # Validate input parameters
-    if (
-        not _validate_tokens_list(tokens)
-        or start_index < 0
-        or start_index >= len(tokens)
-    ):
+    if not _validate_tokens_list(tokens) or start_index < 0 or start_index >= len(tokens):
         return None, None
 
     table_name = None
@@ -571,27 +573,39 @@ def _extract_create_table_components(
     i = start_index
 
     # Check for optional "IF NOT EXISTS" sequence
-    i, name_token = _next_significant_token(tokens, start=i)
-    if name_token is None:
+    next_res = _next_significant_token(tokens, start=i)
+    tmp_i = next_res[0]
+    name_token = next_res[1]
+    if tmp_i is None or name_token is None:
         return None, None
+    i = tmp_i
     token_value = normalize_token(name_token)
 
     # If we find "IF", check for "NOT EXISTS" sequence
     if token_value == "IF":
         # Check for "NOT"
-        i, not_token = _next_significant_token(tokens, start=i + 1)
-        if not_token is None or normalize_token(not_token) != "NOT":
+        next_res = _next_significant_token(tokens, start=i + 1)
+        tmp_i = next_res[0]
+        not_token = next_res[1]
+        if tmp_i is None or not_token is None or normalize_token(not_token) != "NOT":
             return None, None
+        i = tmp_i
 
         # Check for "EXISTS"
-        i, exists_token = _next_significant_token(tokens, start=i + 1)
-        if exists_token is None or normalize_token(exists_token) != "EXISTS":
+        next_res = _next_significant_token(tokens, start=i + 1)
+        tmp_i = next_res[0]
+        exists_token = next_res[1]
+        if tmp_i is None or exists_token is None or normalize_token(exists_token) != "EXISTS":
             return None, None
+        i = tmp_i
 
         # Get the table name token after "IF NOT EXISTS"
-        i, name_token = _next_significant_token(tokens, start=i + 1)
-        if name_token is None:
+        next_res = _next_significant_token(tokens, start=i + 1)
+        tmp_i = next_res[0]
+        name_token = next_res[1]
+        if tmp_i is None or name_token is None:
             return None, None
+        i = tmp_i
     elif token_value in {"NOT", "EXISTS"}:
         # Malformed SQL - "NOT" or "EXISTS" without "IF"
         return None, None
@@ -601,11 +615,16 @@ def _extract_create_table_components(
         # Check if this is followed by a dot (schema prefix)
         next_i, next_token = _next_significant_token(tokens, start=i + 1)
         if next_token and str(next_token.value) == ".":
+            # Ensure next_i is present
+            if next_i is None:
+                return None, None
             # Skip the dot and get the actual table name
-            next_i, table_token = _next_significant_token(tokens, start=next_i + 1)
-            if table_token and _is_identifier_token(table_token):
+            next_res = _next_significant_token(tokens, start=next_i + 1)
+            tmp_next_i = next_res[0]
+            table_token = next_res[1]
+            if tmp_next_i is not None and table_token and _is_identifier_token(table_token):
                 table_name = _extract_identifier_name(table_token)
-                i = next_i  # Update position to after the table name
+                i = tmp_next_i  # Update position to after the table name
             else:
                 return None, None
         else:
@@ -618,9 +637,12 @@ def _extract_create_table_components(
         return None, None
 
     # Find opening parenthesis
-    i, paren_token = _next_significant_token(tokens, start=i + 1)
-    if not paren_token or str(paren_token.value) != "(":
+    next_res = _next_significant_token(tokens, start=i + 1)
+    tmp_i = next_res[0]
+    paren_token = next_res[1]
+    if tmp_i is None or not paren_token or str(paren_token.value) != "(":
         return None, None
+    i = tmp_i
 
     # Extract everything between parentheses
     paren_count = 1
@@ -719,8 +741,8 @@ def _split_by_top_level_commas(tokens: list[Token]) -> list[list[Token]]:
     Returns:
         List of token lists, each representing a column definition
     """
-    parts = []
-    current_part = []
+    parts: list[list[Token]] = []
+    current_part: list[Token] = []
     paren_count = 0
 
     for token in tokens:
@@ -744,7 +766,7 @@ def _split_by_top_level_commas(tokens: list[Token]) -> list[list[Token]]:
     return parts
 
 
-def _extract_column_name_and_type(tokens: list[Token]) -> tuple[str, str]:
+def _extract_column_name_and_type(tokens: list[Token]) -> tuple[str | None, str | None]:
     """
     Extract column name and SQL type from column definition tokens.
 
@@ -758,8 +780,8 @@ def _extract_column_name_and_type(tokens: list[Token]) -> tuple[str, str]:
         return None, None
 
     # Find the first identifier (column name)
-    column_name = None
-    type_start_idx = None
+    column_name: str | None = None
+    type_start_idx: int | None = None
 
     for i, token in enumerate(tokens):
         if _is_whitespace_or_comment(token):
@@ -854,7 +876,7 @@ def extract_table_names(sql_query: str) -> list[str]:
     if not clean_sql.strip():
         return []
 
-    table_names = set()
+    table_names: set[str] = set()
 
     # Parse the SQL using sqlparse
     parsed = sqlparse.parse(clean_sql)
@@ -870,9 +892,7 @@ def extract_table_names(sql_query: str) -> list[str]:
 
     # If no table names were found, the SQL might be malformed
     if not table_names:
-        raise SqlValidationError(
-            "No table names found in SQL query - possible malformed SQL"
-        )
+        raise SqlValidationError("No table names found in SQL query - possible malformed SQL")
 
     # Return unique table names in lowercase
     return list(table_names)
@@ -888,7 +908,7 @@ def _extract_tables_from_statement(statement: Statement) -> set[str]:
     Returns:
         Set of table names found in the statement (in lowercase)
     """
-    table_names = set()
+    table_names: set[str] = set()
 
     # Convert statement to string and analyze
     sql_str = str(statement).upper()
@@ -1001,20 +1021,115 @@ def split_sql_file(
         - Large files are processed efficiently without loading entire content into memory
         - Thread-safe: Can be called concurrently from multiple threads
     """
+    return parse_sql_file(file_path, strip_semicolon=strip_semicolon)
+
+
+def parse_sql_file(
+    file_path: str | Path,
+    *,
+    strip_semicolon: bool = False,
+) -> list[str]:
+    """
+    Read a SQL file and parse it into individual executable statements.
+
+    This function reads a SQL file and intelligently splits it into individual
+    statements that can be executed separately. It handles complex SQL files
+    with comments, multiple statements, and preserves statement integrity.
+
+    Processing Steps:
+        1. Read entire file content using SafeTextFileReader.read()
+        2. Parse using sqlparse for accurate statement boundaries
+        3. Filter out empty statements and comment-only lines
+        4. Optionally strip trailing semicolons
+
+    Args:
+        file_path: Path to the SQL file to process. Can be a string path or
+            pathlib.Path object. SafeTextFileReader validates the path during
+            instantiation, ensuring the file exists and is readable.
+        strip_semicolon: If True, remove trailing semicolons from each statement.
+            If False (default), preserve semicolons as they appear in the file.
+            Useful when the execution engine expects statements without semicolons.
+
+    Returns:
+        List of individual SQL statements as strings. Each statement is:
+        - Trimmed of leading/trailing whitespace
+        - Free of comments (unless within string literals)
+        - Non-empty and contains actual SQL content
+        - Optionally without trailing semicolons
+
+    Raises:
+        FileError: If file operations fail, including:
+            - SQL file path is invalid
+            - SQL file not found
+            - Permission denied reading SQL file
+            - Decoding error reading SQL file
+            - I/O error reading SQL file
+            - Unknown error reading SQL file
+            - Unexpected error reading SQL file
+
+    Examples:
+        Basic usage:
+            >>> statements = parse_sql_file("setup.sql")
+            >>> for stmt in statements:
+            ...     print(f"Statement: {stmt}")
+
+        With semicolon stripping:
+            >>> statements = parse_sql_file("migration.sql", strip_semicolon=True)
+            >>> # Statements will not have trailing semicolons
+
+        Using pathlib.Path:
+            >>> from pathlib import Path
+            >>> sql_file = Path("database") / "schema.sql"
+            >>> statements = parse_sql_file(sql_file)
+
+        Handling complex SQL files:
+            >>> # File content:
+            >>> # -- Create users table
+            >>> # CREATE TABLE users (
+            >>> #     id INTEGER PRIMARY KEY,
+            >>> #     name TEXT NOT NULL
+            >>> # );
+            >>> #
+            >>> # /* Insert sample data */
+            >>> # INSERT INTO users (name) VALUES ('Alice'), ('Bob');
+            >>> statements = parse_sql_file("complex.sql")
+            >>> len(statements)  # Returns 2 (CREATE and INSERT)
+
+    Note:
+        - Files are read with UTF-8 encoding
+        - SafeTextFileReader normalizes newlines to \\n
+        - Comments within string literals are preserved
+        - Empty lines and comment-only lines are filtered out
+        - Statement boundaries are determined by sqlparse for accuracy
+        - Thread-safe: Can be called concurrently from multiple threads
+    """
+    # Basic input validation for cases SafeTextFileReader doesn't handle
     if file_path is None:
         raise SqlValidationError("file_path cannot be None")
 
-    if not isinstance(file_path, (str, Path)):
+    if not isinstance(file_path, str | Path):
         raise SqlValidationError("file_path must be a string or Path object")
 
     if not file_path:
         raise SqlValidationError("file_path cannot be empty")
 
     try:
-        with open(file_path, encoding="utf-8") as f:
-            sql_content = f.read()
+        reader = SafeTextFileReader(file_path, encoding="utf-8")
+        sql_content = reader.read()
+
         return parse_sql_statements(sql_content, strip_semicolon=strip_semicolon)
-    except FileNotFoundError:
-        raise SqlFileError(f"SQL file not found: {file_path}") from None
-    except OSError as e:
-        raise SqlFileError(f"Error reading SQL file {file_path}: {e}") from e
+
+    except safe_io_exc.SplurgeSafeIoPathValidationError as exc:
+        raise FileError(f"Invalid file path: {file_path}") from exc
+    except safe_io_exc.SplurgeSafeIoFileNotFoundError as exc:
+        raise FileError(f"SQL file not found: {file_path}") from exc
+    except safe_io_exc.SplurgeSafeIoFilePermissionError as exc:
+        raise FileError(f"Permission denied reading SQL file: {file_path}") from exc
+    except safe_io_exc.SplurgeSafeIoFileDecodingError as exc:
+        raise FileError(f"Decoding error reading SQL file (not UTF-8?): {file_path}") from exc
+    except safe_io_exc.SplurgeSafeIoOsError as exc:
+        raise FileError(f"I/O error reading SQL file: {file_path}") from exc
+    except safe_io_exc.SplurgeSafeIoUnknownError as exc:
+        raise FileError(f"Unknown error reading SQL file: {file_path}") from exc
+    except Exception as exc:
+        raise FileError(f"Unexpected error reading SQL file: {file_path}") from exc

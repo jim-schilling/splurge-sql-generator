@@ -24,41 +24,42 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3 :: Only",
     "Topic :: Database",
     "Topic :: Software Development :: Code Generators",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "sqlalchemy>=2.0.39",
-    "sqlparse>=0.4.4",
+    "sqlalchemy>=2.0.42",
+    "sqlparse>=0.5.3",
     "jinja2>=3.1.0",
     "PyYAML>=6.0.2",
+    "splurge-safe-io>=2025.1.1"
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "pytest-xdist>=3.0.0",
-    "black>=23.0.0",
-    "isort>=5.12.0",
-    "flake8>=6.0.0",
-    "mypy>=1.0.0",
-    "ruff>=0.12.10",
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
+    "pytest-xdist>=3.8.0",
+    "pytest-mock>=3.15.1",
+    "mypy>=1.18.2",
+    "pre-commit>=4.3.0",
+    "ruff>=0.12.7",
 ]
 test = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "pytest-xdist>=3.0.0",
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
+    "pytest-xdist>=3.8.0",
 ]
-docs = [
-    "sphinx>=7.0.0",
-    "sphinx-rtd-theme>=1.3.0",
+lint = [
+    "mypy>=1.18.2",
+    "ruff>=0.12.7",
 ]
 
 [project.scripts]
-splurge-sql-gen = "splurge_sql_generator.cli:main"
+splurge-sql-generator = "splurge_sql_generator.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/jim-schilling/splurge-sql-generator"
@@ -75,32 +76,9 @@ exclude = ["tests*", "examples*", "output*"]
 splurge_sql_generator = ["templates/*.j2"]
 
 # Development tools configuration
-[tool.black]
-line-length = 120
-target-version = ['py310']
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | build
-  | dist
-)/
-'''
-
-[tool.isort]
-profile = "black"
-multi_line_output = 3
-line_length = 120
-known_first_party = ["splurge_sql_generator"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -113,24 +91,70 @@ warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 strict_equality = true
+files = ["splurge_sql_generator"]
+show_error_codes = true
+# Allow missing imports for vendored/external helper package used at runtime
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-x --tb=short -q --strict-markers --strict-config --disable-warnings"
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = [
-    "--strict-markers",
-    "--strict-config",
-    "--cov=splurge_sql_generator",
-    "--cov-report=term-missing",
-    "--cov-report=html",
-    "-x",
-    "-v",
-    "-n",
-    "6",
-]
 markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "integration: marks tests as integration tests",
+    "unit: Unit tests that test individual components in isolation",
+    "integration: Integration tests that verify component interactions",
+    "e2e: End-to-end tests that verify complete workflows",
+    "slow: Slow running tests (typically integration or e2e)",
+    "database: Tests requiring database connectivity",
+    "security: Tests focused on security features",
+    "performance: Tests measuring performance characteristics",
+    "critical: Critical path tests that must always pass",
+    "essential: Essential functionality tests",
+    "important: Important but not critical functionality",
+    "nice_to_have: Nice-to-have functionality tests",
+    "fast: Fast tests (< 0.1s each)",
+    "medium: Medium speed tests (0.1-1s each)",
+    "in_memory: Tests that can use in-memory databases",
 ]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+
+[tool.coverage.run]
+source = ["splurge_sql_generator"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

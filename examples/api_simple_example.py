@@ -10,6 +10,7 @@ import os
 import sys
 
 from sqlalchemy import create_engine, text
+
 from splurge_sql_generator import generate_class
 from splurge_sql_generator.utils import to_snake_case
 
@@ -39,9 +40,7 @@ def _ensure_generated_classes() -> None:
     if not os.path.exists(user_module_path):
         sql_path = os.path.join(PROJECT_ROOT, "examples", "User.sql")
         schema_path = os.path.join(PROJECT_ROOT, "examples", "User.schema")
-        generate_class(
-            sql_path, output_file_path=user_module_path, schema_file_path=schema_path
-        )
+        generate_class(sql_path, output_file_path=user_module_path, schema_file_path=schema_path)
 
 
 def setup_logging():
@@ -144,9 +143,7 @@ def demonstrate_simplified_logger():
         print("5. Updating user status:")
         with engine.connect() as tx_conn:
             with tx_conn.begin():
-                User.update_user_status(
-                    connection=tx_conn, user_id=3, new_status="active"
-                )
+                User.update_user_status(connection=tx_conn, user_id=3, new_status="active")
                 print("   Updated user status")
         print()
 
@@ -180,9 +177,7 @@ def main():
 
     print("\n" + "=" * 50)
     print("Example completed successfully!")
-    print(
-        "\nThe simplified logger approach makes the API cleaner and more maintainable."
-    )
+    print("\nThe simplified logger approach makes the API cleaner and more maintainable.")
 
 
 if __name__ == "__main__":

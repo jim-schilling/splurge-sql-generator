@@ -4,24 +4,25 @@ Comprehensive tests for sql_helper.py module.
 Tests the public API and behavior of all exported functions and constants.
 """
 
-import pytest
-from pathlib import Path
-import tempfile
 import os
+import tempfile
+from pathlib import Path
 
+import pytest
+
+from splurge_sql_generator.exceptions import SqlValidationError
 from splurge_sql_generator.sql_helper import (
-    remove_sql_comments,
-    normalize_token,
-    detect_statement_type,
-    parse_sql_statements,
-    extract_create_table_statements,
-    parse_table_columns,
-    extract_table_names,
-    split_sql_file,
     EXECUTE_STATEMENT,
     FETCH_STATEMENT,
+    detect_statement_type,
+    extract_create_table_statements,
+    extract_table_names,
+    normalize_token,
+    parse_sql_statements,
+    parse_table_columns,
+    remove_sql_comments,
+    split_sql_file,
 )
-from splurge_sql_generator.errors import SqlValidationError
 
 
 class TestSqlHelperPublicAPI:
@@ -36,9 +37,7 @@ class TestSqlHelperPublicAPI:
         """Test remove_sql_comments with edge cases."""
         # Empty and None inputs
         assert remove_sql_comments("") == ""
-        assert (
-            remove_sql_comments(None) == ""
-        )  # Function returns empty string for None input
+        assert remove_sql_comments(None) == ""  # Function returns empty string for None input
 
         # Whitespace only - sqlparse strips whitespace
         assert remove_sql_comments("   \n\t  ") == ""
@@ -137,7 +136,7 @@ class TestSqlHelperPublicAPI:
     def test_normalize_token_edge_cases(self):
         """Test normalize_token with edge cases."""
         from sqlparse.sql import Token
-        from sqlparse.tokens import Whitespace, Punctuation
+        from sqlparse.tokens import Punctuation, Whitespace
 
         # Test with whitespace token
         token = Token(Whitespace, "   ")
@@ -162,22 +161,11 @@ class TestSqlHelperPublicAPI:
         assert detect_statement_type("DESC users") == FETCH_STATEMENT
 
         # Execute statements
-        assert (
-            detect_statement_type("INSERT INTO users VALUES (1, 'John')")
-            == EXECUTE_STATEMENT
-        )
-        assert (
-            detect_statement_type("UPDATE users SET name = 'Jane' WHERE id = 1")
-            == EXECUTE_STATEMENT
-        )
-        assert (
-            detect_statement_type("DELETE FROM users WHERE id = 1") == EXECUTE_STATEMENT
-        )
+        assert detect_statement_type("INSERT INTO users VALUES (1, 'John')") == EXECUTE_STATEMENT
+        assert detect_statement_type("UPDATE users SET name = 'Jane' WHERE id = 1") == EXECUTE_STATEMENT
+        assert detect_statement_type("DELETE FROM users WHERE id = 1") == EXECUTE_STATEMENT
         assert detect_statement_type("CREATE TABLE users (id INT)") == EXECUTE_STATEMENT
-        assert (
-            detect_statement_type("ALTER TABLE users ADD COLUMN email TEXT")
-            == EXECUTE_STATEMENT
-        )
+        assert detect_statement_type("ALTER TABLE users ADD COLUMN email TEXT") == EXECUTE_STATEMENT
         assert detect_statement_type("DROP TABLE users") == EXECUTE_STATEMENT
 
         # Edge cases
@@ -640,9 +628,9 @@ class TestSqlHelperPublicAPI:
 
     def test_split_sql_file_nonexistent(self):
         """Test split_sql_file with nonexistent file."""
-        from splurge_sql_generator.errors import SqlFileError
+        from splurge_sql_generator.exceptions import FileError
 
-        with pytest.raises(SqlFileError):
+        with pytest.raises(FileError):
             split_sql_file("nonexistent_file.sql")
 
     def test_split_sql_file_empty_content(self):
@@ -894,7 +882,9 @@ class TestSqlHelperIntegration:
         assert tables[0][0] == "users"
 
         # Test that parse_table_columns raises SqlValidationError for malformed input
-        malformed_table_body = "CONSTRAINT pk_id PRIMARY KEY (id), CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id)"
+        malformed_table_body = (
+            "CONSTRAINT pk_id PRIMARY KEY (id), CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id)"
+        )
         with pytest.raises(SqlValidationError):
             parse_table_columns(malformed_table_body)
 
@@ -1084,7 +1074,7 @@ def test_extract_table_names_update_with_from():
 
 def test_extract_table_names_quoted_identifiers_raise():
     """Quoted-only identifiers are not supported; expect validation error."""
-    from splurge_sql_generator.errors import SqlValidationError
+    from splurge_sql_generator.exceptions import SqlValidationError
 
     sql = 'SELECT * FROM "Users"'
     with pytest.raises(SqlValidationError):

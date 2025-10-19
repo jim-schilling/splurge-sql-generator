@@ -1,12 +1,11 @@
 import os
 import tempfile
-from tests.unit.test_utils import temp_sql_files
 
 import pytest
 
-
+from splurge_sql_generator.exceptions import SqlValidationError
 from splurge_sql_generator.sql_parser import SqlParser
-from splurge_sql_generator.errors import SqlValidationError
+from tests.unit.test_utils import temp_sql_files
 
 
 @pytest.fixture
@@ -86,9 +85,7 @@ def test_get_method_info_basic_types(parser):
     assert not info["has_returning"]
 
     # INSERT statements
-    info = parser.get_method_info(
-        "INSERT INTO users (name) VALUES (:name) RETURNING id"
-    )
+    info = parser.get_method_info("INSERT INTO users (name) VALUES (:name) RETURNING id")
     assert info["type"] == "insert"
     assert not info["is_fetch"]
     assert "name" in info["parameters"]
@@ -291,7 +288,9 @@ def test_get_method_info_edge_cases(parser):
 
 
 def test_parse_file_not_found(parser):
-    with pytest.raises(FileNotFoundError):
+    from splurge_sql_generator.exceptions import FileError
+
+    with pytest.raises(FileError):
         parser.parse_file("nonexistent_file.sql")
 
 
@@ -301,9 +300,7 @@ def test_parse_file_encoding(parser):
 #get_user_with_unicode
 SELECT * FROM users WHERE name = :name;
         """
-    with tempfile.NamedTemporaryFile(
-        "w+", delete=False, suffix=".sql", encoding="utf-8"
-    ) as f:
+    with tempfile.NamedTemporaryFile("w+", delete=False, suffix=".sql", encoding="utf-8") as f:
         f.write(sql)
         fname = f.name
     try:
@@ -370,7 +367,9 @@ def test_parse_file_empty_file(parser):
         f.write("")
         fname = f.name
     try:
-        with pytest.raises(ValueError) as cm:
+        from splurge_sql_generator.exceptions import SqlValidationError
+
+        with pytest.raises(SqlValidationError) as cm:
             parser.parse_file(fname)
         assert "First line must be a class comment" in str(cm.value)
     finally:
@@ -421,9 +420,7 @@ SELECT * FROM users WHERE id = :user_id;
         """
     with pytest.raises(SqlValidationError) as cm:
         parser.parse_string(sql, "test.sql")
-    assert "First line must be a class comment starting with # in test.sql" in str(
-        cm.value
-    )
+    assert "First line must be a class comment starting with # in test.sql" in str(cm.value)
 
 
 def test_parse_string_empty_class_comment(parser):
@@ -519,8 +516,9 @@ def test_get_method_info_with_file_path(parser):
 
 def test_get_method_info_parameter_fallback_on_sqlparse_error(parser):
     """Fallback regex path is used when sqlparse.parse raises; parameters are still captured."""
-    import splurge_sql_generator.sql_parser as sql_parser_module
     from unittest.mock import patch
+
+    import splurge_sql_generator.sql_parser as sql_parser_module
 
     def raise_err(_):
         raise RuntimeError("boom")

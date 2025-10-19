@@ -13,9 +13,8 @@ from pathlib import Path
 
 import pytest
 
-
+from splurge_sql_generator.exceptions import SqlValidationError
 from splurge_sql_generator.schema_parser import SchemaParser
-from splurge_sql_generator.errors import SqlValidationError
 
 
 def test_yaml_non_string_values_and_missing_default():
@@ -89,17 +88,21 @@ def test_parse_schema_file_unicode_decode_error():
         with open(bad_file, "wb") as f:
             f.write(b"\xff\xfe\xfd\xfc")
 
+        from splurge_sql_generator.exceptions import FileError
+
         parser = SchemaParser()
-        with pytest.raises(UnicodeDecodeError):
-            parser.parse_schema_file(str(bad_file))
+        with pytest.raises(FileError):
+            parser._parse_schema_file(str(bad_file))
 
 
 def test_parse_schema_file_oserror_on_directory():
-    """Passing a directory to parse_schema_file should raise OSError."""
+    """Passing a directory to parse_schema_file should raise FileError."""
+    from splurge_sql_generator.exceptions import FileError
+
     with tempfile.TemporaryDirectory() as temp_dir:
         parser = SchemaParser()
-        with pytest.raises(OSError):
-            parser.parse_schema_file(temp_dir)
+        with pytest.raises(FileError):
+            parser._parse_schema_file(temp_dir)
 
 
 def test_parse_schema_file_sql_validation_error_propagates():
@@ -119,9 +122,9 @@ CREATE TABLE users (
 
         parser = SchemaParser()
         with pytest.raises(SqlValidationError) as ctx:
-            parser.parse_schema_file(str(schema_path))
+            parser._parse_schema_file(str(schema_path))
 
-        assert "SQL validation error in schema file" in str(ctx.value)
+        assert "No valid column definitions found in table body" in str(ctx.value)
 
 
 def test_load_schema_for_sql_file_with_explicit_override():
@@ -155,9 +158,7 @@ CREATE TABLE orders (
         )
 
         parser = SchemaParser()
-        parser.load_schema_for_sql_file(
-            str(sql_file), schema_file_path=str(override_schema)
-        )
+        parser.load_schema_for_sql_file(str(sql_file), schema_file_path=str(override_schema))
 
         assert "orders" in parser.table_schemas
         assert "users" not in parser.table_schemas

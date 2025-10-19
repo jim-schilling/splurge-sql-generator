@@ -11,12 +11,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import splurge_safe_io.exceptions as safe_io_exc
 from jinja2 import Environment, FileSystemLoader
+from splurge_safe_io.safe_text_file_writer import SafeTextFileWriter, open_safe_text_writer
 
-from splurge_sql_generator.errors import SqlValidationError
+from splurge_sql_generator.exceptions import FileError, SqlValidationError
 from splurge_sql_generator.schema_parser import SchemaParser
 from splurge_sql_generator.sql_parser import SqlParser
-from splurge_sql_generator.utils import to_snake_case, safe_write_file
+from splurge_sql_generator.utils import to_snake_case
+
+DOMAINS = ["code", "generator"]
 
 
 class PythonCodeGenerator:
@@ -37,9 +41,7 @@ class PythonCodeGenerator:
             validate_parameters: Whether to validate SQL parameters against schema (default: False)
         """
         self._parser = SqlParser()
-        self._schema_parser = SchemaParser(
-            sql_type_mapping_file=sql_type_mapping_file or "types.yaml"
-        )
+        self._schema_parser = SchemaParser(sql_type_mapping_file=sql_type_mapping_file or "types.yaml")
         self._validate_parameters = validate_parameters
         # Set up Jinja2 environment with templates directory
         template_dir = Path(__file__).parent / "templates"
@@ -66,7 +68,7 @@ class PythonCodeGenerator:
         sql_file_path: str,
         *,
         output_file_path: str | None = None,
-        schema_file_path: str,
+        schema_file_path: Path | str,
     ) -> str:
         """
         Generate a Python class from a SQL file.
@@ -85,28 +87,53 @@ class PythonCodeGenerator:
         # Parse the SQL file first (this will catch validation errors like invalid class names)
         class_name, method_queries = self.parser.parse_file(sql_file_path)
 
-        # Load schema
-        schema_path = Path(schema_file_path)
+        try:
+            # Load schema
+            schema_path = Path(schema_file_path)
+            self._schema_parser.load_schema(schema_path)
 
-        if schema_path.exists():
-            # Load schema if it exists
-            self._schema_parser.load_schema(schema_file_path)
-        else:
-            # Schema files are required
-            raise FileNotFoundError(
-                f"Schema file required but not found: {schema_path}. "
-                f"Specify a schema file using the --schema option or ensure a corresponding .schema file exists."
-            )
+        except safe_io_exc.SplurgeSafeIoPathValidationError as e:
+            raise FileError(
+                message=f"Schema file path is invalid: {schema_file_path}. Specify a schema file using the --schema option or ensure a corresponding .schema file exists.",
+                details=str(e.message),
+            ) from e
+        except safe_io_exc.SplurgeSafeIoFileNotFoundError as e:
+            raise FileError(
+                message=f"Schema file not found: {schema_file_path}. Specify a schema file using the --schema option or ensure a corresponding .schema file exists.",
+                details=str(e.message),
+            ) from e
+        except safe_io_exc.SplurgeSafeIoFilePermissionError as e:
+            raise FileError(
+                message=f"Permission denied reading schema file: {schema_file_path}. Specify a schema file using the --schema option or ensure a corresponding .schema file exists.",
+                details=str(e.message),
+            ) from e
 
         # Generate the Python code using template
-        python_code = self._generate_python_code(
-            class_name, method_queries, sql_file_path
-        )
+        python_code = self._generate_python_code(class_name, method_queries, sql_file_path)
 
         # Save to file if output path provided
         if output_file_path:
-            safe_write_file(output_file_path, python_code)
-
+            try:
+                with open_safe_text_writer(output_file_path) as writer:
+                    writer.write(python_code)
+            except safe_io_exc.SplurgeSafeIoFileEncodingError as e:
+                raise FileError(
+                    message=f"Encoding error writing to file: {output_file_path}.", details=str(e.message)
+                ) from e
+            except safe_io_exc.SplurgeSafeIoFilePermissionError as e:
+                raise FileError(
+                    message=f"Permission denied writing to file: {output_file_path}.", details=str(e.message)
+                ) from e
+            except safe_io_exc.SplurgeSafeIoOsError as e:
+                raise FileError(message=f"OS error writing to file: {output_file_path}.", details=str(e.message)) from e
+            except safe_io_exc.SplurgeSafeIoFileOperationError as e:
+                raise FileError(
+                    message=f"File operation error writing to file: {output_file_path}.", details=str(e.message)
+                ) from e
+            except safe_io_exc.SplurgeSafeIoUnknownError as e:
+                raise FileError(
+                    message=f"Unknown error writing to file: {output_file_path}.", details=str(e.message)
+                ) from e
         return python_code
 
     def _generate_python_code(
@@ -130,9 +157,7 @@ class PythonCodeGenerator:
         methods: list[dict[str, Any]] = []
         for method_name, sql_query in method_queries.items():
             method_info = self.parser.get_method_info(sql_query)
-            method_data = self._prepare_method_data(
-                method_name, sql_query, method_info, file_path
-            )
+            method_data = self._prepare_method_data(method_name, sql_query, method_info, file_path)
             methods.append(method_data)
 
         # Render template (preloaded)
@@ -188,9 +213,7 @@ class PythonCodeGenerator:
         """
         # Validate parameters against schema if enabled
         if self._validate_parameters:
-            self._validate_parameters_against_schema(
-                sql_query, method_info["parameters"], file_path
-            )
+            self._validate_parameters_against_schema(sql_query, method_info["parameters"], file_path)
 
         # Generate method signature
         parameters = self._generate_method_signature(method_info["parameters"])
@@ -359,9 +382,7 @@ class PythonCodeGenerator:
         # If no exact match, try to infer from SQL context
         return self._infer_type_from_sql_context(sql_query, parameter, table_names)
 
-    def _infer_type_from_sql_context(
-        self, sql_query: str, parameter: str, table_names: list[str]
-    ) -> str:
+    def _infer_type_from_sql_context(self, sql_query: str, parameter: str, table_names: list[str]) -> str:
         """
         Infer parameter type from SQL query context when parameter name doesn't match column names.
 
@@ -433,27 +454,15 @@ class PythonCodeGenerator:
             ]
         ):
             return "int"
-        elif any(
-            suffix in parameter_lower for suffix in ["_price", "price", "cost", "rate"]
-        ):
+        elif any(suffix in parameter_lower for suffix in ["_price", "price", "cost", "rate"]):
             return "float"
-        elif any(
-            suffix in parameter_lower for suffix in ["_name", "name", "title", "label"]
-        ):
+        elif any(suffix in parameter_lower for suffix in ["_name", "name", "title", "label"]):
             return "str"
-        elif any(
-            suffix in parameter_lower
-            for suffix in ["_description", "description", "text", "content"]
-        ):
+        elif any(suffix in parameter_lower for suffix in ["_description", "description", "text", "content"]):
             return "str"
-        elif any(
-            suffix in parameter_lower for suffix in ["_term", "term", "search", "query"]
-        ):
+        elif any(suffix in parameter_lower for suffix in ["_term", "term", "search", "query"]):
             return "str"
-        elif any(
-            suffix in parameter_lower
-            for suffix in ["_active", "active", "enabled", "is_"]
-        ):
+        elif any(suffix in parameter_lower for suffix in ["_active", "active", "enabled", "is_"]):
             return "bool"
 
         return "Any"
@@ -524,6 +533,11 @@ class PythonCodeGenerator:
                 # Convert class name to snake_case for filename
                 snake_case_name = to_snake_case(class_name)
                 output_path = Path(output_dir) / f"{snake_case_name}.py"
-                safe_write_file(output_path, python_code)
+                # safe_write_file(output_path, python_code)
+                try:
+                    writer = SafeTextFileWriter(output_path)
+                    writer.write(python_code)
+                finally:
+                    writer.close()
 
         return generated_classes

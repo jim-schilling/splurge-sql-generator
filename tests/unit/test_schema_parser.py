@@ -5,13 +5,11 @@ These tests validate the behavior of the SchemaParser without using mocks,
 focusing on real file operations and SQL parsing.
 """
 
-
 import os
 import shutil
 import tempfile
 
 import pytest
-
 
 from splurge_sql_generator.schema_parser import SchemaParser
 
@@ -534,7 +532,8 @@ def test_parse_schema_file(parser, temp_dir):
     with open(schema_file, "w", encoding="utf-8") as f:
         f.write(schema_content)
 
-    tables = parser.parse_schema_file(schema_file)
+    parser.load_schema(schema_file)
+    tables = parser.table_schemas
 
     # Check that both tables were parsed
     assert "users" in tables
@@ -576,7 +575,8 @@ def test_parse_schema_file_with_comments(parser, temp_dir):
     with open(schema_file, "w", encoding="utf-8") as f:
         f.write(schema_content)
 
-    tables = parser.parse_schema_file(schema_file)
+    parser.load_schema(schema_file)
+    tables = parser.table_schemas
 
     # Should still parse correctly despite comments
     assert "users" in tables
@@ -588,7 +588,8 @@ def test_parse_schema_file_missing(parser, temp_dir):
     missing_file = os.path.join(temp_dir, "missing.schema")
 
     # Should not raise an exception
-    result = parser.parse_schema_file(missing_file)
+    parser.load_schema(missing_file)
+    result = parser.table_schemas
 
     # Should return empty dict
     assert result == {}
@@ -704,14 +705,14 @@ def test_load_schema(parser, temp_dir):
 
 
 def test_load_schema_missing_file(parser, temp_dir):
-    """Test loading schema with missing file raises FileNotFoundError."""
+    """Test loading schema with missing file loads empty schema."""
     missing_schema = os.path.join(temp_dir, "missing.schema")
 
-    with pytest.raises(FileNotFoundError) as context:
-        parser.load_schema(missing_schema)
+    # Should not raise an exception, just load empty schema
+    parser.load_schema(missing_schema)
 
-    assert "Schema file not found" in str(context.value)
-    assert "missing.schema" in str(context.value)
+    # Should have empty table schemas
+    assert parser.table_schemas == {}
 
 
 def test_load_schema_for_sql_file(parser, temp_dir):
@@ -861,7 +862,8 @@ def test_parse_schema_file_with_multiple_statements(parser, temp_dir):
     with open(schema_file, "w", encoding="utf-8") as f:
         f.write(schema_content)
 
-    tables = parser.parse_schema_file(schema_file)
+    parser.load_schema(schema_file)
+    tables = parser.table_schemas
 
     # Check that all tables were parsed
     assert "users" in tables

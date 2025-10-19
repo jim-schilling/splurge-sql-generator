@@ -14,7 +14,7 @@ from unittest.mock import Mock
 import pytest
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
-from tests.unit.test_utils import temp_sql_files, create_basic_schema
+from tests.unit.test_utils import create_basic_schema, temp_sql_files
 
 
 class TestGeneratedCodeBehavior:
@@ -52,9 +52,7 @@ SELECT * FROM users WHERE id = :user_id AND status = :status;
         mock_result.fetchall.return_value = [{"id": 1, "name": "Test User"}]
 
         # Call generated method
-        result = UserRepo.get_user(
-            connection=mock_connection, user_id=1, status="active"
-        )
+        result = UserRepo.get_user(connection=mock_connection, user_id=1, status="active")
 
         # Validate database was called
         mock_connection.execute.assert_called_once()
@@ -64,9 +62,7 @@ SELECT * FROM users WHERE id = :user_id AND status = :status;
         sql_text = call_args[0][0].text  # First argument is the SQL text object
         params = call_args[0][1]  # Second argument is the parameters
 
-        assert (
-            "SELECT * FROM users WHERE id = :user_id AND status = :status" in sql_text
-        )
+        assert "SELECT * FROM users WHERE id = :user_id AND status = :status" in sql_text
         assert params == {"user_id": 1, "status": "active"}
 
         # Validate result
@@ -89,9 +85,7 @@ INSERT INTO users (name, email) VALUES (:name, :email) RETURNING id;
         mock_connection.execute.return_value = mock_result
 
         # Call generated method
-        UserRepo.create_user(
-            connection=mock_connection, name="Test User", email="test@example.com"
-        )
+        UserRepo.create_user(connection=mock_connection, name="Test User", email="test@example.com")
 
         # Validate database was called
         mock_connection.execute.assert_called_once()
@@ -127,9 +121,7 @@ UPDATE users SET status = :new_status WHERE id = :user_id;
         mock_connection.execute.return_value = mock_result
 
         # Call generated method
-        UserRepo.update_user_status(
-            connection=mock_connection, user_id=1, new_status="inactive"
-        )
+        UserRepo.update_user_status(connection=mock_connection, user_id=1, new_status="inactive")
 
         # Validate database was called
         mock_connection.execute.assert_called_once()
@@ -243,15 +235,11 @@ CREATE TABLE order_details (
         assert "GROUP BY o.id, o.order_date, u.name" in sql_text
         assert "ORDER BY o.order_date DESC" in sql_text
 
-    def _create_and_import_module(
-        self, sql_content: str, schema_content: str | None = None
-    ) -> Any:
+    def _create_and_import_module(self, sql_content: str, schema_content: str | None = None) -> Any:
         """Create SQL file, generate Python code, and import the generated module."""
         with temp_sql_files(sql_content, schema_content) as (sql_file, schema_file):
             # Generate Python code
-            generated_code = self.generator.generate_class(
-                sql_file, schema_file_path=schema_file
-            )
+            generated_code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
 
             # Write generated code to file
             py_file = Path(self.temp_dir) / "generated_module.py"

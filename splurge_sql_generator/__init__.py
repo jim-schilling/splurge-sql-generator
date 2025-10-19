@@ -44,6 +44,8 @@ __all__ = [
     "is_execute_statement",
 ]
 
+__domains__ = ["cli", "code", "exceptions", "generator", "misc", "parser", "schema", "sql", "util"]
+
 
 def is_fetch_statement(sql: str) -> bool:
     """
@@ -130,9 +132,7 @@ def generate_multiple_classes(
         Dictionary mapping class names to generated code
     """
     generator = PythonCodeGenerator()
-    return generator.generate_multiple_classes(
-        sql_files, output_dir=output_dir, schema_file_path=schema_file_path
-    )
+    return generator.generate_multiple_classes(sql_files, output_dir=output_dir, schema_file_path=schema_file_path)
 
 
 def generate_types_file(*, output_path: str | None = None) -> str:

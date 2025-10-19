@@ -11,6 +11,7 @@ import sys
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection
+
 from splurge_sql_generator import generate_class
 from splurge_sql_generator.utils import to_snake_case
 
@@ -52,9 +53,7 @@ def _ensure_generated_classes() -> None:
         snake_case_name = to_snake_case(module_name)
         py_path = os.path.join(output_dir, f"{snake_case_name}.py")
         if not os.path.exists(py_path):
-            generate_class(
-                sql_path, output_file_path=py_path, schema_file_path=schema_path
-            )
+            generate_class(sql_path, output_file_path=py_path, schema_file_path=schema_path)
 
 
 def setup_database():
@@ -213,17 +212,13 @@ def demonstrate_product_operations(connection: Connection):
         print(f"Created product with ID: {result.fetchone()[0]}")
 
     # Search products
-    products = ProductRepository.search_products(
-        connection=connection, search_term="%laptop%"
-    )
+    products = ProductRepository.search_products(connection=connection, search_term="%laptop%")
     print(f"Found {len(products)} products matching 'laptop':")
     for product in products:
         print(f"  - {product.name}: ${product.price}")
 
     # Check low stock
-    low_stock = ProductRepository.get_low_stock_products(
-        connection=connection, threshold=20
-    )
+    low_stock = ProductRepository.get_low_stock_products(connection=connection, threshold=20)
     print(f"Found {len(low_stock)} products with low stock:")
     for product in low_stock:
         print(f"  - {product.name}: {product.stock_quantity} in stock")
@@ -236,9 +231,7 @@ def demonstrate_order_operations(connection: Connection):
 
     # Create an order
     with connection.begin():
-        result = OrderService.create_order(
-            connection=connection, user_id=1, total_amount=1029.98, status="pending"
-        )
+        result = OrderService.create_order(connection=connection, user_id=1, total_amount=1029.98, status="pending")
         order_id = result.fetchone()[0]
         print(f"Created order with ID: {order_id}")
 

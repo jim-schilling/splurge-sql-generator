@@ -6,9 +6,9 @@ This module provides common helper functions and fixtures used across multiple t
 
 import re
 import tempfile
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator
 
 
 @contextmanager
@@ -214,9 +214,7 @@ CREATE TABLE order_details (
 """
 
 
-def assert_generated_code_structure(
-    code: str, class_name: str, method_names: list[str]
-) -> None:
+def assert_generated_code_structure(code: str, class_name: str, method_names: list[str]) -> None:
     """
     Assert that generated code has the expected structure.
 
@@ -228,14 +226,10 @@ def assert_generated_code_structure(
     Raises:
         AssertionError: If structure doesn't match expectations
     """
-    assert f"class {class_name}" in code, (
-        f"Class {class_name} not found in generated code"
-    )
+    assert f"class {class_name}" in code, f"Class {class_name} not found in generated code"
 
     for method_name in method_names:
-        assert f"def {method_name}(" in code, (
-            f"Method {method_name} not found in generated code"
-        )
+        assert f"def {method_name}(" in code, f"Method {method_name} not found in generated code"
         assert "@classmethod" in code, "Generated methods should be class methods"
 
     # Check for required imports
@@ -251,9 +245,7 @@ def assert_generated_code_structure(
         assert import_stmt in code, f"Required import missing: {import_stmt}"
 
 
-def assert_method_parameters(
-    code: str, method_name: str, expected_params: list[str]
-) -> None:
+def assert_method_parameters(code: str, method_name: str, expected_params: list[str]) -> None:
     """
     Assert that a method has the expected parameters with proper type annotations.
 
@@ -273,6 +265,4 @@ def assert_method_parameters(
     for param in expected_params:
         # Look for parameter with any type annotation (int, str, float, bool, Any, etc.)
         pattern = rf"{re.escape(param)}:\s*[^\s,]+"
-        assert re.search(pattern, code), (
-            f"Parameter {param} with type annotation not found for method {method_name}"
-        )
+        assert re.search(pattern, code), f"Parameter {param} with type annotation not found for method {method_name}"

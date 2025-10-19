@@ -5,15 +5,13 @@ This module tests the parameter validation feature that ensures SQL parameters
 map to existing table/column combinations in the loaded schema.
 """
 
-
 import tempfile
 from pathlib import Path
 
 import pytest
 
-
 from splurge_sql_generator.code_generator import PythonCodeGenerator
-from splurge_sql_generator.errors import SqlValidationError
+from splurge_sql_generator.exceptions import SqlValidationError
 
 
 @pytest.fixture

@@ -11,6 +11,5 @@ This module is licensed under the MIT License.
 
 from splurge_sql_generator.cli import main
 
-
 if __name__ == "__main__":
     main()

@@ -4,12 +4,16 @@ alwaysApply: false
 ---
 - Validate behavior of public APIs only.
 - Prefer validation using actual data, interfaces, and objects
-- Avoid or minimize use of mocks, except where appropriate.
-- Target 85% code coverage for all public interfaces and methods.
+- Minimize use of mocks, except where appropriate.
+- Mock at architectural boundaries (external systems, I/O) but prefer real objects for internal logic.
+- Avoid dynamic patching.
+- Unit test must target 85% code coverage for all public interfaces and methods.
+- Combination of unit tests and integration tests must target 95% code coverage for all public interfaces and methods.
+- Prefer tests that are independent, repeatable, and deterministic.
 - Prefer shared helpers for common logic.
 - Avoid validation of implementation details and private APIs.
 - Prefer validation of patterns of text, and avoid exact matching of content and formatting.
-- Prefer pytest with pytest-xdist for testing with default parameters of -x -v -n auto.
+- Prefer pytest; pytest-xdist may be used optionally for parallel runs (e.g., -n auto) when wanted.
 - Prefer pytest-cov for code coverage with parameters --cov=your_package --cov-report=term-missing.
 - Run pytest with code coverage when asked by user, otherwise skip.
 - Prefer pytest-mock for mocking, where appropriate.

@@ -2,20 +2,18 @@
 Tests for the CLI --types option functionality.
 """
 
-
 import os
 import tempfile
-from tests.unit.test_utils import (
-    temp_sql_files,
-    assert_generated_code_structure,
-    assert_method_parameters,
-)
 
 import pytest
 
-
 from splurge_sql_generator.code_generator import PythonCodeGenerator
 from splurge_sql_generator.schema_parser import SchemaParser
+from tests.unit.test_utils import (
+    assert_generated_code_structure,
+    assert_method_parameters,
+    temp_sql_files,
+)
 
 
 @pytest.fixture
@@ -124,9 +122,7 @@ SELECT id, name FROM test_table WHERE id = :custom_int;
         generator = PythonCodeGenerator(sql_type_mapping_file=custom_yaml_file)
 
         # Generate code
-        generated_code = generator.generate_class(
-            sql_file, schema_file_path=schema_file
-        )
+        generated_code = generator.generate_class(sql_file, schema_file_path=schema_file)
 
         # Verify code structure
         assert_generated_code_structure(generated_code, "TestClass", ["test_method"])

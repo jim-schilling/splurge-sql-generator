@@ -13,12 +13,12 @@ import pytest
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
 from tests.unit.test_utils import (
-    temp_sql_files,
-    temp_multiple_sql_files,
-    create_basic_schema,
-    create_complex_schema,
     assert_generated_code_structure,
     assert_method_parameters,
+    create_basic_schema,
+    create_complex_schema,
+    temp_multiple_sql_files,
+    temp_sql_files,
 )
 
 
@@ -65,9 +65,7 @@ CREATE TABLE users (
 """
 
         with temp_sql_files(sql_content, schema_content) as (sql_file, schema_file):
-            generated_code = self.generator.generate_class(
-                sql_file, schema_file_path=schema_file
-            )
+            generated_code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
 
             # Validate generated code structure
             assert_generated_code_structure(
@@ -83,9 +81,7 @@ CREATE TABLE users (
                 "create_user",
                 ["username", "email", "password_hash", "status"],
             )
-            assert_method_parameters(
-                generated_code, "update_user_status", ["new_status", "user_id"]
-            )
+            assert_method_parameters(generated_code, "update_user_status", ["new_status", "user_id"])
 
         # Validate SQL content
         assert "SELECT id, username, email, created_at" in generated_code
@@ -126,9 +122,7 @@ SELECT * FROM products WHERE id = :product_id;
         with temp_multiple_sql_files(files_data) as file_paths:
             sql_file_paths = [sql_path for sql_path, _ in file_paths]
             schema_file_paths = [schema_path for _, schema_path in file_paths]
-            result = self.generator.generate_multiple_classes(
-                sql_file_paths, schema_file_path=schema_file_paths[0]
-            )
+            result = self.generator.generate_multiple_classes(sql_file_paths, schema_file_path=schema_file_paths[0])
 
             # Validate results
             assert len(result) == 2
@@ -141,9 +135,7 @@ SELECT * FROM products WHERE id = :product_id;
                 try:
                     ast.parse(code)
                 except SyntaxError as e:
-                    pytest.fail(
-                        f"Generated code for {class_name} has syntax error: {e}"
-                    )
+                    pytest.fail(f"Generated code for {class_name} has syntax error: {e}")
 
     def test_complex_sql_with_joins_and_subqueries(self) -> None:
         """Test generating code for complex SQL with joins and subqueries."""
@@ -178,9 +170,7 @@ HAVING SUM(total_amount) > :min_amount;
             sql_file,
             schema_file,
         ):
-            generated_code = self.generator.generate_class(
-                sql_file, schema_file_path=schema_file
-            )
+            generated_code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
 
             # Validate complex SQL handling
             assert_generated_code_structure(
@@ -190,12 +180,8 @@ HAVING SUM(total_amount) > :min_amount;
             )
 
             # Validate method parameters
-            assert_method_parameters(
-                generated_code, "get_user_orders_with_details", ["user_id"]
-            )
-            assert_method_parameters(
-                generated_code, "get_order_summary", ["start_date", "min_amount"]
-            )
+            assert_method_parameters(generated_code, "get_user_orders_with_details", ["user_id"])
+            assert_method_parameters(generated_code, "get_order_summary", ["start_date", "min_amount"])
 
             # Validate SQL content preservation
             assert "JOIN users u ON o.user_id = u.id" in generated_code
@@ -234,11 +220,11 @@ SELECT * FROM users WHERE id = :user_id;
 
     def test_error_handling_with_invalid_files(self) -> None:
         """Test error handling with invalid or missing files."""
+        from splurge_sql_generator.exceptions import FileError
+
         # Test with non-existent file
-        with pytest.raises(FileNotFoundError):
-            self.generator.generate_class(
-                "nonexistent_file.sql", schema_file_path="nonexistent.schema"
-            )
+        with pytest.raises(FileError):
+            self.generator.generate_class("nonexistent_file.sql", schema_file_path="nonexistent.schema")
 
         # Test with valid SQL but missing schema (should fail now)
         valid_sql = """# TestClass
@@ -250,9 +236,7 @@ SELECT * FROM test_table WHERE id = :id;
         sql_file.write_text(valid_sql)
 
         # Should fail without schema file (schema files are required)
-        with pytest.raises(
-            TypeError, match="argument should be a str or an os.PathLike object"
-        ):
+        with pytest.raises(TypeError, match="argument should be a str or an os.PathLike object"):
             self.generator.generate_class(str(sql_file), schema_file_path=None)
 
     def test_schema_required_validation(self) -> None:
@@ -276,9 +260,7 @@ SELECT * FROM test_table WHERE id = :id AND name = :name;
 """
 
         with temp_sql_files(sql_content, schema_content) as (sql_file, schema_file):
-            generated_code = self.generator.generate_class(
-                sql_file, schema_file_path=schema_file
-            )
+            generated_code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
 
             # Validate that parameters use proper types inferred from schema
             assert "id: int" in generated_code

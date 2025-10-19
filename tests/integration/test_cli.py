@@ -1,15 +1,12 @@
 import os
+import re
 import subprocess
 import sys
 import tempfile
-import re
 
 from tests.unit.test_utils import create_basic_schema, create_sql_with_schema
 
-
-SCRIPT = os.path.join(
-    os.path.dirname(__file__), "..", "..", "splurge_sql_generator", "cli.py"
-)
+SCRIPT = os.path.join(os.path.dirname(__file__), "..", "..", "splurge_sql_generator", "cli.py")
 
 
 def run_cli(args, input_sql=None):
@@ -208,9 +205,7 @@ def test_cli_empty_directory_strict_mode(tmp_path):
 
 def test_cli_invalid_sql_file(tmp_path):
     """Test CLI with invalid SQL file (missing class comment)."""
-    create_sql_with_schema(
-        tmp_path, "invalid.sql", "SELECT 1;"
-    )  # Missing class comment
+    create_sql_with_schema(tmp_path, "invalid.sql", "SELECT 1;")  # Missing class comment
 
     result = run_cli([str(tmp_path / "invalid.sql")])
     assert result.returncode != 0
@@ -219,9 +214,7 @@ def test_cli_invalid_sql_file(tmp_path):
 
 def test_cli_invalid_class_name(tmp_path):
     """Test CLI with invalid class name (reserved keyword)."""
-    create_sql_with_schema(
-        tmp_path, "invalid_class.sql", "# class\n#method\nSELECT 1;"
-    )  # 'class' is reserved
+    create_sql_with_schema(tmp_path, "invalid_class.sql", "# class\n#method\nSELECT 1;")  # 'class' is reserved
 
     result = run_cli([str(tmp_path / "invalid_class.sql")])
     assert result.returncode != 0
@@ -230,9 +223,7 @@ def test_cli_invalid_class_name(tmp_path):
 
 def test_cli_invalid_method_name(tmp_path):
     """Test CLI with invalid method name (reserved keyword)."""
-    create_sql_with_schema(
-        tmp_path, "invalid_method.sql", "# TestClass\n#def\nSELECT 1;"
-    )  # 'def' is reserved
+    create_sql_with_schema(tmp_path, "invalid_method.sql", "# TestClass\n#def\nSELECT 1;")  # 'def' is reserved
 
     result = run_cli([str(tmp_path / "invalid_method.sql")])
     assert result.returncode != 0
@@ -271,12 +262,8 @@ RETURNING id;
     assert "def get_user_by_id(" in content
     assert "def create_user(" in content
     # Check that parameters have type annotations (may be Any, int, str, etc.)
-    assert re.search(r"user_id:\s*[^\s,]+,", content), (
-        "user_id parameter with type annotation not found"
-    )
-    assert re.search(r"status:\s*[^\s,]+,", content), (
-        "status parameter with type annotation not found"
-    )
+    assert re.search(r"user_id:\s*[^\s,]+,", content), "user_id parameter with type annotation not found"
+    assert re.search(r"status:\s*[^\s,]+,", content), "status parameter with type annotation not found"
 
 
 def test_cli_dry_run_multiple_files(tmp_path):
@@ -284,9 +271,7 @@ def test_cli_dry_run_multiple_files(tmp_path):
     create_sql_with_schema(tmp_path, "dry1.sql", "# DryOne\n#method1\nSELECT 1;")
     create_sql_with_schema(tmp_path, "dry2.sql", "# DryTwo\n#method2\nSELECT 2;")
 
-    result = run_cli(
-        [str(tmp_path / "dry1.sql"), str(tmp_path / "dry2.sql"), "--dry-run"]
-    )
+    result = run_cli([str(tmp_path / "dry1.sql"), str(tmp_path / "dry2.sql"), "--dry-run"])
 
     assert result.returncode == 0
     assert "Generated class: DryOne" in result.stdout
@@ -297,9 +282,7 @@ def test_cli_dry_run_multiple_files(tmp_path):
 
 def test_cli_output_dir_creation(tmp_path):
     """Test CLI creates output directory if it doesn't exist."""
-    create_sql_with_schema(
-        tmp_path, "create_dir.sql", "# CreateDir\n#method\nSELECT 1;"
-    )
+    create_sql_with_schema(tmp_path, "create_dir.sql", "# CreateDir\n#method\nSELECT 1;")
 
     # Use a nested output directory that doesn't exist
     outdir = tmp_path / "nested" / "output" / "dir"
@@ -312,9 +295,7 @@ def test_cli_output_dir_creation(tmp_path):
 
 def test_cli_file_permission_error(tmp_path):
     """Test CLI handles file permission errors gracefully."""
-    create_sql_with_schema(
-        tmp_path, "permission.sql", "# Permission\n#method\nSELECT 1;"
-    )
+    create_sql_with_schema(tmp_path, "permission.sql", "# Permission\n#method\nSELECT 1;")
     sql_file = tmp_path / "permission.sql"
 
     # Make the file read-only

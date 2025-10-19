@@ -11,13 +11,20 @@ This module is licensed under the MIT License.
 
 import logging
 from pathlib import Path
+
+import splurge_safe_io.exceptions as safe_io_exc
+import yaml  # type: ignore
+from splurge_safe_io.safe_text_file_reader import SafeTextFileReader, open_safe_text_reader
+from splurge_safe_io.safe_text_file_writer import open_safe_text_writer
+
+from splurge_sql_generator.exceptions import FileError, SqlValidationError
 from splurge_sql_generator.sql_helper import (
     extract_create_table_statements,
     parse_table_columns,
 )
-from splurge_sql_generator.errors import SqlValidationError
-from splurge_sql_generator.utils import clean_sql_type, safe_read_file, safe_write_file
-import yaml
+from splurge_sql_generator.utils import clean_sql_type
+
+DOMAINS = ["schema", "parser"]
 
 
 class SchemaParser:
@@ -52,11 +59,12 @@ class SchemaParser:
         Raises:
             ValueError: If the loaded YAML is not a dictionary or is missing required keys
         """
+        mapping_path = None
         try:
             mapping_path = Path(mapping_file)
             if mapping_path.exists():
-                with open(mapping_path, "r", encoding="utf-8") as f:
-                    loaded_mapping = yaml.safe_load(f)
+                with open_safe_text_reader(mapping_path, encoding="utf-8") as reader:
+                    loaded_mapping = yaml.safe_load(reader)
 
                 # Validate the loaded mapping
                 if not isinstance(loaded_mapping, dict):
@@ -76,9 +84,7 @@ class SchemaParser:
                         "These entries will be ignored."
                     )
                     # Filter out non-string values
-                    loaded_mapping = {
-                        k: v for k, v in loaded_mapping.items() if isinstance(v, str)
-                    }
+                    loaded_mapping = {k: v for k, v in loaded_mapping.items() if isinstance(v, str)}
 
                 # Ensure DEFAULT key exists
                 if "DEFAULT" not in loaded_mapping:
@@ -88,34 +94,40 @@ class SchemaParser:
                     )
                     loaded_mapping["DEFAULT"] = "Any"
 
-                self._logger.info(
-                    f"Successfully loaded {len(loaded_mapping)} type mappings from '{mapping_file}'"
-                )
+                self._logger.info(f"Successfully loaded {len(loaded_mapping)} type mappings from '{mapping_file}'")
                 return loaded_mapping
             else:
                 # Return default mapping if file doesn't exist
-                self._logger.info(
-                    f"Type mapping file '{mapping_file}' not found, using default mappings"
-                )
+                self._logger.info(f"Type mapping file '{mapping_file}' not found, using default mappings")
                 return self._get_default_mapping()
 
-        except (OSError, IOError) as e:
-            self._logger.warning(
-                f"Failed to read SQL type mapping file '{mapping_file}': {e}"
-            )
-            # Fallback to default mapping on file I/O errors
+        except safe_io_exc.SplurgeSafeIoPathValidationError as e:
+            path_str = str(mapping_path) if mapping_path else mapping_file
+            self._logger.warning(f"Invalid SQL type mapping file path: {path_str}: {str(e.message)}")
+            return self._get_default_mapping()
+        except safe_io_exc.SplurgeSafeIoFileNotFoundError as e:
+            path_str = str(mapping_path) if mapping_path else mapping_file
+            self._logger.warning(f"SQL type mapping file not found: {path_str}: {str(e.message)}")
+            return self._get_default_mapping()
+        except safe_io_exc.SplurgeSafeIoFilePermissionError as e:
+            path_str = str(mapping_path) if mapping_path else mapping_file
+            self._logger.warning(f"Permission denied reading SQL type mapping file: {path_str}: {str(e.message)}")
+            return self._get_default_mapping()
+        except safe_io_exc.SplurgeSafeIoFileDecodingError as e:
+            path_str = str(mapping_path) if mapping_path else mapping_file
+            self._logger.warning(f"Decoding error reading SQL type mapping file: {path_str}: {str(e.message)}")
+            return self._get_default_mapping()
+        except safe_io_exc.SplurgeSafeIoUnknownError as e:
+            path_str = str(mapping_path) if mapping_path else mapping_file
+            self._logger.warning(f"Unknown error reading SQL type mapping file: {path_str}: {str(e.message)}")
             return self._get_default_mapping()
         except yaml.YAMLError as e:
-            self._logger.error(
-                f"Invalid YAML syntax in type mapping file '{mapping_file}': {e}"
-            )
-            # Fallback to default mapping on YAML parsing errors
+            path_str = str(mapping_path) if mapping_path else mapping_file
+            self._logger.warning(f"Invalid YAML syntax in SQL type mapping file: {path_str}: {str(e)}")
             return self._get_default_mapping()
-        except ValueError as e:
-            self._logger.error(
-                f"Invalid content in type mapping file '{mapping_file}': {e}"
-            )
-            # Fallback to default mapping on validation errors
+        except Exception as e:
+            path_str = str(mapping_path) if mapping_path else mapping_file
+            self._logger.warning(f"Unexpected error reading SQL type mapping file: {path_str}: {str(e)}")
             return self._get_default_mapping()
 
     def _get_default_mapping(self) -> dict[str, str]:
@@ -187,7 +199,7 @@ class SchemaParser:
             "DEFAULT": "Any",
         }
 
-    def parse_schema_file(self, schema_file_path: str) -> dict[str, dict[str, str]]:
+    def _parse_schema_file(self, schema_file_path: Path | str) -> dict[str, dict[str, str]]:
         """
         Parse a SQL schema file and extract column type information.
 
@@ -198,30 +210,38 @@ class SchemaParser:
             Dictionary mapping table names to column type mappings
 
         Raises:
-            PermissionError: If the schema file cannot be read due to permissions
-            UnicodeDecodeError: If the schema file contains invalid UTF-8 encoding
+            FileError: If the schema file cannot be read
             SqlValidationError: If the SQL content is malformed and cannot be parsed
-
         Note:
             If the schema file does not exist, an empty dictionary is returned.
         """
         try:
-            schema_content = safe_read_file(schema_file_path)
+            reader = SafeTextFileReader(schema_file_path)
+            schema_content = reader.read()
             return self._parse_schema_content(schema_content)
-        except FileNotFoundError:
-            self._logger.warning(
-                f"Schema file not found: '{schema_file_path}'. Returning empty schema."
-            )
+
+        except safe_io_exc.SplurgeSafeIoPathValidationError as e:
+            raise FileError(
+                message=f"Schema file path is invalid: {str(schema_file_path)}.", details=str(e.message)
+            ) from e
+        except safe_io_exc.SplurgeSafeIoFileNotFoundError:
+            # Return empty dict if file doesn't exist (as documented)
             return {}
-        except (PermissionError, UnicodeDecodeError, OSError) as e:
-            self._logger.error(f"Error reading schema file '{schema_file_path}': {e}")
-            raise
-        except SqlValidationError as e:
-            self._logger.error(
-                f"SQL validation error in schema file '{schema_file_path}': {e}. Please check the SQL syntax in your schema file."
-            )
-            raise SqlValidationError(
-                f"SQL validation error in schema file '{schema_file_path}': {e}. Please check the SQL syntax in your schema file."
+        except safe_io_exc.SplurgeSafeIoFilePermissionError as e:
+            raise FileError(
+                message=f"Permission denied reading schema file: {str(schema_file_path)}.", details=str(e.message)
+            ) from e
+        except safe_io_exc.SplurgeSafeIoFileDecodingError as e:
+            raise FileError(
+                message=f"Decoding error reading schema file: {str(schema_file_path)}.", details=str(e.message)
+            ) from e
+        except safe_io_exc.SplurgeSafeIoOsError as e:
+            raise FileError(
+                message=f"OS error reading schema file: {str(schema_file_path)}.", details=str(e.message)
+            ) from e
+        except safe_io_exc.SplurgeSafeIoUnknownError as e:
+            raise FileError(
+                message=f"Unknown error reading schema file: {str(schema_file_path)}.", details=str(e.message)
             ) from e
 
     def _parse_schema_content(self, content: str) -> dict[str, dict[str, str]]:
@@ -287,9 +307,7 @@ class SchemaParser:
         # Fallback to default
         default_type = self._sql_type_mapping.get("DEFAULT", "Any")
         if default_type == "Any":
-            self._logger.debug(
-                f"Unknown SQL type '{sql_type}' (cleaned: '{clean_type}'), using 'Any'"
-            )
+            self._logger.debug(f"Unknown SQL type '{sql_type}' (cleaned: '{clean_type}'), using 'Any'")
         else:
             self._logger.debug(
                 f"Unknown SQL type '{sql_type}' (cleaned: '{clean_type}'), using default: '{default_type}'"
@@ -327,7 +345,7 @@ class SchemaParser:
 
         return "Any"
 
-    def load_schema(self, schema_file_path: str) -> None:
+    def load_schema(self, schema_file_path: Path | str) -> None:
         """
         Load a schema file and populate the internal table schemas.
 
@@ -335,29 +353,24 @@ class SchemaParser:
             schema_file_path: Path to the schema file to load
 
         Raises:
-            PermissionError: If the schema file cannot be read due to permissions
-            UnicodeDecodeError: If the schema file contains invalid UTF-8 encoding
+            FileError: If the schema file cannot be read
             SqlValidationError: If the SQL content is malformed and cannot be parsed
 
         Note:
             If the schema file does not exist, an empty schema will be loaded.
         """
-        schema_path = Path(schema_file_path)
-        if not schema_path.exists():
-            raise FileNotFoundError(
-                f"Schema file not found: '{schema_path}'. Please ensure the file exists and the path is correct."
-            )
 
         try:
-            self._table_schemas = self.parse_schema_file(str(schema_path))
+            self._table_schemas = dict[str, dict[str, str]]()
+            self._table_schemas = self._parse_schema_file(schema_file_path)
             self._logger.info(
-                f"Successfully loaded schema from '{schema_file_path}' with {len(self._table_schemas)} tables"
+                f"Successfully loaded schema from '{str(schema_file_path)}' with {len(self._table_schemas)} tables"
             )
-        except Exception as e:
-            self._logger.error(f"Failed to load schema from '{schema_file_path}': {e}")
+        except (FileError, SqlValidationError) as e:
+            self._logger.error(f"Failed to load schema from '{str(schema_file_path)}': {str(e)}")
             raise
 
-    def generate_types_file(self, *, output_path: str | None = None) -> str:
+    def generate_types_file(self, *, output_path: Path | str | None = None) -> str:
         """
         Generate the default SQL type mapping YAML file.
 
@@ -477,18 +490,33 @@ class SchemaParser:
 
         yaml_content += "\n# Default fallback for unknown types\nDEFAULT: Any\n"
 
-        # Write the file using safe write utility
         try:
-            safe_write_file(output_path, yaml_content)
-            self._logger.info(f"Successfully generated types file: '{output_path}'")
-        except (PermissionError, OSError) as e:
-            self._logger.error(f"Failed to write types file to '{output_path}': {e}")
-            raise
+            with open_safe_text_writer(output_path) as writer:
+                writer.write(yaml_content)
+            self._logger.info(f"Successfully generated types file: '{str(output_path)}'")
+        except safe_io_exc.SplurgeSafeIoFileEncodingError as e:
+            raise FileError(
+                message=f"Encoding error writing to file: {str(output_path)}.", details=str(e.message)
+            ) from e
+        except safe_io_exc.SplurgeSafeIoFilePermissionError as e:
+            raise FileError(
+                message=f"Permission denied writing to file: {str(output_path)}.", details=str(e.message)
+            ) from e
+        except safe_io_exc.SplurgeSafeIoOsError as e:
+            raise FileError(message=f"OS error writing to file: {str(output_path)}.", details=str(e.message)) from e
+        except safe_io_exc.SplurgeSafeIoFileOperationError as e:
+            raise FileError(
+                message=f"File operation error writing to file: {str(output_path)}.", details=str(e.message)
+            ) from e
+        except safe_io_exc.SplurgeSafeIoUnknownError as e:
+            raise FileError(
+                message=f"Unknown error writing to file: {str(output_path)}.", details=str(e.message)
+            ) from e
 
         return str(output_path)
 
     def load_schema_for_sql_file(
-        self, sql_file_path: str, *, schema_file_path: str | None = None
+        self, sql_file_path: Path | str, *, schema_file_path: Path | str | None = None
     ) -> None:
         """
         Load schema file for a given SQL file.
@@ -499,9 +527,7 @@ class SchemaParser:
                              with the same stem as the SQL file.
 
         Raises:
-            FileNotFoundError: If the schema file does not exist
-            PermissionError: If the schema file cannot be read due to permissions
-            UnicodeDecodeError: If the schema file contains invalid UTF-8 encoding
+            FileError: If the schema file cannot be read
             SqlValidationError: If the SQL content is malformed and cannot be parsed
         """
         if schema_file_path is None:
@@ -509,27 +535,25 @@ class SchemaParser:
             sql_path = Path(sql_file_path)
             schema_path = sql_path.with_suffix(".schema")
             self._logger.info(
-                f"Looking for schema file: '{schema_path}' (derived from SQL file: '{sql_file_path}')"
+                f"Looking for schema file: '{str(schema_path)}' (derived from SQL file: '{str(sql_file_path)}')"
             )
         else:
             schema_path = Path(schema_file_path)
-            self._logger.info(
-                f"Using specified schema file: '{schema_path}' for SQL file: '{sql_file_path}'"
-            )
+            self._logger.info(f"Using specified schema file: '{str(schema_path)}' for SQL file: '{str(sql_file_path)}'")
 
         # Load schema file (may be empty if file doesn't exist)
         try:
-            self._table_schemas = self.parse_schema_file(str(schema_path))
+            self._table_schemas = self._parse_schema_file(str(schema_path))
             if len(self._table_schemas) > 0:
                 self._logger.info(
-                    f"Successfully loaded schema from '{schema_path}' with {len(self._table_schemas)} tables for SQL file '{sql_file_path}'"
+                    f"Successfully loaded schema from '{str(schema_path)}' with {len(self._table_schemas)} tables for SQL file '{str(sql_file_path)}'"
                 )
             else:
                 self._logger.warning(
-                    f"No schema found for SQL file '{sql_file_path}'. Schema file '{schema_path}' is empty or missing."
+                    f"No schema found for SQL file '{str(sql_file_path)}'. Schema file '{str(schema_path)}' is empty or missing."
                 )
-        except Exception as e:
+        except (FileError, SqlValidationError) as e:
             self._logger.error(
-                f"Failed to load schema from '{schema_path}' for SQL file '{sql_file_path}': {e}"
+                f"Failed to load schema from '{str(schema_path)}' for SQL file '{str(sql_file_path)}': {str(e)}"
             )
             raise

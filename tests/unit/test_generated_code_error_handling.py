@@ -14,7 +14,7 @@ from unittest.mock import Mock
 import pytest
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
-from tests.unit.test_utils import temp_sql_files, create_basic_schema
+from tests.unit.test_utils import create_basic_schema, temp_sql_files
 
 
 class TestGeneratedCodeErrorHandling:
@@ -78,15 +78,11 @@ SELECT * FROM users WHERE id = :user_id;
             error_call = mock_logger.error.call_args[0][0]
             assert "Error in get_user operation" in error_call
 
-    def _create_and_import_module(
-        self, sql_content: str, schema_content: str | None = None
-    ) -> Any:
+    def _create_and_import_module(self, sql_content: str, schema_content: str | None = None) -> Any:
         """Create SQL file, generate Python code, and import the generated module."""
         with temp_sql_files(sql_content, schema_content) as (sql_file, schema_file):
             # Generate Python code
-            generated_code = self.generator.generate_class(
-                sql_file, schema_file_path=schema_file
-            )
+            generated_code = self.generator.generate_class(sql_file, schema_file_path=schema_file)
 
             # Write generated code to file
             py_file = Path(self.temp_dir) / "generated_module.py"
