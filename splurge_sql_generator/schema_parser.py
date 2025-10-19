@@ -12,12 +12,10 @@ This module is licensed under the MIT License.
 import logging
 from pathlib import Path
 
-import splurge_safe_io.exceptions as safe_io_exc
 import yaml  # type: ignore[import-untyped]
-from splurge_safe_io.safe_text_file_reader import SafeTextFileReader, open_safe_text_reader
-from splurge_safe_io.safe_text_file_writer import open_safe_text_writer
 
 from splurge_sql_generator.exceptions import FileError, SqlValidationError
+from splurge_sql_generator.file_utils import SafeTextFileIoAdapter
 from splurge_sql_generator.sql_helper import (
     extract_create_table_statements,
     parse_table_columns,
@@ -127,8 +125,9 @@ class SchemaParser:
         try:
             mapping_path = Path(mapping_file)
             if mapping_path.exists():
-                with open_safe_text_reader(mapping_path, encoding="utf-8") as reader:
-                    loaded_mapping = yaml.safe_load(reader)
+                file_io = SafeTextFileIoAdapter()
+                content = file_io.read_text(mapping_path, encoding="utf-8")
+                loaded_mapping = yaml.safe_load(content)
 
                 # Validate the loaded mapping
                 if not isinstance(loaded_mapping, dict):
@@ -165,25 +164,9 @@ class SchemaParser:
                 self._logger.info(f"Type mapping file '{mapping_file}' not found, using default mappings")
                 return self._get_default_mapping()
 
-        except safe_io_exc.SplurgeSafeIoPathValidationError as e:
+        except FileError as e:
             path_str = str(mapping_path) if mapping_path else mapping_file
-            self._logger.warning(f"Invalid SQL type mapping file path: {path_str}: {str(e.message)}")
-            return self._get_default_mapping()
-        except safe_io_exc.SplurgeSafeIoFileNotFoundError as e:
-            path_str = str(mapping_path) if mapping_path else mapping_file
-            self._logger.warning(f"SQL type mapping file not found: {path_str}: {str(e.message)}")
-            return self._get_default_mapping()
-        except safe_io_exc.SplurgeSafeIoFilePermissionError as e:
-            path_str = str(mapping_path) if mapping_path else mapping_file
-            self._logger.warning(f"Permission denied reading SQL type mapping file: {path_str}: {str(e.message)}")
-            return self._get_default_mapping()
-        except safe_io_exc.SplurgeSafeIoFileDecodingError as e:
-            path_str = str(mapping_path) if mapping_path else mapping_file
-            self._logger.warning(f"Decoding error reading SQL type mapping file: {path_str}: {str(e.message)}")
-            return self._get_default_mapping()
-        except safe_io_exc.SplurgeSafeIoUnknownError as e:
-            path_str = str(mapping_path) if mapping_path else mapping_file
-            self._logger.warning(f"Unknown error reading SQL type mapping file: {path_str}: {str(e.message)}")
+            self._logger.warning(f"Error reading SQL type mapping file: {path_str}: {str(e.message)}")
             return self._get_default_mapping()
         except yaml.YAMLError as e:
             path_str = str(mapping_path) if mapping_path else mapping_file
@@ -220,33 +203,16 @@ class SchemaParser:
             If the schema file does not exist, an empty dictionary is returned.
         """
         try:
-            reader = SafeTextFileReader(schema_file_path)
-            schema_content = reader.read()
+            file_io = SafeTextFileIoAdapter()
+            schema_content = file_io.read_text(schema_file_path)
             return self._parse_schema_content(schema_content)
 
-        except safe_io_exc.SplurgeSafeIoPathValidationError as e:
-            raise FileError(
-                message=f"Schema file path is invalid: {str(schema_file_path)}.", details=str(e.message)
-            ) from e
-        except safe_io_exc.SplurgeSafeIoFileNotFoundError:
-            # Return empty dict if file doesn't exist (as documented)
-            return {}
-        except safe_io_exc.SplurgeSafeIoFilePermissionError as e:
-            raise FileError(
-                message=f"Permission denied reading schema file: {str(schema_file_path)}.", details=str(e.message)
-            ) from e
-        except safe_io_exc.SplurgeSafeIoFileDecodingError as e:
-            raise FileError(
-                message=f"Decoding error reading schema file: {str(schema_file_path)}.", details=str(e.message)
-            ) from e
-        except safe_io_exc.SplurgeSafeIoOsError as e:
-            raise FileError(
-                message=f"OS error reading schema file: {str(schema_file_path)}.", details=str(e.message)
-            ) from e
-        except safe_io_exc.SplurgeSafeIoUnknownError as e:
-            raise FileError(
-                message=f"Unknown error reading schema file: {str(schema_file_path)}.", details=str(e.message)
-            ) from e
+        except FileError as e:
+            # Check if it's a "not found" error - we return empty dict for those
+            if "not found" in str(e.message).lower():
+                return {}
+            # Re-raise other FileErrors
+            raise
 
     def _parse_schema_content(self, content: str) -> dict[str, dict[str, str]]:
         """
@@ -505,26 +471,13 @@ class SchemaParser:
         yaml_content += "\n# Default fallback for unknown types\nDEFAULT: Any\n"
 
         try:
-            with open_safe_text_writer(output_path) as writer:
-                writer.write(yaml_content)
+            file_io = SafeTextFileIoAdapter()
+            file_io.write_text(output_path, yaml_content)
             self._logger.info(f"Successfully generated types file: '{str(output_path)}'")
-        except safe_io_exc.SplurgeSafeIoFileEncodingError as e:
+        except FileError as e:
+            # Re-raise FileError with original message
             raise FileError(
-                message=f"Encoding error writing to file: {str(output_path)}.", details=str(e.message)
-            ) from e
-        except safe_io_exc.SplurgeSafeIoFilePermissionError as e:
-            raise FileError(
-                message=f"Permission denied writing to file: {str(output_path)}.", details=str(e.message)
-            ) from e
-        except safe_io_exc.SplurgeSafeIoOsError as e:
-            raise FileError(message=f"OS error writing to file: {str(output_path)}.", details=str(e.message)) from e
-        except safe_io_exc.SplurgeSafeIoFileOperationError as e:
-            raise FileError(
-                message=f"File operation error writing to file: {str(output_path)}.", details=str(e.message)
-            ) from e
-        except safe_io_exc.SplurgeSafeIoUnknownError as e:
-            raise FileError(
-                message=f"Unknown error writing to file: {str(output_path)}.", details=str(e.message)
+                message=f"Error writing types file: {str(output_path)}.", details=str(e.message)
             ) from e
 
         return str(output_path)

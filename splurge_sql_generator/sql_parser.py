@@ -10,12 +10,11 @@ import re
 from pathlib import Path
 from typing import Any
 
-import splurge_safe_io.exceptions as safe_io_exc
 import sqlparse
-from splurge_safe_io.safe_text_file_reader import SafeTextFileReader
 from sqlparse import tokens as T
 
 from splurge_sql_generator.exceptions import FileError, SqlValidationError
+from splurge_sql_generator.file_utils import SafeTextFileIoAdapter
 from splurge_sql_generator.sql_helper import (
     FETCH_STATEMENT,
     detect_statement_type,
@@ -82,30 +81,16 @@ class SqlParser:
             Tuple of (class_name, method_queries_dict)
 
         Raises:
-            FileNotFoundError: If the SQL file does not exist
-            OSError: If there are I/O errors reading the file
+            FileError: If the SQL file cannot be read or parsed
             SqlValidationError: If the file format is invalid
         """
         try:
-            reader = SafeTextFileReader(file_path)
-            content = reader.read()
+            file_io = SafeTextFileIoAdapter()
+            content = file_io.read_text(file_path)
             return self.parse_string(content, file_path)
-        except safe_io_exc.SplurgeSafeIoPathValidationError as e:
-            raise FileError(message=f"SQL file path is invalid: {str(file_path)}.", details=str(e.message)) from e
-        except safe_io_exc.SplurgeSafeIoFileNotFoundError as e:
-            raise FileError(message=f"SQL file not found: '{str(file_path)}'.", details=str(e.message)) from e
-        except safe_io_exc.SplurgeSafeIoFilePermissionError as e:
-            raise FileError(
-                message=f"Permission denied reading SQL file: {str(file_path)}.", details=str(e.message)
-            ) from e
-        except safe_io_exc.SplurgeSafeIoFileDecodingError as e:
-            raise FileError(
-                message=f"Decoding error reading SQL file: {str(file_path)}.", details=str(e.message)
-            ) from e
-        except safe_io_exc.SplurgeSafeIoOsError as e:
-            raise FileError(message=f"OS error reading SQL file: {str(file_path)}.", details=str(e.message)) from e
-        except safe_io_exc.SplurgeSafeIoUnknownError as e:
-            raise FileError(message=f"Unknown error reading SQL file: {str(file_path)}.", details=str(e.message)) from e
+        except FileError:
+            # Re-raise FileError as-is (already has proper formatting from adapter)
+            raise
 
     def parse_string(self, content: str, file_path: str | Path | None = None) -> tuple[str, dict[str, str]]:
         """
