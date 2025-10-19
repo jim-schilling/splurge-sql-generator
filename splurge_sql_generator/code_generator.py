@@ -161,7 +161,7 @@ class PythonCodeGenerator:
             methods.append(method_data)
 
         # Render template (preloaded)
-        return self._template.render(class_name=class_name, methods=methods)
+        return str(self._template.render(class_name=class_name, methods=methods))
 
     @dataclass
     class _MethodData:
