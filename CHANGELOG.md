@@ -1,22 +1,23 @@
 ## Changelog
 
-### [2025.5.0] - 2025-09-14
+### [2025.5.0] - 2025-10-19
 
 #### Added
-- Simplified and hardened schema parser behavior with clearer error messages and a reliable `DEFAULT` fallback for missing or invalid YAML mappings. This reduces surprising failures when schema files contain unexpected types or nested structures.
-- New documentation and examples describing the schema-parser simplification and common upgrade paths (see `docs/2025-08-24-schema-parser-simplification.md`).
+- Centralized Safe I/O adapter: introduced `SafeTextFileIoAdapter` in `splurge_sql_generator.file_utils` and migrated internal modules to use the adapter for consistent error translation and simplified file I/O.
+- Comprehensive API and CLI reference docs:
+  - `docs/api/API-REFERENCE.md`
+  - `docs/cli/CLI-REFERENCE.md`
 
 #### Changed
-- Refactored public schema-related APIs for simpler, more predictable usage. `load_schema_for_sql_file` and `SchemaParser` now prefer an explicit `schema_file_path` when provided and fall back in a documented, deterministic way.
-- Type inference tuning: reduced false-positive type guesses and strengthened schema-backed inference to prefer explicit schema mappings where available.
+- Replaced direct usage of `splurge_safe_io.safe_text_file_reader.SafeTextFileReader` and `splurge_safe_io.safe_text_file_writer.SafeTextFileWriter` with the `SafeTextFileIoAdapter` across the codebase (modules updated: `sql_helper.py`, `sql_parser.py`, `schema_parser.py`, `code_generator.py`).
+- Renamed module `splurge_sql_generator.types` → `splurge_sql_generator.type_definitions` to avoid shadowing the Python standard library `types` module.
 
 #### Fixed
-- Various small correctness fixes around parameter deduplication and identifier normalization in the code generator.
-- Ensured stable snake_case conversion for all-uppercase acronyms and improved Unicode error re-raising in file I/O utilities.
+- Improved cross-version compatibility (Python 3.11/3.12) by normalizing error messages and adding explicit validation for `None` schema file paths.
 
 #### Technical Improvements
-- Increased test coverage for schema parsing and end-to-end CLI flows; improved CI stability and cross-platform test behavior.
-- Documentation updates and examples refreshed to match the simplified parser behavior and new API ergonomics.
+- Simplified exception mapping by centralizing file I/O errors in the adapter; reduced duplication and improved maintainability.
+- Added comprehensive docs and examples for API and CLI usage, and updated tests to match standardized error messages.
 
 ### [2025.4.6] - 2025-09-03
 

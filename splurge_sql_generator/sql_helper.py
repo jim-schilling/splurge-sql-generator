@@ -13,9 +13,7 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-import splurge_safe_io.exceptions as safe_io_exc
 import sqlparse
-from splurge_safe_io.safe_text_file_reader import SafeTextFileReader
 from sqlparse.sql import Statement, Token
 from sqlparse.tokens import Comment, Literal, Name
 
@@ -23,6 +21,7 @@ from splurge_sql_generator.exceptions import (
     FileError,
     SqlValidationError,
 )
+from splurge_sql_generator.file_utils import SafeTextFileIoAdapter
 from splurge_sql_generator.utils import clean_sql_type, is_empty_or_whitespace, normalize_string
 
 DOMAINS = ["sql", "helper"]
@@ -1152,7 +1151,7 @@ def parse_sql_file(
         - Statement boundaries are determined by sqlparse for accuracy
         - Thread-safe: Can be called concurrently from multiple threads
     """
-    # Basic input validation for cases SafeTextFileReader doesn't handle
+    # Basic input validation for cases SafeTextFileIoAdapter doesn't handle
     if file_path is None:
         raise SqlValidationError("file_path cannot be None")
 
@@ -1163,8 +1162,8 @@ def parse_sql_file(
         raise SqlValidationError("file_path cannot be empty")
 
     try:
-        reader = SafeTextFileReader(file_path, encoding="utf-8")
-        sql_content = reader.read()
+        file_io = SafeTextFileIoAdapter()
+        sql_content = file_io.read_text(file_path, encoding="utf-8")
 
         # Check file size for large file handling
         content_size_mb = len(sql_content.encode("utf-8")) / (1024 * 1024)
@@ -1176,17 +1175,10 @@ def parse_sql_file(
 
         return parse_sql_statements(sql_content, strip_semicolon=strip_semicolon)
 
-    except safe_io_exc.SplurgeSafeIoPathValidationError as exc:
-        raise FileError(f"Invalid file path: {file_path}") from exc
-    except safe_io_exc.SplurgeSafeIoFileNotFoundError as exc:
-        raise FileError(f"SQL file not found: {file_path}") from exc
-    except safe_io_exc.SplurgeSafeIoFilePermissionError as exc:
-        raise FileError(f"Permission denied reading SQL file: {file_path}") from exc
-    except safe_io_exc.SplurgeSafeIoFileDecodingError as exc:
-        raise FileError(f"Decoding error reading SQL file (not UTF-8?): {file_path}") from exc
-    except safe_io_exc.SplurgeSafeIoOsError as exc:
-        raise FileError(f"I/O error reading SQL file: {file_path}") from exc
-    except safe_io_exc.SplurgeSafeIoUnknownError as exc:
-        raise FileError(f"Unknown error reading SQL file: {file_path}") from exc
+    except FileError as e:
+        # Enhance error message with SQL-specific context
+        if "not found" in str(e.message).lower():
+            raise FileError(f"SQL file not found: {file_path}") from e
+        raise
     except Exception as exc:
         raise FileError(f"Unexpected error reading SQL file: {file_path}") from exc

@@ -8,7 +8,6 @@ __pycache__/
 *.sqlite
 
 output/
-plans/
 .convert_tmp/
 .convert_out/
 

@@ -11,11 +11,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import splurge_safe_io.exceptions as safe_io_exc
 from jinja2 import Environment, FileSystemLoader
-from splurge_safe_io.safe_text_file_writer import SafeTextFileWriter, open_safe_text_writer
 
 from splurge_sql_generator.exceptions import FileError, SqlValidationError
+from splurge_sql_generator.file_utils import SafeTextFileIoAdapter
 from splurge_sql_generator.schema_parser import SchemaParser
 from splurge_sql_generator.sql_parser import SqlParser
 from splurge_sql_generator.utils import to_snake_case
@@ -96,21 +95,9 @@ class PythonCodeGenerator:
             schema_path = Path(schema_file_path)
             self._schema_parser.load_schema(schema_path)
 
-        except safe_io_exc.SplurgeSafeIoPathValidationError as e:
-            raise FileError(
-                message=f"Schema file path is invalid: {schema_file_path}. Specify a schema file using the --schema option or ensure a corresponding .schema file exists.",
-                details=str(e.message),
-            ) from e
-        except safe_io_exc.SplurgeSafeIoFileNotFoundError as e:
-            raise FileError(
-                message=f"Schema file not found: {schema_file_path}. Specify a schema file using the --schema option or ensure a corresponding .schema file exists.",
-                details=str(e.message),
-            ) from e
-        except safe_io_exc.SplurgeSafeIoFilePermissionError as e:
-            raise FileError(
-                message=f"Permission denied reading schema file: {schema_file_path}. Specify a schema file using the --schema option or ensure a corresponding .schema file exists.",
-                details=str(e.message),
-            ) from e
+        except FileError:
+            # Re-raise FileError as-is (already has proper formatting)
+            raise
 
         # Generate the Python code using template
         python_code = self._generate_python_code(class_name, method_queries, sql_file_path)
@@ -118,26 +105,11 @@ class PythonCodeGenerator:
         # Save to file if output path provided
         if output_file_path:
             try:
-                with open_safe_text_writer(output_file_path) as writer:
-                    writer.write(python_code)
-            except safe_io_exc.SplurgeSafeIoFileEncodingError as e:
-                raise FileError(
-                    message=f"Encoding error writing to file: {output_file_path}.", details=str(e.message)
-                ) from e
-            except safe_io_exc.SplurgeSafeIoFilePermissionError as e:
-                raise FileError(
-                    message=f"Permission denied writing to file: {output_file_path}.", details=str(e.message)
-                ) from e
-            except safe_io_exc.SplurgeSafeIoOsError as e:
-                raise FileError(message=f"OS error writing to file: {output_file_path}.", details=str(e.message)) from e
-            except safe_io_exc.SplurgeSafeIoFileOperationError as e:
-                raise FileError(
-                    message=f"File operation error writing to file: {output_file_path}.", details=str(e.message)
-                ) from e
-            except safe_io_exc.SplurgeSafeIoUnknownError as e:
-                raise FileError(
-                    message=f"Unknown error writing to file: {output_file_path}.", details=str(e.message)
-                ) from e
+                file_io = SafeTextFileIoAdapter()
+                file_io.write_text(output_file_path, python_code)
+            except FileError:
+                # Re-raise FileError as-is (already has proper formatting)
+                raise
         return python_code
 
     def _generate_python_code(
@@ -537,11 +509,8 @@ class PythonCodeGenerator:
                 # Convert class name to snake_case for filename
                 snake_case_name = to_snake_case(class_name)
                 output_path = Path(output_dir) / f"{snake_case_name}.py"
-                # safe_write_file(output_path, python_code)
-                try:
-                    writer = SafeTextFileWriter(output_path)
-                    writer.write(python_code)
-                finally:
-                    writer.close()
+                # Use SafeTextFileIoAdapter to write the file
+                file_io = SafeTextFileIoAdapter()
+                file_io.write_text(output_path, python_code)
 
         return generated_classes
