@@ -21,7 +21,7 @@ from splurge_sql_generator.sql_helper import (
 )
 from splurge_sql_generator.sql_parser import SqlParser
 
-__version__ = "2025.5.0"
+__version__ = "2025.5.1"
 
 __all__ = [
     # SQL Helper functions

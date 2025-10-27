@@ -1,5 +1,11 @@
 ## Changelog
 
+### [2025.5.1] - 2025-10-27
+
+#### Updated
+- **Dependency version constraint**: Updated `splurge-safe-io` dependency in `pyproject.toml` to restrict to `<2025.2.0` to avoid compatibility issues with future major releases.
+- **Version bump**: Incremented version to `2025.5.1` to reflect changes made.
+
 ### [2025.5.0] - 2025-10-19
 
 #### Added
