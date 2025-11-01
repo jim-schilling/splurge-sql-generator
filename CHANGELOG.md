@@ -1,5 +1,53 @@
 ## Changelog
 
+### [2025.6.1] - 2025-10-31
+
+#### Added
+- **Token Navigation Helpers**: New utility functions in `sql_helper.py` to simplify token navigation and error handling:
+  - `require_next_token()` - Gets the next significant token or raises `SplurgeSqlGeneratorTokenizationError`
+  - `require_token_at()` - Gets the significant token at or after index or raises error
+  - Both helpers reduce boilerplate code and provide consistent error messaging
+- **Type Inference Module**: New `type_inference.py` module with `ParameterTypeInferrer` class:
+  - Extracted type inference logic from `code_generator.py` for better separation of concerns
+  - Supports three-tier inference strategy: exact match, SQL context match, and name heuristics
+  - Improved testability and maintainability of type inference logic
+- **Type Inference Tests**: Comprehensive test suite for type inference module (`tests/unit/test_type_inference.py`) with 13 test cases covering all inference strategies
+
+#### Changed
+- **Token Navigation Refactoring**: Updated `find_main_statement_after_with()` and `detect_statement_type()` to use new token navigation helpers, reducing code duplication
+- **Identifier Extraction Consolidation**: Removed duplicate `_extract_identifier_name()` function and consolidated all identifier extraction to use the public `extract_identifier_name()` function
+- **Type Inference Architecture**: Refactored `PythonCodeGenerator` to use `ParameterTypeInferrer` instead of inline type inference methods, improving code organization
+- **Configuration Cleanup**: Removed unused `max_file_size_mb` configuration option from `GeneratorConfig` (unused - `sql_helper.py` uses its own `MAX_MEMORY_MB` constant)
+- **Code Generator Simplification**: Removed redundant type inference methods from `code_generator.py`:
+  - `_infer_parameter_type()`
+  - `_infer_type_from_sql_context()`
+  - `_infer_type_from_parameter_name()`
+  - `_extract_table_names()` (now handled by type inference module)
+
+#### Fixed
+- **Type Safety Improvements**: Enhanced type annotations and return types throughout the codebase
+- **Code Organization**: Better separation of concerns with dedicated type inference module
+- **Configuration Clarity**: Improved documentation for `validate_parameters` configuration option, clarifying its limited scope
+
+#### Technical Improvements
+- **DRY Principle**: Reduced code duplication in token navigation and identifier extraction
+- **Maintainability**: Improved code organization with extracted type inference module and consolidated helper functions
+- **Test Coverage**: Added comprehensive test coverage for new type inference module
+- **Error Handling**: Consistent error handling with proper exception types (`SplurgeSqlGeneratorTokenizationError`)
+- **Code Simplification**: Removed unused configuration options following YAGNI principle
+
+#### Development Experience
+- **Better Code Organization**: Type inference logic now in dedicated module, easier to test and maintain
+- **Reduced Boilerplate**: Token navigation helpers eliminate repetitive `None` checks and error handling code
+- **Improved Maintainability**: Consolidated identifier extraction reduces maintenance burden
+- **Clearer Configuration**: Removed unused configuration options reduces confusion
+
+#### Code Quality
+- **All Tests Passing**: Full test suite passes with no regressions
+- **No Breaking Changes**: Public API maintained unchanged, all existing functionality works as before
+- **Type Safety**: Improved type annotations for better IDE support and static analysis
+- **Documentation**: Enhanced docstrings and inline comments for better code understanding
+
 ### [2025.6.0] - 2025-10-31
 
 #### Added
