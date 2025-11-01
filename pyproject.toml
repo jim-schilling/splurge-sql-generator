@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "splurge-sql-generator"
-version = "2025.5.1"
+version = "2025.6.0"
 description = "A Python tool for generating Python classes from SQL files"
 authors = [
     {name = "Jim Schilling"}
@@ -35,7 +35,6 @@ dependencies = [
     "sqlparse>=0.5.3",
     "jinja2>=3.1.0",
     "PyYAML>=6.0.2",
-    "splurge-safe-io>=2025.1.1,<2025.2.0"
 ]
 
 [project.optional-dependencies]
@@ -90,13 +89,20 @@ disallow_untyped_decorators = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
-warn_no_return = true
 warn_unreachable = true
 strict_equality = true
-files = ["splurge_sql_generator"]
 show_error_codes = true
 # Allow missing imports for vendored/external helper package used at runtime
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["examples.*"]
+check_untyped_defs = false
+disallow_untyped_defs = false
 
 [tool.pytest.ini_options]
 minversion = "7.0"
@@ -133,6 +139,8 @@ omit = [
     "*/tests/*",
     "*/test_*",
     "*/__pycache__/*",
+    "*/examples/*",
+    "*/_vendor/*",
 ]
 
 [tool.coverage.report]
@@ -147,6 +155,13 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
+]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+    "*/examples/*",
+    "*/_vendor/*",
 ]
 
 [tool.ruff]

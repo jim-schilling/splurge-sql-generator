@@ -14,13 +14,18 @@ from pathlib import Path
 
 import yaml  # type: ignore[import-untyped]
 
-from splurge_sql_generator.exceptions import FileError, SqlValidationError
-from splurge_sql_generator.file_utils import SafeTextFileIoAdapter
-from splurge_sql_generator.sql_helper import (
+from .exceptions import (
+    SplurgeSqlGeneratorFileError,
+    SplurgeSqlGeneratorRuntimeError,
+    SplurgeSqlGeneratorSqlValidationError,
+    SplurgeSqlGeneratorValueError,
+)
+from .file_utils import SafeTextFileIoAdapter
+from .sql_helper import (
     extract_create_table_statements,
     parse_table_columns,
 )
-from splurge_sql_generator.utils import clean_sql_type
+from .utils import clean_sql_type
 
 DOMAINS = ["schema", "parser"]
 
@@ -131,7 +136,7 @@ class SchemaParser:
 
                 # Validate the loaded mapping
                 if not isinstance(loaded_mapping, dict):
-                    raise ValueError(
+                    raise SplurgeSqlGeneratorValueError(
                         f"YAML file '{mapping_file}' must contain a dictionary, got {type(loaded_mapping).__name__}"
                     )
 
@@ -164,7 +169,7 @@ class SchemaParser:
                 self._logger.info(f"Type mapping file '{mapping_file}' not found, using default mappings")
                 return self._get_default_mapping()
 
-        except FileError as e:
+        except SplurgeSqlGeneratorFileError as e:
             path_str = str(mapping_path) if mapping_path else mapping_file
             self._logger.warning(f"Error reading SQL type mapping file: {path_str}: {str(e.message)}")
             return self._get_default_mapping()
@@ -197,8 +202,8 @@ class SchemaParser:
             Dictionary mapping table names to column type mappings
 
         Raises:
-            FileError: If the schema file cannot be read
-            SqlValidationError: If the SQL content is malformed and cannot be parsed
+            SplurgeSqlGeneratorFileError: If the schema file cannot be read
+            SplurgeSqlGeneratorSqlValidationError: If the SQL content is malformed and cannot be parsed
         Note:
             If the schema file does not exist, an empty dictionary is returned.
         """
@@ -207,7 +212,7 @@ class SchemaParser:
             schema_content = file_io.read_text(schema_file_path)
             return self._parse_schema_content(schema_content)
 
-        except FileError as e:
+        except SplurgeSqlGeneratorFileError as e:
             # Check if it's a "not found" error - we return empty dict for those
             if "not found" in str(e.message).lower():
                 return {}
@@ -225,7 +230,7 @@ class SchemaParser:
             Dictionary mapping table names to column type mappings
 
         Raises:
-            SqlValidationError: If sqlparse fails to parse CREATE TABLE statements
+            SplurgeSqlGeneratorSqlValidationError: If sqlparse fails to parse CREATE TABLE statements
         """
         tables: dict[str, dict[str, str]] = {}
 
@@ -323,8 +328,9 @@ class SchemaParser:
             schema_file_path: Path to the schema file to load
 
         Raises:
-            FileError: If the schema file cannot be read (re-raised after logging)
-            SqlValidationError: If the SQL content is malformed and cannot be parsed (re-raised after logging)
+            SplurgeSqlGeneratorFileError: If the schema file cannot be read (re-raised after logging)
+            SplurgeSqlGeneratorSqlValidationError: If the SQL content is malformed and cannot be parsed (re-raised after logging)
+            SplurgeSqlGeneratorRuntimeError: If a runtime error occurs during schema loading (re-raised after logging)
 
         Note:
             If the schema file does not exist, an empty schema will be loaded.
@@ -336,11 +342,11 @@ class SchemaParser:
             self._logger.info(
                 f"Successfully loaded schema from '{str(schema_file_path)}' with {len(self._table_schemas)} tables"
             )
-        except FileError as e:
+        except SplurgeSqlGeneratorFileError as e:
             self._logger.error(f"Failed to load schema from '{str(schema_file_path)}': {str(e)}")
             # Preserve empty schema and re-raise for explicit error handling
             raise
-        except SqlValidationError as e:
+        except SplurgeSqlGeneratorSqlValidationError as e:
             self._logger.error(f"SQL validation error in schema file '{str(schema_file_path)}': {str(e)}")
             # Re-raise validation errors - they indicate malformed SQL that needs attention
             raise
@@ -348,7 +354,9 @@ class SchemaParser:
             self._logger.error(
                 f"Unexpected error loading schema from '{str(schema_file_path)}': {type(e).__name__}: {str(e)}"
             )
-            raise
+            raise SplurgeSqlGeneratorRuntimeError(
+                f"Unexpected error loading schema from '{str(schema_file_path)}': {type(e).__name__}: {str(e)}"
+            ) from e
 
     def generate_types_file(self, *, output_path: Path | str | None = None) -> str:
         """
@@ -361,7 +369,7 @@ class SchemaParser:
             Path to the generated types file
 
         Raises:
-            OSError: If the file cannot be written
+            SplurgeSqlGeneratorOSError: If the file cannot be written
         """
         if output_path is None:
             output_path = "types.yaml"
@@ -474,9 +482,10 @@ class SchemaParser:
             file_io = SafeTextFileIoAdapter()
             file_io.write_text(output_path, yaml_content)
             self._logger.info(f"Successfully generated types file: '{str(output_path)}'")
-        except FileError as e:
-            # Re-raise FileError with original message
-            raise FileError(message=f"Error writing types file: {str(output_path)}.", details=str(e.message)) from e
+        except SplurgeSqlGeneratorFileError as e:
+            raise SplurgeSqlGeneratorFileError(
+                message=f"Error writing types file: {str(output_path)}.", details={"details": str(e.message)}
+            ) from e
 
         return str(output_path)
 
@@ -492,8 +501,8 @@ class SchemaParser:
                              with the same stem as the SQL file.
 
         Raises:
-            FileError: If the schema file cannot be read
-            SqlValidationError: If the SQL content is malformed and cannot be parsed
+            SplurgeSqlGeneratorFileError: If the schema file cannot be read
+            SplurgeSqlGeneratorSqlValidationError: If the SQL content is malformed and cannot be parsed
         """
         if schema_file_path is None:
             # Default behavior: look for .schema file with same stem
@@ -517,7 +526,7 @@ class SchemaParser:
                 self._logger.warning(
                     f"No schema found for SQL file '{str(sql_file_path)}'. Schema file '{str(schema_path)}' is empty or missing."
                 )
-        except (FileError, SqlValidationError) as e:
+        except (SplurgeSqlGeneratorFileError, SplurgeSqlGeneratorSqlValidationError) as e:
             self._logger.error(
                 f"Failed to load schema from '{str(schema_path)}' for SQL file '{str(sql_file_path)}': {str(e)}"
             )

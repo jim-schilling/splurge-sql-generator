@@ -3,7 +3,7 @@ import tempfile
 
 import pytest
 
-from splurge_sql_generator.exceptions import SqlValidationError
+from splurge_sql_generator.exceptions import SplurgeSqlGeneratorSqlValidationError, SplurgeSqlGeneratorValueError
 from splurge_sql_generator.sql_parser import SqlParser
 from tests.unit.test_utils import temp_sql_files
 
@@ -288,9 +288,9 @@ def test_get_method_info_edge_cases(parser):
 
 
 def test_parse_file_not_found(parser):
-    from splurge_sql_generator.exceptions import FileError
+    from splurge_sql_generator.exceptions import SplurgeSqlGeneratorFileError
 
-    with pytest.raises(FileError):
+    with pytest.raises(SplurgeSqlGeneratorFileError):
         parser.parse_file("nonexistent_file.sql")
 
 
@@ -312,7 +312,7 @@ SELECT * FROM users WHERE name = :name;
 
 
 def test_parse_file_missing_class_comment(parser):
-    """Test that parse_file raises SqlValidationError when first line is not a class comment."""
+    """Test that parse_file raises SplurgeSqlGeneratorSqlValidationError when first line is not a class comment."""
     sql = """get_user
 SELECT * FROM users WHERE id = :user_id;
         """
@@ -320,7 +320,7 @@ SELECT * FROM users WHERE id = :user_id;
         f.write(sql)
         fname = f.name
     try:
-        with pytest.raises(SqlValidationError) as cm:
+        with pytest.raises(SplurgeSqlGeneratorSqlValidationError) as cm:
             parser.parse_file(fname)
         assert "First line must be a class comment" in str(cm.value)
     finally:
@@ -328,7 +328,7 @@ SELECT * FROM users WHERE id = :user_id;
 
 
 def test_parse_file_empty_class_comment(parser):
-    """Test that parse_file raises SqlValidationError when class comment is empty."""
+    """Test that parse_file raises SplurgeSqlGeneratorSqlValidationError when class comment is empty."""
     sql = """#
 #get_user
 SELECT * FROM users WHERE id = :user_id;
@@ -337,7 +337,7 @@ SELECT * FROM users WHERE id = :user_id;
         f.write(sql)
         fname = f.name
     try:
-        with pytest.raises(SqlValidationError) as cm:
+        with pytest.raises(SplurgeSqlGeneratorValueError) as cm:
             parser.parse_file(fname)
         assert "Class name cannot be empty" in str(cm.value)
     finally:
@@ -345,7 +345,7 @@ SELECT * FROM users WHERE id = :user_id;
 
 
 def test_parse_file_invalid_class_comment_format(parser):
-    """Test that parse_file raises SqlValidationError when class comment doesn't start with '#'."""
+    """Test that parse_file raises SplurgeSqlGeneratorSqlValidationError when class comment doesn't start with '#'."""
     sql = """TestClass
 #get_user
 SELECT * FROM users WHERE id = :user_id;
@@ -354,7 +354,7 @@ SELECT * FROM users WHERE id = :user_id;
         f.write(sql)
         fname = f.name
     try:
-        with pytest.raises(SqlValidationError) as cm:
+        with pytest.raises(SplurgeSqlGeneratorSqlValidationError) as cm:
             parser.parse_file(fname)
         assert "First line must be a class comment" in str(cm.value)
     finally:
@@ -367,9 +367,9 @@ def test_parse_file_empty_file(parser):
         f.write("")
         fname = f.name
     try:
-        from splurge_sql_generator.exceptions import SqlValidationError
+        from splurge_sql_generator.exceptions import SplurgeSqlGeneratorSqlValidationError
 
-        with pytest.raises(SqlValidationError) as cm:
+        with pytest.raises(SplurgeSqlGeneratorSqlValidationError) as cm:
             parser.parse_file(fname)
         assert "First line must be a class comment" in str(cm.value)
     finally:
@@ -408,7 +408,7 @@ def test_parse_string_missing_class_comment(parser):
     sql = """get_user
 SELECT * FROM users WHERE id = :user_id;
         """
-    with pytest.raises(SqlValidationError) as cm:
+    with pytest.raises(SplurgeSqlGeneratorSqlValidationError) as cm:
         parser.parse_string(sql)
     assert "First line must be a class comment" in str(cm.value)
 
@@ -418,7 +418,7 @@ def test_parse_string_missing_class_comment_with_file_path(parser):
     sql = """get_user
 SELECT * FROM users WHERE id = :user_id;
         """
-    with pytest.raises(SqlValidationError) as cm:
+    with pytest.raises(SplurgeSqlGeneratorSqlValidationError) as cm:
         parser.parse_string(sql, "test.sql")
     assert "First line must be a class comment starting with # in test.sql" in str(cm.value)
 
@@ -429,7 +429,7 @@ def test_parse_string_empty_class_comment(parser):
 #get_user
 SELECT * FROM users WHERE id = :user_id;
         """
-    with pytest.raises(SqlValidationError) as cm:
+    with pytest.raises(SplurgeSqlGeneratorValueError) as cm:
         parser.parse_string(sql)
     assert "Class name cannot be empty" in str(cm.value)
 
@@ -440,7 +440,7 @@ def test_parse_string_invalid_class_comment_format(parser):
 #get_user
 SELECT * FROM users WHERE id = :user_id;
         """
-    with pytest.raises(SqlValidationError) as cm:
+    with pytest.raises(SplurgeSqlGeneratorSqlValidationError) as cm:
         parser.parse_string(sql)
     assert "First line must be a class comment" in str(cm.value)
 
@@ -451,14 +451,14 @@ def test_parse_string_leading_whitespace_before_hash_raises(parser):
 #get_user
 SELECT * FROM users WHERE id = :user_id;
         """
-    with pytest.raises(SqlValidationError) as cm:
+    with pytest.raises(SplurgeSqlGeneratorSqlValidationError) as cm:
         parser.parse_string(sql)
     assert "First line must be a class comment" in str(cm.value)
 
 
 def test_parse_string_empty_content(parser):
     """Test parse_string raises error when content is empty."""
-    with pytest.raises(SqlValidationError) as cm:
+    with pytest.raises(SplurgeSqlGeneratorSqlValidationError) as cm:
         parser.parse_string("")
     assert "First line must be a class comment" in str(cm.value)
 
@@ -469,7 +469,7 @@ def test_parse_string_invalid_class_name(parser):
 #get_user
 SELECT * FROM users WHERE id = :user_id;
         """
-    with pytest.raises(SqlValidationError) as cm:
+    with pytest.raises(SplurgeSqlGeneratorValueError) as cm:
         parser.parse_string(sql)
     assert "Class name must be a valid Python identifier" in str(cm.value)
 
@@ -480,7 +480,7 @@ def test_parse_string_reserved_keyword_class_name(parser):
 #get_user
 SELECT * FROM users WHERE id = :user_id;
         """
-    with pytest.raises(SqlValidationError) as cm:
+    with pytest.raises(SplurgeSqlGeneratorValueError) as cm:
         parser.parse_string(sql)
     assert "Class name cannot be a reserved keyword" in str(cm.value)
 
@@ -509,7 +509,7 @@ SELECT * FROM users WHERE id = :user_id;
 def test_get_method_info_with_file_path(parser):
     """Test get_method_info with file path for error context."""
     sql = "SELECT * FROM users WHERE id = :class"  # 'class' is a reserved keyword
-    with pytest.raises(SqlValidationError) as cm:
+    with pytest.raises(SplurgeSqlGeneratorValueError) as cm:
         parser.get_method_info(sql, "test.sql")
     assert "Parameter name cannot be a reserved keyword in test.sql" in str(cm.value)
 

@@ -1,4 +1,3 @@
-import os
 import re
 import subprocess
 import sys
@@ -6,11 +5,10 @@ from pathlib import Path
 
 from tests.unit.test_utils import create_basic_schema, create_sql_with_schema
 
-SCRIPT = os.path.join(os.path.dirname(__file__), "..", "..", "splurge_sql_generator", "cli.py")
-
 
 def run_cli(args: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run([sys.executable, SCRIPT, *args], capture_output=True, text=True)
+    """Run the CLI as a module rather than as a script."""
+    return subprocess.run([sys.executable, "-m", "splurge_sql_generator.cli", *args], capture_output=True, text=True)
 
 
 def test_end_to_end_single_file_output_dir(tmp_path: Path):

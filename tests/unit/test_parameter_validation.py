@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
-from splurge_sql_generator.exceptions import SqlValidationError
+from splurge_sql_generator.exceptions import SplurgeSqlGeneratorSqlValidationError
 
 
 @pytest.fixture
@@ -53,7 +53,7 @@ INSERT INTO users (name, email) VALUES (:name, :email);
 
 
 def test_invalid_parameters_raise_error(generator):
-    """Test that invalid parameters raise SqlValidationError."""
+    """Test that invalid parameters raise SplurgeSqlGeneratorSqlValidationError(."""
     sql = """# TestClass
 #get_user
 SELECT * FROM users WHERE id = :user_id;
@@ -73,7 +73,7 @@ SELECT * FROM users WHERE id = :user_id;
         f.write(schema)
 
     try:
-        with pytest.raises(SqlValidationError) as cm:
+        with pytest.raises(SplurgeSqlGeneratorSqlValidationError) as cm:
             generator.generate_class(sql_fname, schema_file_path=schema_fname)
 
         error_msg = str(cm.value)
@@ -106,7 +106,7 @@ INSERT INTO users (name, email, status) VALUES (:name, :email, :status);
         f.write(schema)
 
     try:
-        with pytest.raises(SqlValidationError) as cm:
+        with pytest.raises(SplurgeSqlGeneratorSqlValidationError) as cm:
             generator.generate_class(sql_fname, schema_file_path=schema_fname)
 
         error_msg = str(cm.value)
@@ -208,7 +208,7 @@ SELECT * FROM users WHERE id = :id;
         f.write(schema)
 
     try:
-        with pytest.raises(SqlValidationError) as cm:
+        with pytest.raises(SplurgeSqlGeneratorSqlValidationError) as cm:
             generator.generate_class(sql_fname, schema_file_path=schema_fname)
 
         error_msg = str(cm.value)

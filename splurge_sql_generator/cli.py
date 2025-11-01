@@ -10,9 +10,10 @@ import argparse
 import sys
 from pathlib import Path
 
-from splurge_sql_generator import __version__
-from splurge_sql_generator.code_generator import PythonCodeGenerator
-from splurge_sql_generator.utils import find_files_by_extension, to_snake_case
+from . import __version__
+from .code_generator import PythonCodeGenerator
+from .exceptions import SplurgeSqlGeneratorFileNotFoundError, SplurgeSqlGeneratorOSError
+from .utils import find_files_by_extension, to_snake_case
 
 DOMAINS = ["cli"]
 
@@ -253,14 +254,14 @@ Examples:
     # Handle --generate-types option
     if args.generate_types is not None:
         try:
-            from splurge_sql_generator.schema_parser import SchemaParser
+            from .schema_parser import SchemaParser
 
             schema_parser = SchemaParser()
             output_path = schema_parser.generate_types_file(output_path=args.generate_types)
             print(f"Generated SQL type mapping file: {output_path}")
             print("You can now customize this file for your specific database requirements.")
             return
-        except OSError as e:
+        except SplurgeSqlGeneratorOSError as e:
             print(f"Error generating types file: {e}", file=sys.stderr)
             sys.exit(1)
 
@@ -305,7 +306,7 @@ Examples:
             # Report generated classes
             _report_generated_classes(generated_classes, output_dir, dry_run=args.dry_run)
 
-    except (OSError, FileNotFoundError) as e:
+    except (SplurgeSqlGeneratorOSError, SplurgeSqlGeneratorFileNotFoundError) as e:
         print(f"Error accessing files: {e}", file=sys.stderr)
         sys.exit(1)
     except ValueError as e:

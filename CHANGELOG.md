@@ -1,5 +1,60 @@
 ## Changelog
 
+### [2025.6.0] - 2025-10-31
+
+#### Added
+- **CLI --version flag**: New `--version` option to display the package version (e.g., `splurge-sql-generator 2025.6.0`)
+- **Deprecated exception aliases**: Backward-compatible aliases for exceptions with new `SplurgeSqlGenerator*` prefixed names:
+  - `FileError` → `SplurgeSqlGeneratorFileError`
+  - `SqlValidationError` → `SplurgeSqlGeneratorSqlValidationError`
+  - `ParsingError` → `SplurgeSqlGeneratorParsingError`
+  - `SqlParsingError` → `SplurgeSqlGeneratorSqlParsingError`
+  - `TokenizationError` → `SplurgeSqlGeneratorTokenizationError`
+  - `SchemaError` → `SplurgeSqlGeneratorSchemaError`
+  - `ColumnDefinitionError` → `SplurgeSqlGeneratorColumnDefinitionError`
+  - `TypeInferenceError` → `SplurgeSqlGeneratorTypeInferenceError`
+  - `ConfigurationError` → `SplurgeSqlGeneratorConfigurationError`
+  - `SplurgeSqlGeneratorValueError` — New exception for value-related errors
+  - Deprecation warnings guide users to new exception names; old names will be removed in v2025.7.0
+- **Enhanced test coverage**: Added comprehensive unit tests and property-based tests using Hypothesis:
+  - `tests/unit/test_utils_extra.py` — Property tests for `to_snake_case`, `normalize_string`, and `is_empty_or_whitespace`
+  - `tests/unit/test_type_definitions.py` — Tests for TypedDict importability and structure
+  - `tests/unit/test_file_utils.py` — Tests for `YamlConfigReader` and `SafeTextFileIoAdapter` with temp files
+  - `tests/unit/test_exceptions.py` — Tests for custom exception attributes and inheritance
+  - `tests/unit/test_config.py` — Tests for `GeneratorConfig.from_env()` and environment override behavior
+  - `tests/unit/test_cli_version.py` — Tests verifying CLI `--version` output
+- **Hypothesis for property-based testing**: Added `hypothesis>=6.97.4` to dev and test optional dependencies
+
+#### Changed
+- **Exception module refactored**: Introduced new `SplurgeSqlGenerator*` prefixed exception hierarchy for consistency with vendor framework
+- **Deprecated decorator fixed**: Fixed `@splurge_deprecated` decorator to properly handle class decoration without breaking inheritance
+- **Examples refactored to use temp folders**: Updated `api_simple_example.py` and `api_usage_example.py` to generate classes into temporary directories instead of hardcoded `output` folder, with automatic cleanup via try-finally blocks
+- **Removed splurge-safe-io dependency**: Project now uses internal exception handling and error management instead of external dependency (functionality moved to vendor package)
+- **Hypothesis test robustness**: Updated property tests to handle Unicode edge cases and ensure cross-platform compatibility
+
+#### Fixed
+- **Exception test compatibility**: Updated exception tests to work with vendor exception framework expecting dict-based details parameter
+- **CLI integration tests**: Updated `tests/integration/test_cli.py` and `tests/integration/test_cli_end_to_end.py` to invoke CLI as a module (`-m splurge_sql_generator.cli`) instead of direct script execution, resolving relative import errors when running tests
+- **Deprecated decorator**: Fixed class decorator to issue warnings at class definition time while preserving class structure and inheritance
+- **Unicode handling in property tests**: Updated Hypothesis strategies to filter control and surrogate characters, preventing test failures on Unicode edge cases
+
+#### Technical Improvements
+- **Property-based testing**: Introduced Hypothesis strategies for testing invariants and edge cases in utility functions
+- **Temp file management**: Examples now properly clean up temporary files using context managers and try-finally blocks
+- **Import robustness**: Absolute imports in CLI ensure module works both as package import and direct script execution
+- **Test isolation**: All tests properly use temp directories (tmp_path) and clean up resources after execution
+
+#### Development Experience
+- **Better test infrastructure**: Hypothesis enables discovery of edge cases through property-based testing
+- **Cleaner examples**: Examples no longer pollute the project directory with generated code
+- **Improved CLI testing**: CLI version tests verify the package version displays correctly
+- **Configuration testing**: Complete coverage of environment variable override behavior
+
+#### Code Quality
+- **Line length constraint**: Maintained 120-character line length limit in code modules
+- **Type safety**: All test code properly typed and passing mypy checks
+- **Coverage**: Extended test coverage with focus on utility functions, file I/O, and configuration management
+
 ### [2025.5.1] - 2025-10-27
 
 #### Updated

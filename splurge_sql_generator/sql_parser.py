@@ -13,15 +13,15 @@ from typing import Any
 import sqlparse
 from sqlparse import tokens as T
 
-from splurge_sql_generator.exceptions import FileError, SqlValidationError
-from splurge_sql_generator.file_utils import SafeTextFileIoAdapter
-from splurge_sql_generator.sql_helper import (
+from .exceptions import SplurgeSqlGeneratorFileError, SplurgeSqlGeneratorSqlValidationError
+from .file_utils import SafeTextFileIoAdapter
+from .sql_helper import (
     FETCH_STATEMENT,
     detect_statement_type,
     extract_table_names,
     remove_sql_comments,
 )
-from splurge_sql_generator.utils import (
+from .utils import (
     format_error_context,
     validate_python_identifier,
 )
@@ -81,15 +81,15 @@ class SqlParser:
             Tuple of (class_name, method_queries_dict)
 
         Raises:
-            FileError: If the SQL file cannot be read or parsed
-            SqlValidationError: If the file format is invalid
+            SplurgeSqlGeneratorFileError: If the SQL file cannot be read or parsed
+            SplurgeSqlGeneratorSqlValidationError: If the file format is invalid
         """
         try:
             file_io = SafeTextFileIoAdapter()
             content = file_io.read_text(file_path)
             return self.parse_string(content, file_path)
-        except FileError:
-            # Re-raise FileError as-is (already has proper formatting from adapter)
+        except SplurgeSqlGeneratorFileError:
+            # Re-raise SplurgeSqlGeneratorFileError as-is (already has proper formatting from adapter)
             raise
 
     def parse_string(self, content: str, file_path: str | Path | None = None) -> tuple[str, dict[str, str]]:
@@ -104,18 +104,22 @@ class SqlParser:
             Tuple of (class_name, method_queries_dict)
 
         Raises:
-            SqlValidationError: If the content format is invalid
+            SplurgeSqlGeneratorSqlValidationError: If the content format is invalid
         """
         # Extract class name from first line comment
         lines = content.split("\n")
         if not lines or not lines[0].strip().startswith("#"):
             file_context = format_error_context(file_path)
-            raise SqlValidationError(f"First line must be a class comment starting with #{file_context}")
+            raise SplurgeSqlGeneratorSqlValidationError(
+                f"First line must be a class comment starting with #{file_context}"
+            )
 
         # Check if first line starts with "#" (before stripping)
         if not lines[0].startswith("#"):
             file_context = format_error_context(file_path)
-            raise SqlValidationError(f"First line must be a class comment starting with #{file_context}")
+            raise SplurgeSqlGeneratorSqlValidationError(
+                f"First line must be a class comment starting with #{file_context}"
+            )
 
         class_comment = lines[0].strip()
         class_name = class_comment[1:].strip()  # Remove '#' prefix
@@ -124,7 +128,7 @@ class SqlParser:
         try:
             validate_python_identifier(class_name, context="class name", file_path=file_path)
         except ValueError as e:
-            raise SqlValidationError(str(e)) from e
+            raise SplurgeSqlGeneratorSqlValidationError(str(e)) from e
 
         # Parse methods and queries
         method_queries = self._extract_methods_and_queries(content, file_path)
@@ -143,7 +147,7 @@ class SqlParser:
             Dictionary mapping method names to SQL queries
 
         Raises:
-            SqlValidationError: If method names are invalid
+            SplurgeSqlGeneratorSqlValidationError: If method names are invalid
         """
         method_queries = {}
 
@@ -166,7 +170,7 @@ class SqlParser:
                         validate_python_identifier(method_name, context="method name", file_path=file_path)
                         method_queries[method_name] = sql_query
                     except ValueError as e:
-                        raise SqlValidationError(str(e)) from e
+                        raise SplurgeSqlGeneratorSqlValidationError(str(e)) from e
 
         return method_queries
 
@@ -183,7 +187,7 @@ class SqlParser:
             Dictionary with method analysis info
 
         Raises:
-            SqlValidationError: If parameter names are invalid
+            SplurgeSqlGeneratorSqlValidationError: If parameter names are invalid
         """
         # Guard clause: trivial inputs return default analysis without extra work
         if not sql_query or not sql_query.strip():
@@ -285,7 +289,7 @@ class SqlParser:
             try:
                 validate_python_identifier(param, context="parameter name", file_path=file_path)
             except ValueError as e:
-                raise SqlValidationError(str(e)) from e
+                raise SplurgeSqlGeneratorSqlValidationError(str(e)) from e
 
         return {
             "type": query_type,

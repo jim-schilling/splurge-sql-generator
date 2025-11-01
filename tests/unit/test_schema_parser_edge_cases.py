@@ -3,7 +3,7 @@ Edge case tests for the SchemaParser module to increase coverage.
 
 Covers:
 - YAML mapping loading fallbacks and validations
-- Error propagation in parse_schema_file (UnicodeDecodeError, OSError, SqlValidationError)
+- Error propagation in parse_schema_file (UnicodeError, SplurgeSqlGeneratorOSError, SplurgeSqlGeneratorSqlValidationError)
 - Explicit schema_file_path override in load_schema_for_sql_file
 - Case-insensitive lookups in get_column_type
 """
@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from splurge_sql_generator.exceptions import SqlValidationError
+from splurge_sql_generator.exceptions import SplurgeSqlGeneratorFileError, SplurgeSqlGeneratorSqlValidationError
 from splurge_sql_generator.schema_parser import SchemaParser
 
 
@@ -80,7 +80,7 @@ def test_yaml_default_override_affects_unknown_types():
 
 
 def test_parse_schema_file_unicode_decode_error():
-    """Binary file with invalid UTF-8 should raise UnicodeDecodeError via safe_read_file."""
+    """Binary file with invalid UTF-8 should raise SplurgeSqlGeneratorFileError via safe_read_file."""
     with tempfile.TemporaryDirectory() as temp_dir:
         bad_file = Path(temp_dir) / "bad.schema"
         # Write invalid UTF-8 byte sequence: 0xFF is always invalid in UTF-8
@@ -88,25 +88,23 @@ def test_parse_schema_file_unicode_decode_error():
         with open(bad_file, "wb") as f:
             f.write(b"\xff\xfe\xfd\xfc")
 
-        from splurge_sql_generator.exceptions import FileError
-
         parser = SchemaParser()
-        with pytest.raises(FileError):
+        with pytest.raises(SplurgeSqlGeneratorFileError):
             parser._parse_schema_file(str(bad_file))
 
 
 def test_parse_schema_file_oserror_on_directory():
-    """Passing a directory to parse_schema_file should raise FileError."""
-    from splurge_sql_generator.exceptions import FileError
+    """Passing a directory to parse_schema_file should raise SplurgeSqlGeneratorFileError."""
+    from splurge_sql_generator.exceptions import SplurgeSqlGeneratorFileError
 
     with tempfile.TemporaryDirectory() as temp_dir:
         parser = SchemaParser()
-        with pytest.raises(FileError):
+        with pytest.raises(SplurgeSqlGeneratorFileError):
             parser._parse_schema_file(temp_dir)
 
 
 def test_parse_schema_file_sql_validation_error_propagates():
-    """Malformed CREATE TABLE with only table-level constraint should raise SqlValidationError."""
+    """Malformed CREATE TABLE with only table-level constraint should raise SplurgeSqlGeneratorSqlValidationError(."""
     with tempfile.TemporaryDirectory() as temp_dir:
         schema_path = Path(temp_dir) / "empty_body.schema"
         # Table has an identifier without a type, which results in no valid
@@ -121,7 +119,7 @@ CREATE TABLE users (
         )
 
         parser = SchemaParser()
-        with pytest.raises(SqlValidationError) as ctx:
+        with pytest.raises(SplurgeSqlGeneratorSqlValidationError) as ctx:
             parser._parse_schema_file(str(schema_path))
 
         assert "No valid column definitions found in table body" in str(ctx.value)
