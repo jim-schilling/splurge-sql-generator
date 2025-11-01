@@ -1,8 +1,8 @@
 # API Reference — splurge_sql_generator
 
-Version: 2025.5.0 (release/2025.5.0-prep)
+Version: 2025.6.0 (release/2025.6.0)
 
-This document is a comprehensive reference for the public Python API provided by the `splurge_sql_generator` package. It includes class and function signatures, descriptions, return values, raised exceptions, short usage examples, and migration notes from 2025.4.x → 2025.5.0.
+This document is a comprehensive reference for the public Python API provided by the `splurge_sql_generator` package. It includes class and function signatures, descriptions, return values, raised exceptions, short usage examples, and migration notes from 2025.4.x → 2025.5.0 and 2025.5.x → 2025.6.0.
 
 ## Table of contents
 
@@ -170,16 +170,49 @@ Convenience wrappers around `detect_statement_type`.
 
 All exceptions live in `splurge_sql_generator.exceptions` and inherit from `SplurgeSqlGeneratorError`.
 
-- `SplurgeSqlGeneratorError(message: str, details: str | None = None)` — base
-- `FileError` — I/O and file path related issues
-- `SqlValidationError` — invalid input / SQL format errors
-- `ParsingError`, `SqlParsingError`, `TokenizationError` — parsing and token-level
-- `SchemaError`, `ColumnDefinitionError`, `TypeInferenceError` — schema-level
-- `ConfigurationError` — configuration / YAML errors
+### Current Exception Hierarchy (2025.6.0+)
+
+- `SplurgeSqlGeneratorError(message: str, details: dict | None = None)` — base exception
+- `SplurgeSqlGeneratorValueError` — value-related errors
+- `SplurgeSqlGeneratorFileError` — I/O and file path related issues
+- `SplurgeSqlGeneratorSqlValidationError` — invalid input / SQL format errors
+- `SplurgeSqlGeneratorParsingError` — base for parsing errors
+  - `SplurgeSqlGeneratorSqlParsingError` — SQL parsing failures
+  - `SplurgeSqlGeneratorTokenizationError` — token-level errors
+- `SplurgeSqlGeneratorSchemaError` — schema processing errors
+  - `SplurgeSqlGeneratorColumnDefinitionError` — column definition parsing failures
+  - `SplurgeSqlGeneratorTypeInferenceError` — type inference failures
+- `SplurgeSqlGeneratorConfigurationError` — configuration / YAML errors
+
+### Deprecated Exception Aliases (will be removed in v2025.7.0)
+
+The following exception names are deprecated. Use the new `SplurgeSqlGenerator*` prefixed names instead:
+
+- `FileError` → `SplurgeSqlGeneratorFileError`
+- `SqlValidationError` → `SplurgeSqlGeneratorSqlValidationError`
+- `ParsingError` → `SplurgeSqlGeneratorParsingError`
+- `SqlParsingError` → `SplurgeSqlGeneratorSqlParsingError`
+- `TokenizationError` → `SplurgeSqlGeneratorTokenizationError`
+- `SchemaError` → `SplurgeSqlGeneratorSchemaError`
+- `ColumnDefinitionError` → `SplurgeSqlGeneratorColumnDefinitionError`
+- `TypeInferenceError` → `SplurgeSqlGeneratorTypeInferenceError`
+- `ConfigurationError` → `SplurgeSqlGeneratorConfigurationError`
+
+Importing or using the deprecated aliases will trigger a `DeprecationWarning` guiding you to the new names.
 
 Examples:
 
 ```py
+# New way (2025.6.0+)
+from splurge_sql_generator.exceptions import SplurgeSqlGeneratorFileError
+try:
+    code = generate_class('examples/User.sql', schema_file_path='nonexistent.schema')
+except SplurgeSqlGeneratorFileError as e:
+    print(e.message)
+    print(e.details)
+
+# Old way (deprecated, will show DeprecationWarning)
+from splurge_sql_generator.exceptions import FileError
 try:
     code = generate_class('examples/User.sql', schema_file_path='nonexistent.schema')
 except FileError as e:
@@ -187,13 +220,34 @@ except FileError as e:
     print(e.details)
 ```
 
-## Migration notes: 2025.4.x → 2025.5.0
+## Migration notes: 2025.4.x → 2025.6.0
 
 This release introduced several API and internal improvements. Important migration notes:
 
-- Safe I/O adapter
-  - File I/O now uses a centralized `SafeTextFileIoAdapter` (in `splurge_sql_generator.file_utils`).
-  - Direct usage of `splurge_safe_io.safe_text_file_reader.SafeTextFileReader` and `splurge_safe_io.safe_text_file_writer.SafeTextFileWriter` has been removed from public modules. If you previously used these classes directly in your code via imports from `splurge_sql_generator`, update to use the new adapter:
+### Exception names (2025.6.0)
+- All exceptions now use `SplurgeSqlGenerator*` prefixed names for consistency
+- Old names remain as deprecated aliases until v2025.7.0
+- Update your exception handling code to use the new names:
+
+```py
+# Before (deprecated)
+from splurge_sql_generator import FileError
+try:
+    ...
+except FileError:
+    pass
+
+# After (recommended)
+from splurge_sql_generator.exceptions import SplurgeSqlGeneratorFileError
+try:
+    ...
+except SplurgeSqlGeneratorFileError:
+    pass
+```
+
+### Safe I/O adapter (2025.5.0)
+- File I/O now uses a centralized `SafeTextFileIoAdapter` (in `splurge_sql_generator.file_utils`).
+- Direct usage of `splurge_safe_io.safe_text_file_reader.SafeTextFileReader` and `splurge_safe_io.safe_text_file_writer.SafeTextFileWriter` has been removed from public modules. If you previously used these classes directly in your code via imports from `splurge_sql_generator`, update to use the new adapter:
 
 ```py
 from splurge_sql_generator.file_utils import SafeTextFileIoAdapter
@@ -202,18 +256,18 @@ content = file_io.read_text('file.sql')
 file_io.write_text('out.sql', '...')
 ```
 
-- Types module renamed
-  - `splurge_sql_generator.types` was renamed to `splurge_sql_generator.type_definitions` to avoid stdlib shadowing. If you imported `splurge_sql_generator.types`, update to:
+### Types module renamed (2025.5.0)
+- `splurge_sql_generator.types` was renamed to `splurge_sql_generator.type_definitions` to avoid stdlib shadowing. If you imported `splurge_sql_generator.types`, update to:
 
 ```py
 from splurge_sql_generator import type_definitions
 ```
 
-- Error messages
-  - Some internal error messages were standardized to `FileError` messages originating from the adapter. Tests were updated accordingly.
+### Error messages (2025.5.0)
+- Some internal error messages were standardized to `FileError` messages originating from the adapter. Tests were updated accordingly.
 
-- Improved explicit validation
-  - Functions now validate `None` more explicitly and raise `TypeError` or `SqlValidationError` with clearer messages.
+### Improved explicit validation (2025.5.0)
+- Functions now validate `None` more explicitly and raise `TypeError` or `SqlValidationError` with clearer messages.
 
 ## Examples
 
