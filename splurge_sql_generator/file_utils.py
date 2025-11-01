@@ -14,12 +14,21 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
-import splurge_safe_io.exceptions as safe_io_exc
 import yaml  # type: ignore[import-untyped]
-from splurge_safe_io.safe_text_file_reader import SafeTextFileReader
-from splurge_safe_io.safe_text_file_writer import open_safe_text_writer
 
 from splurge_sql_generator.exceptions import ConfigurationError, FileError
+
+from ._vendor.splurge_safe_io.exceptions import (
+    SplurgeSafeIoFileNotFoundError,
+    SplurgeSafeIoLookupError,
+    SplurgeSafeIoOSError,
+    SplurgeSafeIoPathValidationError,
+    SplurgeSafeIoPermissionError,
+    SplurgeSafeIoRuntimeError,
+    SplurgeSafeIoUnicodeError,
+)
+from ._vendor.splurge_safe_io.safe_text_file_reader import SafeTextFileReader
+from ._vendor.splurge_safe_io.safe_text_file_writer import open_safe_text_writer
 
 DOMAINS = ["file", "utilities"]
 
@@ -97,18 +106,20 @@ class SafeTextFileIoAdapter(FileIoAdapter):
             if not isinstance(content, str):
                 raise FileError(f"Unexpected return type from SafeTextFileReader: {type(content)}")
             return content
-        except safe_io_exc.SplurgeSafeIoPathValidationError as e:
-            raise FileError(f"Invalid file path: {path}", details=str(e.message)) from e
-        except safe_io_exc.SplurgeSafeIoFileNotFoundError as e:
-            raise FileError(f"File not found: {path}", details=str(e.message)) from e
-        except safe_io_exc.SplurgeSafeIoFilePermissionError as e:
-            raise FileError(f"Permission denied reading {path}", details=str(e.message)) from e
-        except safe_io_exc.SplurgeSafeIoFileDecodingError as e:
-            raise FileError(f"Encoding error reading {path}", details=str(e.message)) from e
-        except safe_io_exc.SplurgeSafeIoOsError as e:
-            raise FileError(f"OS error reading {path}", details=str(e.message)) from e
-        except safe_io_exc.SplurgeSafeIoUnknownError as e:
-            raise FileError(f"Unknown error reading {path}", details=str(e.message)) from e
+        except SplurgeSafeIoPathValidationError as e:
+            raise FileError(f"Invalid file path: {path}", details={"details": str(e.message)}) from e
+        except SplurgeSafeIoFileNotFoundError as e:
+            raise FileError(f"File not found: {path}", details={"details": str(e.message)}) from e
+        except SplurgeSafeIoPermissionError as e:
+            raise FileError(f"Permission denied reading {path}", details={"details": str(e.message)}) from e
+        except SplurgeSafeIoLookupError as e:
+            raise FileError(f"Lookup error reading {path}", details={"details": str(e.message)}) from e
+        except SplurgeSafeIoUnicodeError as e:
+            raise FileError(f"Encoding error reading {path}", details={"details": str(e.message)}) from e
+        except SplurgeSafeIoOSError as e:
+            raise FileError(f"OS error reading {path}", details={"details": str(e.message)}) from e
+        except SplurgeSafeIoRuntimeError as e:
+            raise FileError(f"Runtime error reading {path}", details={"details": str(e.message)}) from e
 
     def write_text(self, path: str | Path, content: str, *, encoding: str = "utf-8") -> None:
         """
@@ -125,18 +136,18 @@ class SafeTextFileIoAdapter(FileIoAdapter):
         try:
             with open_safe_text_writer(path, encoding=encoding) as writer:
                 writer.write(content)
-        except safe_io_exc.SplurgeSafeIoPathValidationError as e:
-            raise FileError(f"Invalid file path: {path}", details=str(e.message)) from e
-        except safe_io_exc.SplurgeSafeIoFileEncodingError as e:
-            raise FileError(f"Encoding error writing to {path}", details=str(e.message)) from e
-        except safe_io_exc.SplurgeSafeIoFilePermissionError as e:
-            raise FileError(f"Permission denied writing to {path}", details=str(e.message)) from e
-        except safe_io_exc.SplurgeSafeIoOsError as e:
-            raise FileError(f"OS error writing to {path}", details=str(e.message)) from e
-        except safe_io_exc.SplurgeSafeIoFileOperationError as e:
-            raise FileError(f"File operation error writing to {path}", details=str(e.message)) from e
-        except safe_io_exc.SplurgeSafeIoUnknownError as e:
-            raise FileError(f"Unknown error writing to {path}", details=str(e.message)) from e
+        except SplurgeSafeIoPathValidationError as e:
+            raise FileError(f"Invalid file path: {path}", details={"details": str(e.message)}) from e
+        except SplurgeSafeIoUnicodeError as e:
+            raise FileError(f"Encoding error writing to {path}", details={"details": str(e.message)}) from e
+        except SplurgeSafeIoPermissionError as e:
+            raise FileError(f"Permission denied writing to {path}", details={"details": str(e.message)}) from e
+        except SplurgeSafeIoOSError as e:
+            raise FileError(f"OS error writing to {path}", details={"details": str(e.message)}) from e
+        except SplurgeSafeIoLookupError as e:
+            raise FileError(f"Lookup error writing to {path}", details={"details": str(e.message)}) from e
+        except SplurgeSafeIoRuntimeError as e:
+            raise FileError(f"Runtime error writing to {path}", details={"details": str(e.message)}) from e
 
     def exists(self, path: str | Path) -> bool:
         """
@@ -196,6 +207,6 @@ class YamlConfigReader:
             # Re-raise file errors as-is
             raise
         except yaml.YAMLError as e:
-            raise ConfigurationError(f"Invalid YAML syntax in {path}", details=str(e)) from e
+            raise ConfigurationError(f"Invalid YAML syntax in {path}", details={"details": str(e)}) from e
         except Exception as e:
-            raise ConfigurationError(f"Error reading YAML from {path}", details=str(e)) from e
+            raise ConfigurationError(f"Error reading YAML from {path}", details={"details": str(e)}) from e

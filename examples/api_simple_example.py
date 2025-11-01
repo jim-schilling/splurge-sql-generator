@@ -7,7 +7,9 @@ This example demonstrates the simplified logger approach with a working database
 
 import logging
 import os
+import shutil
 import sys
+import tempfile
 
 from sqlalchemy import create_engine, text
 
@@ -16,31 +18,29 @@ from splurge_sql_generator.utils import to_snake_case
 
 # Add the project root to the path so we can import from 'output' and the package
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.insert(0, PROJECT_ROOT)
 
 
-def _ensure_generated_classes() -> None:
-    """Generate required example classes into project-root 'output' if missing.
+def _generate_classes_to_temp() -> tuple[str]:
+    """Generate required example classes into a temporary directory.
 
-    Creates 'output' package and generates `User.py` from `examples/User.sql` when
-    the module does not exist yet. This makes the example runnable without a
-    prior CLI step.
+    Returns:
+        Temporary directory path
     """
-    output_dir = os.path.join(PROJECT_ROOT, "output")
-    os.makedirs(output_dir, exist_ok=True)
+    temp_dir = tempfile.mkdtemp()
+    
+    # Create __init__.py to make it a package
+    init_file = os.path.join(temp_dir, "__init__.py")
+    with open(init_file, "w", encoding="utf-8") as f:
+        f.write("")
 
-    init_file = os.path.join(output_dir, "__init__.py")
-    if not os.path.exists(init_file):
-        with open(init_file, "w", encoding="utf-8") as f:
-            f.write("")
-
-    # Use public utility to convert class name to snake_case
+    # Generate User class
+    sql_path = os.path.join(PROJECT_ROOT, "examples", "User.sql")
+    schema_path = os.path.join(PROJECT_ROOT, "examples", "User.schema")
     snake_case_name = to_snake_case("User")
-    user_module_path = os.path.join(output_dir, f"{snake_case_name}.py")
-    if not os.path.exists(user_module_path):
-        sql_path = os.path.join(PROJECT_ROOT, "examples", "User.sql")
-        schema_path = os.path.join(PROJECT_ROOT, "examples", "User.schema")
-        generate_class(sql_path, output_file_path=user_module_path, schema_file_path=schema_path)
+    user_module_path = os.path.join(temp_dir, f"{snake_case_name}.py")
+    generate_class(sql_path, output_file_path=user_module_path, schema_file_path=schema_path)
+    
+    return temp_dir
 
 
 def setup_logging():
@@ -97,59 +97,69 @@ def demonstrate_simplified_logger():
     # Setup logging
     setup_logging()
 
-    # Ensure generated classes and import
-    _ensure_generated_classes()
-    from output.user import User
+    # Generate classes to temporary directory
+    temp_dir = _generate_classes_to_temp()
+    
+    try:
+        # Add temp directory to path so we can import
+        sys.path.insert(0, temp_dir)
+        from user import User
 
-    # Create database
-    engine = create_test_database()
+        # Create database
+        engine = create_test_database()
 
-    with engine.connect() as connection:
-        print("1. Fetching user by ID (notice the logger output above):")
-        users = User.get_user_by_id(connection=connection, user_id=1)
+        with engine.connect() as connection:
+            print("1. Fetching user by ID (notice the logger output above):")
+            users = User.get_user_by_id(connection=connection, user_id=1)
 
-        if users:
-            user = users[0]
-            print(f"   Found user: {user.username} ({user.email})")
-        print()
+            if users:
+                user = users[0]
+                print(f"   Found user: {user.username} ({user.email})")
+            print()
 
-        print("2. Fetching users by status:")
-        active_users = User.get_users_by_status(connection=connection, status="active")
-        print(f"   Found {len(active_users)} active users")
-        for user in active_users:
-            print(f"   - {user.username}")
-        print()
+            print("2. Fetching users by status:")
+            active_users = User.get_users_by_status(connection=connection, status="active")
+            print(f"   Found {len(active_users)} active users")
+            for user in active_users:
+                print(f"   - {user.username}")
+            print()
 
-        print("3. Getting user count by status:")
-        status_counts = User.get_user_count_by_status(connection=connection)
-        for status_count in status_counts:
-            print(f"   - {status_count.status}: {status_count.user_count}")
-        print()
+            print("3. Getting user count by status:")
+            status_counts = User.get_user_count_by_status(connection=connection)
+            for status_count in status_counts:
+                print(f"   - {status_count.status}: {status_count.user_count}")
+            print()
 
-        print("4. Creating a new user (with transaction):")
-        with engine.connect() as tx_conn:
-            with tx_conn.begin():
-                result = User.create_user(
-                    connection=tx_conn,
-                    username="alice_jones",
-                    email="alice@example.com",
-                    password_hash="hashed_password_999",
-                    status="active",
-                )
-                new_user_id = result.fetchone()[0]
-                print(f"   Created user with ID: {new_user_id}")
-        print()
+            print("4. Creating a new user (with transaction):")
+            with engine.connect() as tx_conn:
+                with tx_conn.begin():
+                    result = User.create_user(
+                        connection=tx_conn,
+                        username="alice_jones",
+                        email="alice@example.com",
+                        password_hash="hashed_password_999",
+                        status="active",
+                    )
+                    new_user_id = result.fetchone()[0]
+                    print(f"   Created user with ID: {new_user_id}")
+            print()
 
-        print("5. Updating user status:")
-        with engine.connect() as tx_conn:
-            with tx_conn.begin():
-                User.update_user_status(connection=tx_conn, user_id=3, new_status="active")
-                print("   Updated user status")
-        print()
+            print("5. Updating user status:")
+            with engine.connect() as tx_conn:
+                with tx_conn.begin():
+                    User.update_user_status(connection=tx_conn, user_id=3, new_status="active")
+                    print("   Updated user status")
+            print()
 
-        print("6. Verifying the update:")
-        updated_users = User.get_users_by_status(connection=connection, status="active")
-        print(f"   Now have {len(updated_users)} active users")
+            print("6. Verifying the update:")
+            updated_users = User.get_users_by_status(connection=connection, status="active")
+            print(f"   Now have {len(updated_users)} active users")
+    
+    finally:
+        # Remove from path and cleanup
+        if temp_dir in sys.path:
+            sys.path.remove(temp_dir)
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 def show_logger_benefits():

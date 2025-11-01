@@ -476,7 +476,9 @@ class SchemaParser:
             self._logger.info(f"Successfully generated types file: '{str(output_path)}'")
         except FileError as e:
             # Re-raise FileError with original message
-            raise FileError(message=f"Error writing types file: {str(output_path)}.", details=str(e.message)) from e
+            raise FileError(
+                message=f"Error writing types file: {str(output_path)}.", details={"details": str(e.message)}
+            ) from e
 
         return str(output_path)
 

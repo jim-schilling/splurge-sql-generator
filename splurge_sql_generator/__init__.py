@@ -9,9 +9,9 @@ This package provides tools to generate Python classes with SQLAlchemy methods
 from SQL template files, with sophisticated SQL parsing and statement type detection.
 """
 
-from splurge_sql_generator.code_generator import PythonCodeGenerator
-from splurge_sql_generator.schema_parser import SchemaParser
-from splurge_sql_generator.sql_helper import (
+from .code_generator import PythonCodeGenerator
+from .schema_parser import SchemaParser
+from .sql_helper import (
     EXECUTE_STATEMENT,
     FETCH_STATEMENT,
     detect_statement_type,
@@ -19,9 +19,9 @@ from splurge_sql_generator.sql_helper import (
     remove_sql_comments,
     split_sql_file,
 )
-from splurge_sql_generator.sql_parser import SqlParser
+from .sql_parser import SqlParser
 
-__version__ = "2025.5.1"
+__version__ = "2025.6.0"
 
 __all__ = [
     # SQL Helper functions

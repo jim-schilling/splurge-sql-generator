@@ -7,7 +7,9 @@ This example demonstrates how to use the generated classes with the simplified l
 
 import logging
 import os
+import shutil
 import sys
+import tempfile
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection
@@ -15,25 +17,24 @@ from sqlalchemy.engine import Connection
 from splurge_sql_generator import generate_class
 from splurge_sql_generator.utils import to_snake_case
 
-# Add the project root to the path so we can import from 'output' and the package
+# Add the project root to the path so we can import from the package
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.insert(0, PROJECT_ROOT)
 
 
-def _ensure_generated_classes() -> None:
-    """Generate all example classes into project-root 'output' if missing.
+def _ensure_generated_classes() -> str:
+    """Generate all example classes into a temporary directory.
 
-    Ensures 'output' is a package and generates modules if not present.
+    Returns:
+        Path to the temporary directory containing generated classes
     """
-    output_dir = os.path.join(PROJECT_ROOT, "output")
-    os.makedirs(output_dir, exist_ok=True)
+    temp_dir = tempfile.mkdtemp()
+    
+    # Create __init__.py to make it a package
+    init_file = os.path.join(temp_dir, "__init__.py")
+    with open(init_file, "w", encoding="utf-8") as f:
+        f.write("")
 
-    init_file = os.path.join(output_dir, "__init__.py")
-    if not os.path.exists(init_file):
-        with open(init_file, "w", encoding="utf-8") as f:
-            f.write("")
-
-    # Generate each required module if missing
+    # Generate each required module
     mapping = {
         "User": (
             os.path.join(PROJECT_ROOT, "examples", "User.sql"),
@@ -51,9 +52,10 @@ def _ensure_generated_classes() -> None:
 
     for module_name, (sql_path, schema_path) in mapping.items():
         snake_case_name = to_snake_case(module_name)
-        py_path = os.path.join(output_dir, f"{snake_case_name}.py")
-        if not os.path.exists(py_path):
-            generate_class(sql_path, output_file_path=py_path, schema_file_path=schema_path)
+        py_path = os.path.join(temp_dir, f"{snake_case_name}.py")
+        generate_class(sql_path, output_file_path=py_path, schema_file_path=schema_path)
+    
+    return temp_dir
 
 
 def setup_database():
@@ -147,7 +149,7 @@ def setup_logging():
 def demonstrate_user_operations(connection: Connection):
     """Demonstrate User class operations with simplified logger."""
     print("\n=== User Operations ===")
-    from output.user import User  # local import after generation
+    from user import User  # local import after generation
 
     # Create users
     with connection.begin():
@@ -185,7 +187,7 @@ def demonstrate_user_operations(connection: Connection):
 def demonstrate_product_operations(connection: Connection):
     """Demonstrate ProductRepository class operations."""
     print("\n=== Product Operations ===")
-    from output.product_repository import (
+    from product_repository import (
         ProductRepository,
     )  # local import after generation
 
@@ -227,7 +229,7 @@ def demonstrate_product_operations(connection: Connection):
 def demonstrate_order_operations(connection: Connection):
     """Demonstrate OrderService class operations."""
     print("\n=== Order Operations ===")
-    from output.order_service import OrderService  # local import after generation
+    from order_service import OrderService  # local import after generation
 
     # Create an order
     with connection.begin():
@@ -267,32 +269,42 @@ def main():
     # Setup logging to see the class-level loggers in action
     setup_logging()
 
-    # Ensure generated classes and import
-    _ensure_generated_classes()
+    # Generate classes to temporary directory
+    temp_dir = _ensure_generated_classes()
+    
+    try:
+        # Add temp directory to path so we can import
+        sys.path.insert(0, temp_dir)
 
-    # Create database and tables
-    engine = setup_database()
+        # Create database and tables
+        engine = setup_database()
 
-    # Demonstrate the simplified logger approach
-    demonstrate_logger_behavior()
+        # Demonstrate the simplified logger approach
+        demonstrate_logger_behavior()
 
-    # Use separate connections to avoid nested/implicit transaction conflicts
-    with engine.connect() as connection:
-        demonstrate_user_operations(connection)
+        # Use separate connections to avoid nested/implicit transaction conflicts
+        with engine.connect() as connection:
+            demonstrate_user_operations(connection)
 
-    with engine.connect() as connection:
-        demonstrate_product_operations(connection)
+        with engine.connect() as connection:
+            demonstrate_product_operations(connection)
 
-    with engine.connect() as connection:
-        demonstrate_order_operations(connection)
+        with engine.connect() as connection:
+            demonstrate_order_operations(connection)
 
-    print("\n" + "=" * 50)
-    print("Example completed successfully!")
-    print("\nKey benefits of the simplified logger approach:")
-    print("- Cleaner method signatures (no optional logger parameter)")
-    print("- Consistent logging behavior across all methods")
-    print("- Class-level logger follows Python best practices")
-    print("- Reduced complexity in generated code")
+        print("\n" + "=" * 50)
+        print("Example completed successfully!")
+        print("\nKey benefits of the simplified logger approach:")
+        print("- Cleaner method signatures (no optional logger parameter)")
+        print("- Consistent logging behavior across all methods")
+        print("- Class-level logger follows Python best practices")
+        print("- Reduced complexity in generated code")
+
+    finally:
+        # Remove from path and cleanup
+        if temp_dir in sys.path:
+            sys.path.remove(temp_dir)
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 if __name__ == "__main__":

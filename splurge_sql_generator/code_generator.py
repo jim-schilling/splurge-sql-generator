@@ -13,11 +13,11 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
-from splurge_sql_generator.exceptions import FileError, SqlValidationError
-from splurge_sql_generator.file_utils import SafeTextFileIoAdapter
-from splurge_sql_generator.schema_parser import SchemaParser
-from splurge_sql_generator.sql_parser import SqlParser
-from splurge_sql_generator.utils import to_snake_case
+from .exceptions import FileError, SqlValidationError
+from .file_utils import SafeTextFileIoAdapter
+from .schema_parser import SchemaParser
+from .sql_parser import SqlParser
+from .utils import to_snake_case
 
 DOMAINS = ["code", "generator"]
 

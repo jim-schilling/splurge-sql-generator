@@ -1,5 +1,18 @@
 ## Changelog
 
+### [2025.6.0] - 2025-10-27
+
+#### Updated
+- **Dependency version constraint**: Updated `splurge-safe-io` dependency in `pyproject.toml` to restrict to `>=2025.3.0,<2025.4.0` to avoid compatibility issues with future major releases.
+
+#### Added
+- **Added `splurge-exceptions` dependency**: Introduced `splurge-exceptions>=2025.2.0,<2025.3.0` as a new dependency to standardize exception handling across Splurge projects.
+
+#### Changed
+- Updated internal error handling to utilize `splurge-exceptions` for consistent exception types and messages across the codebase.
+- `SplurgeSqlGeneratorError` now inherits from `splurge_exceptions.SplurgeFrameworkError` for unified exception hierarchy.
+- Updated tests and documentation to reflect the new exception handling approach.
+
 ### [2025.5.1] - 2025-10-27
 
 #### Updated
