@@ -1,7 +1,7 @@
 import pytest
 import yaml
 
-from splurge_sql_generator.exceptions import ConfigurationError
+from splurge_sql_generator.exceptions import SplurgeSqlGeneratorConfigurationError
 from splurge_sql_generator.file_utils import SafeTextFileIoAdapter, YamlConfigReader
 
 
@@ -31,7 +31,7 @@ def test_yaml_config_reader_syntax_error_raises(tmp_path):
     # Intentionally broken YAML that should raise YAMLError
     p.write_text(":\n -", encoding="utf-8")
     reader = YamlConfigReader()
-    with pytest.raises(ConfigurationError):
+    with pytest.raises(SplurgeSqlGeneratorConfigurationError):
         reader.read(p)
 
 

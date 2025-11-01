@@ -10,5 +10,5 @@ def test_exceptions_inheritance_and_attributes():
     fe = exceptions.FileError("file", details={"type": "file"})
     assert isinstance(fe, exceptions.SplurgeSqlGeneratorError)
 
-    se = exceptions.SqlValidationError("sql")
+    se = exceptions.SplurgeSqlGeneratorSqlValidationError("sql")
     assert isinstance(se, exceptions.SplurgeSqlGeneratorError)

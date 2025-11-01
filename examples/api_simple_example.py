@@ -20,14 +20,14 @@ from splurge_sql_generator.utils import to_snake_case
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
-def _generate_classes_to_temp() -> tuple[str]:
+def _generate_classes_to_temp() -> str:
     """Generate required example classes into a temporary directory.
 
     Returns:
         Temporary directory path
     """
     temp_dir = tempfile.mkdtemp()
-    
+
     # Create __init__.py to make it a package
     init_file = os.path.join(temp_dir, "__init__.py")
     with open(init_file, "w", encoding="utf-8") as f:
@@ -39,7 +39,7 @@ def _generate_classes_to_temp() -> tuple[str]:
     snake_case_name = to_snake_case("User")
     user_module_path = os.path.join(temp_dir, f"{snake_case_name}.py")
     generate_class(sql_path, output_file_path=user_module_path, schema_file_path=schema_path)
-    
+
     return temp_dir
 
 
@@ -99,7 +99,7 @@ def demonstrate_simplified_logger():
 
     # Generate classes to temporary directory
     temp_dir = _generate_classes_to_temp()
-    
+
     try:
         # Add temp directory to path so we can import
         sys.path.insert(0, temp_dir)
@@ -154,7 +154,7 @@ def demonstrate_simplified_logger():
             print("6. Verifying the update:")
             updated_users = User.get_users_by_status(connection=connection, status="active")
             print(f"   Now have {len(updated_users)} active users")
-    
+
     finally:
         # Remove from path and cleanup
         if temp_dir in sys.path:

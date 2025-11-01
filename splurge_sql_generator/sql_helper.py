@@ -17,12 +17,12 @@ import sqlparse
 from sqlparse.sql import Statement, Token
 from sqlparse.tokens import Comment, Literal, Name
 
-from splurge_sql_generator.exceptions import (
-    FileError,
-    SqlValidationError,
+from .exceptions import (
+    SplurgeSqlGeneratorFileError,
+    SplurgeSqlGeneratorSqlValidationError,
 )
-from splurge_sql_generator.file_utils import SafeTextFileIoAdapter
-from splurge_sql_generator.utils import clean_sql_type, is_empty_or_whitespace, normalize_string
+from .file_utils import SafeTextFileIoAdapter
+from .utils import clean_sql_type, is_empty_or_whitespace, normalize_string
 
 DOMAINS = ["sql", "helper"]
 _LOGGER = logging.getLogger(__name__)
@@ -447,7 +447,7 @@ def extract_create_table_statements(sql_content: str) -> list[tuple[str, str]]:
         List of tuples containing (table_name, table_body) for each CREATE TABLE found
 
     Raises:
-        SqlValidationError: If sqlparse fails to parse the content or encounters malformed CREATE TABLE statements
+        SplurgeSqlGeneratorSqlValidationError: If sqlparse fails to parse the content or encounters malformed CREATE TABLE statements
     """
     # Validate input
     if not sql_content:
@@ -502,7 +502,7 @@ def extract_create_table_statements(sql_content: str) -> list[tuple[str, str]]:
         return create_tables
 
     except Exception as e:
-        raise SqlValidationError(f"Failed to parse CREATE TABLE statements: {e}") from e
+        raise SplurgeSqlGeneratorSqlValidationError(f"Failed to parse CREATE TABLE statements: {e}") from e
 
 
 def _is_identifier_token(token: Token) -> bool:
@@ -733,7 +733,7 @@ def parse_table_columns(table_body: str) -> dict[str, str]:
         Dictionary mapping column names (lowercase) to normalized SQL types
 
     Raises:
-        SqlValidationError: If the table body cannot be parsed with sqlparse or if no valid columns are found
+        SplurgeSqlGeneratorSqlValidationError: If the table body cannot be parsed with sqlparse or if no valid columns are found
 
     Examples:
         >>> parse_table_columns("id INTEGER PRIMARY KEY, name VARCHAR(255) NOT NULL")
@@ -744,18 +744,17 @@ def parse_table_columns(table_body: str) -> dict[str, str]:
     """
     # Validate input
     if is_empty_or_whitespace(table_body):
-        raise SqlValidationError("Table body cannot be None or empty")
+        raise SplurgeSqlGeneratorSqlValidationError("Table body cannot be None or empty")
 
     table_body = normalize_string(table_body)
     if is_empty_or_whitespace(table_body):
-        raise SqlValidationError("No valid column definitions found in table body")
-
+        raise SplurgeSqlGeneratorSqlValidationError("No valid column definitions found in table body")
     columns: dict[str, str] = {}
 
     # Parse the table body as a SQL fragment
     parsed = sqlparse.parse(table_body)
     if not parsed:
-        raise SqlValidationError("Failed to parse table body with sqlparse")
+        raise SplurgeSqlGeneratorSqlValidationError("Failed to parse table body with sqlparse")
 
     # Get tokens from the parsed statement
     tokens = list(parsed[0].flatten())
@@ -774,7 +773,7 @@ def parse_table_columns(table_body: str) -> dict[str, str]:
 
     # If no valid columns were parsed, raise an error
     if not valid_columns_found:
-        raise SqlValidationError("No valid column definitions found in table body")
+        raise SplurgeSqlGeneratorSqlValidationError("No valid column definitions found in table body")
 
     return columns
 
@@ -901,7 +900,7 @@ def extract_table_names(sql_query: str) -> list[str]:
         List of table names found in the query (in lowercase)
 
     Raises:
-        SqlValidationError: If the SQL query cannot be parsed with sqlparse
+        SplurgeSqlGeneratorSqlValidationError: If the SQL query cannot be parsed with sqlparse
 
     Examples:
         >>> extract_table_names("SELECT * FROM users WHERE id = :id")
@@ -931,7 +930,7 @@ def extract_table_names(sql_query: str) -> list[str]:
 
     # Check if parsing was successful
     if not parsed:
-        raise SqlValidationError("Failed to parse SQL query with sqlparse")
+        raise SplurgeSqlGeneratorSqlValidationError("Failed to parse SQL query with sqlparse")
 
     for statement in parsed:
         # Extract table names from the statement
@@ -940,7 +939,7 @@ def extract_table_names(sql_query: str) -> list[str]:
 
     # If no table names were found, the SQL might be malformed
     if not table_names:
-        raise SqlValidationError("No table names found in SQL query - possible malformed SQL")
+        raise SplurgeSqlGeneratorSqlValidationError("No table names found in SQL query - possible malformed SQL")
 
     # Return unique table names in lowercase
     return list(table_names)
@@ -1023,12 +1022,12 @@ def split_sql_file(
         - Optionally without trailing semicolons
 
     Raises:
-        SqlFileError: If file operations fail, including:
+        SplurgeSqlGeneratorFileError: If file operations fail, including:
             - File not found
             - Permission denied
             - I/O errors during reading
             - Encoding errors (non-UTF-8 content)
-        SqlValidationError: If input validation fails:
+        SplurgeSqlGeneratorSqlValidationError: If input validation fails:
             - file_path is None
             - file_path is empty string
             - file_path is not string or Path object
@@ -1106,7 +1105,7 @@ def parse_sql_file(
         - Optionally without trailing semicolons
 
     Raises:
-        FileError: If file operations fail, including:
+        SplurgeSqlGeneratorFileError: If file operations fail, including:
             - SQL file path is invalid
             - SQL file not found
             - Permission denied reading SQL file
@@ -1114,6 +1113,10 @@ def parse_sql_file(
             - I/O error reading SQL file
             - Unknown error reading SQL file
             - Unexpected error reading SQL file
+        SplurgeSqlGeneratorSqlValidationError: If input validation fails:
+            - file_path is None
+            - file_path is empty string
+            - file_path is not string or Path object
 
     Examples:
         Basic usage:
@@ -1153,13 +1156,13 @@ def parse_sql_file(
     """
     # Basic input validation for cases SafeTextFileIoAdapter doesn't handle
     if file_path is None:
-        raise SqlValidationError("file_path cannot be None")
+        raise SplurgeSqlGeneratorSqlValidationError("file_path cannot be None")
 
     if not isinstance(file_path, str | Path):
-        raise SqlValidationError("file_path must be a string or Path object")
+        raise SplurgeSqlGeneratorSqlValidationError("file_path must be a string or Path object")
 
     if not file_path:
-        raise SqlValidationError("file_path cannot be empty")
+        raise SplurgeSqlGeneratorSqlValidationError("file_path cannot be empty")
 
     try:
         file_io = SafeTextFileIoAdapter()
@@ -1175,10 +1178,10 @@ def parse_sql_file(
 
         return parse_sql_statements(sql_content, strip_semicolon=strip_semicolon)
 
-    except FileError as e:
+    except SplurgeSqlGeneratorFileError as e:
         # Enhance error message with SQL-specific context
         if "not found" in str(e.message).lower():
-            raise FileError(f"SQL file not found: {file_path}") from e
+            raise SplurgeSqlGeneratorFileError(f"SQL file not found: {file_path}") from e
         raise
     except Exception as exc:
-        raise FileError(f"Unexpected error reading SQL file: {file_path}") from exc
+        raise SplurgeSqlGeneratorFileError(f"Unexpected error reading SQL file: {file_path}") from exc

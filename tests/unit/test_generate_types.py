@@ -156,9 +156,9 @@ def test_generate_types_file_directory_creation():
 
 def test_generate_types_file_error_handling():
     """Test error handling when file cannot be written."""
-    from splurge_sql_generator.exceptions import FileError
+    from splurge_sql_generator.exceptions import SplurgeSqlGeneratorFileError
 
     # Try to write to a directory (which should fail)
     with tempfile.TemporaryDirectory() as temp_dir:
-        with pytest.raises(FileError):
+        with pytest.raises(SplurgeSqlGeneratorFileError):
             generate_types_file(output_path=temp_dir)

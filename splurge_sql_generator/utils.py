@@ -14,7 +14,11 @@ import re
 from pathlib import Path
 from typing import Any
 
-from splurge_sql_generator.exceptions import SqlValidationError
+from .exceptions import (
+    SplurgeSqlGeneratorFileNotFoundError,
+    SplurgeSqlGeneratorSqlValidationError,
+    SplurgeSqlGeneratorValueError,
+)
 
 DOMAINS = ["util"]
 
@@ -116,19 +120,23 @@ def validate_python_identifier(name: str, *, context: str = "identifier", file_p
         file_path: Optional file path for error context
 
     Raises:
-        ValueError: If name is not a valid Python identifier
+        SplurgeSqlGeneratorValueError: If name is not a valid Python identifier
     """
     if not name:
         file_context = f" in {file_path}" if file_path else ""
-        raise ValueError(f"{context.capitalize()} cannot be empty{file_context}")
+        raise SplurgeSqlGeneratorValueError(f"{context.capitalize()} cannot be empty{file_context}")
 
     if not name.isidentifier():
         file_context = f" in {file_path}" if file_path else ""
-        raise ValueError(f"{context.capitalize()} must be a valid Python identifier{file_context}: {name}")
+        raise SplurgeSqlGeneratorValueError(
+            f"{context.capitalize()} must be a valid Python identifier{file_context}: {name}"
+        )
 
     if keyword.iskeyword(name):
         file_context = f" in {file_path}" if file_path else ""
-        raise ValueError(f"{context.capitalize()} cannot be a reserved keyword{file_context}: {name}")
+        raise SplurgeSqlGeneratorValueError(
+            f"{context.capitalize()} cannot be a reserved keyword{file_context}: {name}"
+        )
 
 
 class InputValidator:
@@ -147,14 +155,14 @@ class InputValidator:
             Validated Path object
 
         Raises:
-            ValueError: If path is not a .sql file
-            FileNotFoundError: If file doesn't exist
+            SplurgeSqlGeneratorValueError: If path is not a .sql file
+            SplurgeSqlGeneratorFileNotFoundError: If file doesn't exist
         """
         p = Path(path)
         if p.suffix.lower() != ".sql":
-            raise ValueError(f"{context} must have .sql extension, got: {path}")
+            raise SplurgeSqlGeneratorValueError(f"{context} must have .sql extension, got: {path}")
         if not p.exists():
-            raise FileNotFoundError(f"{context} not found: {path}")
+            raise SplurgeSqlGeneratorFileNotFoundError(f"{context} not found: {path}")
         return p
 
     @staticmethod
@@ -170,10 +178,10 @@ class InputValidator:
             Stripped SQL content
 
         Raises:
-            SqlValidationError: If content is empty or whitespace-only
+            SplurgeSqlGeneratorSqlValidationError: If content is empty or whitespace-only
         """
         if not content or not content.strip():
-            raise SqlValidationError(f"{context} cannot be empty or whitespace-only")
+            raise SplurgeSqlGeneratorSqlValidationError(f"{context} cannot be empty or whitespace-only")
         return content.strip()
 
     @staticmethod
@@ -189,16 +197,16 @@ class InputValidator:
             Validated identifier
 
         Raises:
-            ValueError: If name is not a valid Python identifier
+            SplurgeSqlGeneratorValueError: If name is not a valid Python identifier
         """
         if not name:
-            raise ValueError(f"{context.capitalize()} cannot be empty")
+            raise SplurgeSqlGeneratorValueError(f"{context.capitalize()} cannot be empty")
 
         if not name.isidentifier():
-            raise ValueError(f"{context.capitalize()} must be valid Python identifier: {name}")
+            raise SplurgeSqlGeneratorValueError(f"{context.capitalize()} must be valid Python identifier: {name}")
 
         if keyword.iskeyword(name):
-            raise ValueError(f"{context.capitalize()} cannot be reserved keyword: {name}")
+            raise SplurgeSqlGeneratorValueError(f"{context.capitalize()} cannot be reserved keyword: {name}")
 
         return name
 

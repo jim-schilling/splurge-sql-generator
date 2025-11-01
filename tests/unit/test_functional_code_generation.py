@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from splurge_sql_generator.code_generator import PythonCodeGenerator
+from splurge_sql_generator.exceptions import SplurgeSqlGeneratorTypeError
 from tests.unit.test_utils import (
     assert_generated_code_structure,
     assert_method_parameters,
@@ -220,10 +221,10 @@ SELECT * FROM users WHERE id = :user_id;
 
     def test_error_handling_with_invalid_files(self) -> None:
         """Test error handling with invalid or missing files."""
-        from splurge_sql_generator.exceptions import FileError
+        from splurge_sql_generator.exceptions import SplurgeSqlGeneratorFileError
 
         # Test with non-existent file
-        with pytest.raises(FileError):
+        with pytest.raises(SplurgeSqlGeneratorFileError):
             self.generator.generate_class("nonexistent_file.sql", schema_file_path="nonexistent.schema")
 
         # Test with valid SQL but missing schema (should fail now)
@@ -236,7 +237,7 @@ SELECT * FROM test_table WHERE id = :id;
         sql_file.write_text(valid_sql)
 
         # Should fail without schema file (schema files are required)
-        with pytest.raises(TypeError, match="Schema file path must be provided and cannot be None"):
+        with pytest.raises(SplurgeSqlGeneratorTypeError, match="Schema file path must be provided and cannot be None"):
             self.generator.generate_class(str(sql_file), schema_file_path=None)
 
     def test_schema_required_validation(self) -> None:

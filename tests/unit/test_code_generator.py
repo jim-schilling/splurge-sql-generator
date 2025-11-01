@@ -106,9 +106,9 @@ SELECT 2;
 
 
 def test_generate_class_invalid_file(generator, parser):
-    from splurge_sql_generator.exceptions import FileError
+    from splurge_sql_generator.exceptions import SplurgeSqlGeneratorFileError
 
-    with pytest.raises(FileError):
+    with pytest.raises(SplurgeSqlGeneratorFileError):
         generator.generate_class("nonexistent_file.sql", schema_file_path="nonexistent.schema")
 
 

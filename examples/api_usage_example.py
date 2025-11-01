@@ -28,7 +28,7 @@ def _ensure_generated_classes() -> str:
         Path to the temporary directory containing generated classes
     """
     temp_dir = tempfile.mkdtemp()
-    
+
     # Create __init__.py to make it a package
     init_file = os.path.join(temp_dir, "__init__.py")
     with open(init_file, "w", encoding="utf-8") as f:
@@ -54,7 +54,7 @@ def _ensure_generated_classes() -> str:
         snake_case_name = to_snake_case(module_name)
         py_path = os.path.join(temp_dir, f"{snake_case_name}.py")
         generate_class(sql_path, output_file_path=py_path, schema_file_path=schema_path)
-    
+
     return temp_dir
 
 
@@ -146,7 +146,7 @@ def setup_logging():
     )
 
 
-def demonstrate_user_operations(connection: Connection):
+def demonstrate_user_operations(connection: Connection) -> None:
     """Demonstrate User class operations with simplified logger."""
     print("\n=== User Operations ===")
     from user import User  # local import after generation
@@ -184,7 +184,7 @@ def demonstrate_user_operations(connection: Connection):
         print(f"  - {status_count.status}: {status_count.user_count}")
 
 
-def demonstrate_product_operations(connection: Connection):
+def demonstrate_product_operations(connection: Connection) -> None:
     """Demonstrate ProductRepository class operations."""
     print("\n=== Product Operations ===")
     from product_repository import (
@@ -226,7 +226,7 @@ def demonstrate_product_operations(connection: Connection):
         print(f"  - {product.name}: {product.stock_quantity} in stock")
 
 
-def demonstrate_order_operations(connection: Connection):
+def demonstrate_order_operations(connection: Connection) -> None:
     """Demonstrate OrderService class operations."""
     print("\n=== Order Operations ===")
     from order_service import OrderService  # local import after generation
@@ -271,7 +271,7 @@ def main():
 
     # Generate classes to temporary directory
     temp_dir = _ensure_generated_classes()
-    
+
     try:
         # Add temp directory to path so we can import
         sys.path.insert(0, temp_dir)

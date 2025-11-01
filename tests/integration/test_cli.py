@@ -6,17 +6,16 @@ import tempfile
 
 from tests.unit.test_utils import create_basic_schema, create_sql_with_schema
 
-SCRIPT = os.path.join(os.path.dirname(__file__), "..", "..", "splurge_sql_generator", "cli.py")
-
 
 def run_cli(args, input_sql=None):
-    cmd = [sys.executable, SCRIPT] + args
+    """Run the CLI as a module rather than as a script."""
+    cmd = [sys.executable, "-m", "splurge_sql_generator.cli"] + args
     if input_sql:
         with tempfile.NamedTemporaryFile("w+", delete=False, suffix=".sql") as f:
             f.write(input_sql)
             fname = f.name
         args = [fname] + args[1:]
-        cmd = [sys.executable, SCRIPT] + args
+        cmd = [sys.executable, "-m", "splurge_sql_generator.cli"] + args
     result = subprocess.run(cmd, capture_output=True, text=True)
     if input_sql:
         os.remove(fname)
@@ -26,7 +25,7 @@ def run_cli(args, input_sql=None):
 def test_cli_help():
     """Test CLI help output."""
     result = subprocess.run(
-        [sys.executable, SCRIPT, "--help"],
+        [sys.executable, "-m", "splurge_sql_generator.cli", "--help"],
         capture_output=True,
         text=True,
     )
@@ -379,7 +378,7 @@ def test_cli_large_sql_file(tmp_path):
 def test_cli_no_arguments():
     """Test CLI with no arguments."""
     result = subprocess.run(
-        [sys.executable, SCRIPT],
+        [sys.executable, "-m", "splurge_sql_generator.cli"],
         capture_output=True,
         text=True,
     )
@@ -390,7 +389,7 @@ def test_cli_no_arguments():
 def test_cli_invalid_option():
     """Test CLI with invalid option."""
     result = subprocess.run(
-        [sys.executable, SCRIPT, "--invalid-option"],
+        [sys.executable, "-m", "splurge_sql_generator.cli", "--invalid-option"],
         capture_output=True,
         text=True,
     )

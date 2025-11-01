@@ -16,8 +16,6 @@ from typing import Any
 
 import yaml  # type: ignore[import-untyped]
 
-from splurge_sql_generator.exceptions import ConfigurationError, FileError
-
 from ._vendor.splurge_safe_io.exceptions import (
     SplurgeSafeIoFileNotFoundError,
     SplurgeSafeIoLookupError,
@@ -29,6 +27,7 @@ from ._vendor.splurge_safe_io.exceptions import (
 )
 from ._vendor.splurge_safe_io.safe_text_file_reader import SafeTextFileReader
 from ._vendor.splurge_safe_io.safe_text_file_writer import open_safe_text_writer
+from .exceptions import SplurgeSqlGeneratorConfigurationError, SplurgeSqlGeneratorFileError
 
 DOMAINS = ["file", "utilities"]
 
@@ -49,7 +48,7 @@ class FileIoAdapter(ABC):
             File contents as string
 
         Raises:
-            FileError: If file cannot be read
+            SplurgeSqlGeneratorFileError: If file cannot be read
         """
 
     @abstractmethod
@@ -63,7 +62,7 @@ class FileIoAdapter(ABC):
             encoding: Text encoding (default: utf-8)
 
         Raises:
-            FileError: If file cannot be written
+            SplurgeSqlGeneratorFileError: If file cannot be written
         """
 
     @abstractmethod
@@ -98,28 +97,36 @@ class SafeTextFileIoAdapter(FileIoAdapter):
             File contents as string
 
         Raises:
-            FileError: If file cannot be read
+            SplurgeSqlGeneratorFileError: If file cannot be read
         """
         try:
             reader = SafeTextFileReader(path, encoding=encoding)
             content = reader.read()
             if not isinstance(content, str):
-                raise FileError(f"Unexpected return type from SafeTextFileReader: {type(content)}")
+                raise SplurgeSqlGeneratorFileError(f"Unexpected return type from SafeTextFileReader: {type(content)}")
             return content
         except SplurgeSafeIoPathValidationError as e:
-            raise FileError(f"Invalid file path: {path}", details={"details": str(e.message)}) from e
+            raise SplurgeSqlGeneratorFileError(f"Invalid file path: {path}", details={"details": str(e.message)}) from e
         except SplurgeSafeIoFileNotFoundError as e:
-            raise FileError(f"File not found: {path}", details={"details": str(e.message)}) from e
+            raise SplurgeSqlGeneratorFileError(f"File not found: {path}", details={"details": str(e.message)}) from e
         except SplurgeSafeIoPermissionError as e:
-            raise FileError(f"Permission denied reading {path}", details={"details": str(e.message)}) from e
+            raise SplurgeSqlGeneratorFileError(
+                f"Permission denied reading {path}", details={"details": str(e.message)}
+            ) from e
         except SplurgeSafeIoLookupError as e:
-            raise FileError(f"Lookup error reading {path}", details={"details": str(e.message)}) from e
+            raise SplurgeSqlGeneratorFileError(
+                f"Lookup error reading {path}", details={"details": str(e.message)}
+            ) from e
         except SplurgeSafeIoUnicodeError as e:
-            raise FileError(f"Encoding error reading {path}", details={"details": str(e.message)}) from e
+            raise SplurgeSqlGeneratorFileError(
+                f"Encoding error reading {path}", details={"details": str(e.message)}
+            ) from e
         except SplurgeSafeIoOSError as e:
-            raise FileError(f"OS error reading {path}", details={"details": str(e.message)}) from e
+            raise SplurgeSqlGeneratorFileError(f"OS error reading {path}", details={"details": str(e.message)}) from e
         except SplurgeSafeIoRuntimeError as e:
-            raise FileError(f"Runtime error reading {path}", details={"details": str(e.message)}) from e
+            raise SplurgeSqlGeneratorFileError(
+                f"Runtime error reading {path}", details={"details": str(e.message)}
+            ) from e
 
     def write_text(self, path: str | Path, content: str, *, encoding: str = "utf-8") -> None:
         """
@@ -131,23 +138,33 @@ class SafeTextFileIoAdapter(FileIoAdapter):
             encoding: Text encoding (default: utf-8)
 
         Raises:
-            FileError: If file cannot be written
+            SplurgeSqlGeneratorFileError: If file cannot be written
         """
         try:
             with open_safe_text_writer(path, encoding=encoding) as writer:
                 writer.write(content)
         except SplurgeSafeIoPathValidationError as e:
-            raise FileError(f"Invalid file path: {path}", details={"details": str(e.message)}) from e
+            raise SplurgeSqlGeneratorFileError(f"Invalid file path: {path}", details={"details": str(e.message)}) from e
         except SplurgeSafeIoUnicodeError as e:
-            raise FileError(f"Encoding error writing to {path}", details={"details": str(e.message)}) from e
+            raise SplurgeSqlGeneratorFileError(
+                f"Encoding error writing to {path}", details={"details": str(e.message)}
+            ) from e
         except SplurgeSafeIoPermissionError as e:
-            raise FileError(f"Permission denied writing to {path}", details={"details": str(e.message)}) from e
+            raise SplurgeSqlGeneratorFileError(
+                f"Permission denied writing to {path}", details={"details": str(e.message)}
+            ) from e
         except SplurgeSafeIoOSError as e:
-            raise FileError(f"OS error writing to {path}", details={"details": str(e.message)}) from e
+            raise SplurgeSqlGeneratorFileError(
+                f"OS error writing to {path}", details={"details": str(e.message)}
+            ) from e
         except SplurgeSafeIoLookupError as e:
-            raise FileError(f"Lookup error writing to {path}", details={"details": str(e.message)}) from e
+            raise SplurgeSqlGeneratorFileError(
+                f"Lookup error writing to {path}", details={"details": str(e.message)}
+            ) from e
         except SplurgeSafeIoRuntimeError as e:
-            raise FileError(f"Runtime error writing to {path}", details={"details": str(e.message)}) from e
+            raise SplurgeSqlGeneratorFileError(
+                f"Runtime error writing to {path}", details={"details": str(e.message)}
+            ) from e
 
     def exists(self, path: str | Path) -> bool:
         """
@@ -186,8 +203,8 @@ class YamlConfigReader:
             Parsed YAML content as dictionary
 
         Raises:
-            FileError: If file cannot be read
-            ConfigurationError: If YAML is invalid or not a dictionary
+            SplurgeSqlGeneratorFileError: If file cannot be read
+            SplurgeSqlGeneratorConfigurationError: If YAML is invalid or not a dictionary
         """
         try:
             content = self._file_io.read_text(path)
@@ -203,10 +220,14 @@ class YamlConfigReader:
             self._logger.debug(f"Successfully loaded {len(parsed)} entries from YAML file: {path}")
             return parsed
 
-        except FileError:
+        except SplurgeSqlGeneratorFileError:
             # Re-raise file errors as-is
             raise
         except yaml.YAMLError as e:
-            raise ConfigurationError(f"Invalid YAML syntax in {path}", details={"details": str(e)}) from e
+            raise SplurgeSqlGeneratorConfigurationError(
+                f"Invalid YAML syntax in {path}", details={"details": str(e)}
+            ) from e
         except Exception as e:
-            raise ConfigurationError(f"Error reading YAML from {path}", details={"details": str(e)}) from e
+            raise SplurgeSqlGeneratorConfigurationError(
+                f"Error reading YAML from {path}", details={"details": str(e)}
+            ) from e

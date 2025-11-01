@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from splurge_sql_generator.exceptions import SplurgeSqlGeneratorValueError
 from splurge_sql_generator.utils import (
     clean_sql_type,
     find_files_by_extension,
@@ -42,15 +43,15 @@ def test_validate_python_identifier():
     validate_python_identifier("foo_bar", context="name")
 
     # invalid empty
-    with pytest.raises(ValueError):
+    with pytest.raises(SplurgeSqlGeneratorValueError):
         validate_python_identifier("", context="name")
 
     # invalid non-identifier
-    with pytest.raises(ValueError):
+    with pytest.raises(SplurgeSqlGeneratorValueError):
         validate_python_identifier("1abc", context="name")
 
     # reserved keyword
-    with pytest.raises(ValueError):
+    with pytest.raises(SplurgeSqlGeneratorValueError):
         validate_python_identifier("class", context="name")
 
 

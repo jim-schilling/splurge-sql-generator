@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from splurge_sql_generator.exceptions import SqlValidationError
+from splurge_sql_generator.exceptions import SplurgeSqlGeneratorSqlValidationError
 from splurge_sql_generator.sql_helper import (
     EXECUTE_STATEMENT,
     FETCH_STATEMENT,
@@ -371,11 +371,11 @@ class TestSqlHelperPublicAPI:
         # Missing closing parenthesis
         sql = "CREATE TABLE users (id INTEGER"
 
-        # Should handle gracefully or raise SqlValidationError
+        # Should handle gracefully or raise SplurgeSqlGeneratorSqlValidationError(
         try:
             tables = extract_create_table_statements(sql)
             assert tables == []
-        except SqlValidationError:
+        except SplurgeSqlGeneratorSqlValidationError:
             pass  # Also acceptable behavior
 
     def test_extract_create_table_statements_with_comments(self):
@@ -469,7 +469,7 @@ class TestSqlHelperPublicAPI:
         # Table body with only constraint definitions, no actual columns
         table_body = "CONSTRAINT pk_id PRIMARY KEY (id), CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id)"
 
-        with pytest.raises(SqlValidationError):
+        with pytest.raises(SplurgeSqlGeneratorSqlValidationError):
             parse_table_columns(table_body)
 
     # These test cases removed because the inputs are actually valid SQL
@@ -477,7 +477,7 @@ class TestSqlHelperPublicAPI:
 
     def test_parse_table_columns_empty_body(self):
         """Test parse_table_columns with empty table body."""
-        with pytest.raises(SqlValidationError):
+        with pytest.raises(SplurgeSqlGeneratorSqlValidationError):
             parse_table_columns("")
 
     def test_parse_table_columns_single_column(self):
@@ -566,7 +566,7 @@ class TestSqlHelperPublicAPI:
     def test_extract_table_names_no_tables(self):
         """Test extract_table_names with SQL that has no table references."""
         sql = "SELECT 1 as value"
-        with pytest.raises(SqlValidationError):
+        with pytest.raises(SplurgeSqlGeneratorSqlValidationError):
             extract_table_names(sql)
 
     def test_split_sql_file_basic(self):
@@ -628,9 +628,9 @@ class TestSqlHelperPublicAPI:
 
     def test_split_sql_file_nonexistent(self):
         """Test split_sql_file with nonexistent file."""
-        from splurge_sql_generator.exceptions import FileError
+        from splurge_sql_generator.exceptions import SplurgeSqlGeneratorFileError
 
-        with pytest.raises(FileError):
+        with pytest.raises(SplurgeSqlGeneratorFileError):
             split_sql_file("nonexistent_file.sql")
 
     def test_split_sql_file_empty_content(self):
@@ -724,11 +724,11 @@ class TestSqlHelperPublicAPI:
         assert result == EXECUTE_STATEMENT
 
     def test_extract_table_names_sqlparse_failure(self):
-        """Test extract_table_names raises SqlValidationError when sqlparse fails."""
+        """Test extract_table_names raises SplurgeSqlGeneratorSqlValidationError when sqlparse fails."""
         # SQL that doesn't contain any table references
         malformed_sql = "SELECT 1 as value"
 
-        with pytest.raises(SqlValidationError):
+        with pytest.raises(SplurgeSqlGeneratorSqlValidationError):
             extract_table_names(malformed_sql)
 
     def test_extract_table_names_complex_malformed_sql(self):
@@ -738,7 +738,7 @@ class TestSqlHelperPublicAPI:
         SELECT 1 as value, 'test' as string, NOW() as timestamp
         """
 
-        with pytest.raises(SqlValidationError):
+        with pytest.raises(SplurgeSqlGeneratorSqlValidationError):
             extract_table_names(malformed_sql)
 
 
@@ -868,7 +868,7 @@ class TestSqlHelperIntegration:
 
     def test_error_handling_integration(self):
         """Test error handling across multiple functions."""
-        # Test with malformed SQL that should cause SqlValidationError
+        # Test with malformed SQL that should cause SplurgeSqlGeneratorSqlValidationError
         malformed_sql = "CREATE TABLE users (id INTEGER"  # Missing closing parenthesis
 
         # The function should handle this gracefully by returning empty list
@@ -881,16 +881,16 @@ class TestSqlHelperIntegration:
         assert len(tables) == 1
         assert tables[0][0] == "users"
 
-        # Test that parse_table_columns raises SqlValidationError for malformed input
+        # Test that parse_table_columns raises SplurgeSqlGeneratorSqlValidationError for malformed input
         malformed_table_body = (
             "CONSTRAINT pk_id PRIMARY KEY (id), CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id)"
         )
-        with pytest.raises(SqlValidationError):
+        with pytest.raises(SplurgeSqlGeneratorSqlValidationError):
             parse_table_columns(malformed_table_body)
 
-        # Test that extract_table_names raises SqlValidationError for malformed input
+        # Test that extract_table_names raises SplurgeSqlGeneratorSqlValidationError for malformed input
         malformed_query = "SELECT 1 as value"
-        with pytest.raises(SqlValidationError):
+        with pytest.raises(SplurgeSqlGeneratorSqlValidationError):
             extract_table_names(malformed_query)
 
     def test_complex_query_processing(self):
@@ -1074,8 +1074,8 @@ def test_extract_table_names_update_with_from():
 
 def test_extract_table_names_quoted_identifiers_raise():
     """Quoted-only identifiers are not supported; expect validation error."""
-    from splurge_sql_generator.exceptions import SqlValidationError
+    from splurge_sql_generator.exceptions import SplurgeSqlGeneratorSqlValidationError
 
     sql = 'SELECT * FROM "Users"'
-    with pytest.raises(SqlValidationError):
+    with pytest.raises(SplurgeSqlGeneratorSqlValidationError):
         extract_table_names(sql)

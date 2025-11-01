@@ -13,7 +13,12 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
-from .exceptions import FileError, SqlValidationError
+from .exceptions import (
+    SplurgeSqlGeneratorFileError,
+    SplurgeSqlGeneratorFileNotFoundError,
+    SplurgeSqlGeneratorSqlValidationError,
+    SplurgeSqlGeneratorTypeError,
+)
 from .file_utils import SafeTextFileIoAdapter
 from .schema_parser import SchemaParser
 from .sql_parser import SqlParser
@@ -81,22 +86,22 @@ class PythonCodeGenerator:
             Generated Python code as string
 
         Raises:
-            FileNotFoundError: If the required schema file is missing
+            SplurgeSqlGeneratorFileError: If the required schema file is missing
         """
         # Parse the SQL file first (this will catch validation errors like invalid class names)
         class_name, method_queries = self.parser.parse_file(sql_file_path)
 
         # Validate schema_file_path is provided
         if schema_file_path is None:
-            raise TypeError("Schema file path must be provided and cannot be None")
+            raise SplurgeSqlGeneratorTypeError("Schema file path must be provided and cannot be None")
 
         try:
             # Load schema
             schema_path = Path(schema_file_path)
             self._schema_parser.load_schema(schema_path)
 
-        except FileError:
-            # Re-raise FileError as-is (already has proper formatting)
+        except SplurgeSqlGeneratorFileError:
+            # Re-raise SplurgeSqlGeneratorFileError as-is (already has proper formatting)
             raise
 
         # Generate the Python code using template
@@ -107,8 +112,8 @@ class PythonCodeGenerator:
             try:
                 file_io = SafeTextFileIoAdapter()
                 file_io.write_text(output_file_path, python_code)
-            except FileError:
-                # Re-raise FileError as-is (already has proper formatting)
+            except SplurgeSqlGeneratorFileError:
+                # Re-raise SplurgeSqlGeneratorFileError as-is (already has proper formatting)
                 raise
         return python_code
 
@@ -292,7 +297,7 @@ class PythonCodeGenerator:
             file_path: Optional file path for error context
 
         Raises:
-            SqlValidationError: If parameters don't match schema definitions
+            SplurgeSqlGeneratorSqlValidationError: If parameters don't match schema definitions
         """
         if not parameters:
             return
@@ -323,7 +328,7 @@ class PythonCodeGenerator:
             file_context = f" in {file_path}" if file_path else ""
             tables_str = ", ".join(table_names)
             params_str = ", ".join(invalid_params)
-            raise SqlValidationError(
+            raise SplurgeSqlGeneratorSqlValidationError(
                 f"Parameters not found in schema{file_context}: {params_str}. "
                 f"Referenced tables: {tables_str}. "
                 f"Available columns: {self._get_available_columns(table_names)}"
@@ -480,7 +485,7 @@ class PythonCodeGenerator:
             Dictionary mapping class names to generated code
 
         Raises:
-            FileNotFoundError: If any required schema file is missing
+            SplurgeSqlGeneratorFileNotFoundError: If any required schema file is missing
         """
         # Load shared schema file
         schema_path = Path(schema_file_path)
@@ -489,7 +494,7 @@ class PythonCodeGenerator:
             self._schema_parser.load_schema(schema_file_path)
         else:
             # Schema file is required
-            raise FileNotFoundError(
+            raise SplurgeSqlGeneratorFileNotFoundError(
                 f"Schema file required but not found: {schema_path}. "
                 f"Specify a valid schema file using the --schema option."
             )

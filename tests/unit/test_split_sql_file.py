@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from splurge_sql_generator.exceptions import FileError, SqlValidationError
+from splurge_sql_generator.exceptions import SplurgeSqlGeneratorFileError, SplurgeSqlGeneratorSqlValidationError
 from splurge_sql_generator.sql_helper import split_sql_file
 
 
@@ -77,22 +77,22 @@ class TestSplitSqlFile:
 
     def test_split_sql_file_nonexistent(self):
         """Test splitting non-existent SQL file."""
-        with pytest.raises(FileError, match="SQL file not found"):
+        with pytest.raises(SplurgeSqlGeneratorFileError, match="SQL file not found"):
             split_sql_file("nonexistent.sql")
 
     def test_split_sql_file_none_path(self):
         """Test splitting with None file path."""
-        with pytest.raises(SqlValidationError, match="file_path cannot be None"):
+        with pytest.raises(SplurgeSqlGeneratorSqlValidationError, match="file_path cannot be None"):
             split_sql_file(None)
 
     def test_split_sql_file_empty_path(self):
         """Test splitting with empty file path."""
-        with pytest.raises(SqlValidationError, match="file_path cannot be empty"):
+        with pytest.raises(SplurgeSqlGeneratorSqlValidationError, match="file_path cannot be empty"):
             split_sql_file("")
 
     def test_split_sql_file_invalid_type(self):
         """Test splitting with invalid file path type."""
-        with pytest.raises(SqlValidationError, match="file_path must be a string or Path object"):
+        with pytest.raises(SplurgeSqlGeneratorSqlValidationError, match="file_path must be a string or Path object"):
             split_sql_file(123)
 
     def test_split_sql_file_empty_content(self):
