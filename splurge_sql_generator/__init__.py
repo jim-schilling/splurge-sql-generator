@@ -21,7 +21,7 @@ from .sql_helper import (
 )
 from .sql_parser import SqlParser
 
-__version__ = "2025.6.0"
+__version__ = "2025.6.1"
 
 __all__ = [
     # SQL Helper functions

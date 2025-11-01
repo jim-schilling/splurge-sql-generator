@@ -12,7 +12,7 @@ This module is licensed under the MIT License.
 import logging
 from pathlib import Path
 
-import yaml  # type: ignore[import-untyped]
+import yaml  # type: ignore
 
 from .exceptions import (
     SplurgeSqlGeneratorFileError,

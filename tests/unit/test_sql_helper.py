@@ -10,7 +10,10 @@ from pathlib import Path
 
 import pytest
 
-from splurge_sql_generator.exceptions import SplurgeSqlGeneratorSqlValidationError
+from splurge_sql_generator.exceptions import (
+    SplurgeSqlGeneratorSqlValidationError,
+    SplurgeSqlGeneratorTokenizationError,
+)
 from splurge_sql_generator.sql_helper import (
     EXECUTE_STATEMENT,
     FETCH_STATEMENT,
@@ -21,6 +24,8 @@ from splurge_sql_generator.sql_helper import (
     parse_sql_statements,
     parse_table_columns,
     remove_sql_comments,
+    require_next_token,
+    require_token_at,
     split_sql_file,
 )
 
@@ -1079,3 +1084,115 @@ def test_extract_table_names_quoted_identifiers_raise():
     sql = 'SELECT * FROM "Users"'
     with pytest.raises(SplurgeSqlGeneratorSqlValidationError):
         extract_table_names(sql)
+
+
+class TestTokenNavigationHelpers:
+    """Test token navigation helper functions."""
+
+    def test_require_next_token_with_valid_token(self):
+        """Test require_next_token when token is found."""
+        from sqlparse import parse
+
+        sql = "SELECT * FROM users"
+        parsed = parse(sql)
+        tokens = list(parsed[0].flatten())
+
+        idx, token = require_next_token(tokens, 0, "SELECT keyword")
+        assert idx is not None
+        assert token is not None
+        assert token.value.strip().upper() == "SELECT"
+
+    def test_require_next_token_with_whitespace(self):
+        """Test require_next_token skips whitespace and finds token."""
+        from sqlparse import parse
+
+        sql = "   SELECT * FROM users"
+        parsed = parse(sql)
+        tokens = list(parsed[0].flatten())
+
+        idx, token = require_next_token(tokens, 0, "SELECT keyword")
+        assert idx is not None
+        assert token is not None
+        assert token.value.strip().upper() == "SELECT"
+
+    def test_require_next_token_raises_when_not_found(self):
+        """Test require_next_token raises when no token found."""
+        from sqlparse import parse
+
+        sql = "   "
+        parsed = parse(sql)
+        # Handle case where parsing returns empty or whitespace-only tokens
+        if parsed:
+            tokens = list(parsed[0].flatten())
+        else:
+            tokens = []
+
+        with pytest.raises(SplurgeSqlGeneratorTokenizationError) as exc_info:
+            require_next_token(tokens, 0, "SELECT keyword")
+
+        assert "SELECT keyword" in str(exc_info.value)
+        assert "index 0" in str(exc_info.value)
+
+    def test_require_next_token_at_end_of_list(self):
+        """Test require_next_token raises when starting beyond available tokens."""
+        from sqlparse import parse
+
+        sql = "SELECT * FROM users"
+        parsed = parse(sql)
+        tokens = list(parsed[0].flatten())
+
+        with pytest.raises(SplurgeSqlGeneratorTokenizationError):
+            require_next_token(tokens, len(tokens) + 10, "token")
+
+    def test_require_token_at_with_valid_token(self):
+        """Test require_token_at when token is found."""
+        from sqlparse import parse
+
+        sql = "SELECT * FROM users"
+        parsed = parse(sql)
+        tokens = list(parsed[0].flatten())
+
+        token = require_token_at(tokens, 0, "SELECT keyword")
+        assert token is not None
+        assert token.value.strip().upper() == "SELECT"
+
+    def test_require_token_at_skips_whitespace(self):
+        """Test require_token_at skips whitespace and comments."""
+        from sqlparse import parse
+
+        sql = "   -- comment\n   SELECT * FROM users"
+        parsed = parse(sql)
+        tokens = list(parsed[0].flatten())
+
+        token = require_token_at(tokens, 0, "SELECT keyword")
+        assert token is not None
+        assert token.value.strip().upper() == "SELECT"
+
+    def test_require_token_at_raises_when_not_found(self):
+        """Test require_token_at raises when no token found."""
+        from sqlparse import parse
+
+        sql = "   "
+        parsed = parse(sql)
+        # Handle case where parsing returns empty or whitespace-only tokens
+        if parsed:
+            tokens = list(parsed[0].flatten())
+        else:
+            tokens = []
+
+        with pytest.raises(SplurgeSqlGeneratorTokenizationError) as exc_info:
+            require_token_at(tokens, 0, "table name")
+
+        assert "table name" in str(exc_info.value)
+        assert "index 0" in str(exc_info.value)
+
+    def test_require_next_token_custom_description(self):
+        """Test require_next_token uses custom description in error."""
+        # Use empty tokens list directly instead of parsing empty string
+        tokens = []
+
+        with pytest.raises(SplurgeSqlGeneratorTokenizationError) as exc_info:
+            require_next_token(tokens, 0, "CREATE TABLE statement")
+
+        error_msg = str(exc_info.value)
+        assert "CREATE TABLE statement" in error_msg

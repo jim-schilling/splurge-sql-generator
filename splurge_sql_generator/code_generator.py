@@ -6,7 +6,6 @@ Copyright (c) 2025, Jim Schilling
 This module is licensed under the MIT License.
 """
 
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -22,6 +21,7 @@ from .exceptions import (
 from .file_utils import SafeTextFileIoAdapter
 from .schema_parser import SchemaParser
 from .sql_parser import SqlParser
+from .type_inference import ParameterTypeInferrer
 from .utils import to_snake_case
 
 DOMAINS = ["code", "generator"]
@@ -46,6 +46,7 @@ class PythonCodeGenerator:
         """
         self._parser = SqlParser()
         self._schema_parser = SchemaParser(sql_type_mapping_file=sql_type_mapping_file or "types.yaml")
+        self._type_inferrer = ParameterTypeInferrer(self._schema_parser)
         self._validate_parameters = validate_parameters
         # Set up Jinja2 environment with templates directory
         template_dir = Path(__file__).parent / "templates"
@@ -179,7 +180,7 @@ class PythonCodeGenerator:
         sql_query: str,
         method_info: dict[str, Any],
         file_path: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any]:  # Returns MethodInfo plus template-specific fields (parameters_list, param_mapping, etc.)
         """
         Prepare method data for template rendering.
 
@@ -212,7 +213,7 @@ class PythonCodeGenerator:
                 param_mapping[param] = python_param
 
                 # Infer parameter type from schema
-                param_types[param] = self._infer_parameter_type(sql_query, param)
+                param_types[param] = self._type_inferrer.infer(sql_query, param)
 
                 if python_param not in parameters_list:
                     parameters_list.append(python_param)
@@ -269,19 +270,6 @@ class PythonCodeGenerator:
 
         return ", ".join(python_params)
 
-    def _extract_table_names(self, sql_query: str) -> list[str]:
-        """
-        Extract table names from SQL query using sql_helper.
-
-        Args:
-            sql_query: SQL query string
-
-        Returns:
-            List of table names referenced in the query (in lowercase)
-        """
-        # Use the SQL parser's table name extraction which leverages sql_helper
-        return self._parser.get_table_names(sql_query)
-
     def _validate_parameters_against_schema(
         self,
         sql_query: str,
@@ -303,7 +291,12 @@ class PythonCodeGenerator:
             return
 
         # Extract table names from the SQL query
-        table_names = self._extract_table_names(sql_query)
+        from .sql_helper import extract_table_names
+
+        try:
+            table_names = extract_table_names(sql_query)
+        except Exception:
+            table_names = []
 
         if not table_names:
             # No tables found in query, can't validate parameters
@@ -333,120 +326,6 @@ class PythonCodeGenerator:
                 f"Referenced tables: {tables_str}. "
                 f"Available columns: {self._get_available_columns(table_names)}"
             )
-
-    def _infer_parameter_type(self, sql_query: str, parameter: str) -> str:
-        """
-        Infer the Python type for a SQL parameter based on the schema.
-
-        Args:
-            sql_query: SQL query string
-            parameter: Parameter name to infer type for
-
-        Returns:
-            Python type annotation
-        """
-        # Extract table names from the SQL query
-        table_names = self._extract_table_names(sql_query)
-
-        if not table_names:
-            return "Any"
-
-        # First, try exact match with column names
-        for table_name in table_names:
-            if (
-                table_name in self._schema_parser.table_schemas
-                and parameter in self._schema_parser.table_schemas[table_name]
-            ):
-                sql_type = self._schema_parser.table_schemas[table_name][parameter]
-                return self._schema_parser.get_python_type(sql_type)
-
-        # If no exact match, try to infer from SQL context
-        return self._infer_type_from_sql_context(sql_query, parameter, table_names)
-
-    def _infer_type_from_sql_context(self, sql_query: str, parameter: str, table_names: list[str]) -> str:
-        """
-        Infer parameter type from SQL query context when parameter name doesn't match column names.
-
-        Args:
-            sql_query: SQL query string
-            parameter: Parameter name to infer type for
-            table_names: List of table names in the query
-
-        Returns:
-            Python type annotation
-        """
-        # Look for the parameter in WHERE clauses, SET clauses, etc.
-        sql_upper = sql_query.upper()
-        param_placeholder = f":{parameter}"
-
-        # Check if parameter is used in WHERE clause with specific columns
-        for table_name in table_names:
-            if table_name not in self._schema_parser.table_schemas:
-                continue
-
-            table_schema = self._schema_parser.table_schemas[table_name]
-
-            # Check each column in the table
-            for column_name, sql_type in table_schema.items():
-                # Look for patterns like "WHERE column = :parameter" or "SET column = :parameter"
-                # Use regex patterns to handle whitespace variations
-                patterns = [
-                    rf"WHERE\s+{column_name}\s*=\s*{re.escape(param_placeholder)}",
-                    rf"SET\s+{column_name}\s*=\s*{re.escape(param_placeholder)}",
-                    rf"WHERE\s+{column_name}\s*<=\s*{re.escape(param_placeholder)}",
-                    rf"WHERE\s+{column_name}\s*>=\s*{re.escape(param_placeholder)}",
-                    rf"WHERE\s+{column_name}\s*>\s*{re.escape(param_placeholder)}",
-                    rf"WHERE\s+{column_name}\s*<\s*{re.escape(param_placeholder)}",
-                    rf"WHERE\s+{column_name}\s+LIKE\s+{re.escape(param_placeholder)}",
-                    rf"WHERE\s+{column_name}\s+IN\s+{re.escape(param_placeholder)}",
-                ]
-
-                for pattern in patterns:
-                    if re.search(pattern, sql_upper):
-                        return self._schema_parser.get_python_type(sql_type)
-
-        # If still no match, try common parameter name patterns
-        return self._infer_type_from_parameter_name(parameter)
-
-    def _infer_type_from_parameter_name(self, parameter: str) -> str:
-        """
-        Infer type from common parameter naming patterns.
-
-        Args:
-            parameter: Parameter name
-
-        Returns:
-            Python type annotation
-        """
-        parameter_lower = parameter.lower()
-
-        # Common patterns for different types
-        if any(suffix in parameter_lower for suffix in ["_id", "id"]):
-            return "int"
-        elif any(
-            suffix in parameter_lower
-            for suffix in [
-                "_quantity",
-                "quantity",
-                "count",
-                "amount",
-                "number",
-                "threshold",
-            ]
-        ):
-            return "int"
-        elif any(suffix in parameter_lower for suffix in ["_price", "price", "cost", "rate"]):
-            return "float"
-        elif any(suffix in parameter_lower for suffix in ["_name", "name", "title", "label"]):
-            return "str"
-        elif any(suffix in parameter_lower for suffix in ["_description", "description", "text", "content"]):
-            return "str"
-        elif any(suffix in parameter_lower for suffix in ["_term", "term", "search", "query"]):
-            return "str"
-        elif any(suffix in parameter_lower for suffix in ["_active", "active", "enabled", "is_"]):
-            return "bool"
-
-        return "Any"
 
     def _get_available_columns(self, table_names: list[str]) -> str:
         """

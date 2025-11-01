@@ -20,6 +20,7 @@ from sqlparse.tokens import Comment, Literal, Name
 from .exceptions import (
     SplurgeSqlGeneratorFileError,
     SplurgeSqlGeneratorSqlValidationError,
+    SplurgeSqlGeneratorTokenizationError,
 )
 from .file_utils import SafeTextFileIoAdapter
 from .utils import clean_sql_type, is_empty_or_whitespace, normalize_string
@@ -173,6 +174,74 @@ def _next_significant_token(
     return None, None
 
 
+def require_next_token(
+    tokens: list[Token],
+    start: int,
+    description: str = "token",
+) -> tuple[int, Token]:
+    """
+    Get the next significant token starting from index, or raise an error.
+
+    This helper reduces boilerplate by automatically handling None checks
+    and providing descriptive error messages.
+
+    Args:
+        tokens: List of sqlparse tokens to search
+        start: Index to start searching from
+        description: Description of the expected token (for error messages)
+
+    Returns:
+        Tuple of (index, token) for the next significant token
+
+    Raises:
+        SplurgeSqlGeneratorTokenizationError: If no significant token is found
+
+    Examples:
+        >>> tokens = [Token(Token.Name, "SELECT"), Token(Token.Text.Whitespace, " ")]
+        >>> idx, token = require_next_token(tokens, 0, "SELECT keyword")
+        >>> token.value
+        'SELECT'
+    """
+    idx, token = _next_significant_token(tokens, start=start)
+    if idx is None or token is None:
+        raise SplurgeSqlGeneratorTokenizationError(
+            f"Expected {description} at or after index {start}, but no significant token found"
+        )
+    return idx, token
+
+
+def require_token_at(
+    tokens: list[Token],
+    index: int,
+    description: str = "token",
+) -> Token:
+    """
+    Get the significant token at or after index, or raise an error.
+
+    This helper is similar to require_next_token but returns only the Token,
+    not the index tuple. Useful when index tracking isn't needed.
+
+    Args:
+        tokens: List of sqlparse tokens to search
+        index: Index to start searching from
+        description: Description of the expected token (for error messages)
+
+    Returns:
+        The next significant token
+
+    Raises:
+        SplurgeSqlGeneratorTokenizationError: If no significant token is found
+
+    Examples:
+        >>> tokens = [Token(Token.Text.Whitespace, " "), Token(Token.Name, "TABLE")]
+        >>> token = require_token_at(tokens, 0, "table keyword")
+        >>> token.value
+        'TABLE'
+    """
+    _, token = require_next_token(tokens, index, description)
+    return token
+
+
 def find_main_statement_after_with(tokens: list[Token]) -> str | None:
     """
     Find the main statement after CTE definitions by scanning tokens after WITH.
@@ -206,8 +275,9 @@ def find_main_statement_after_with(tokens: list[Token]) -> str | None:
             i += 1
 
             # Find next significant token after AS
-            next_i, _ = _next_significant_token(tokens, start=i)
-            if next_i is None:
+            try:
+                next_i, _ = require_next_token(tokens, i, "token after AS")
+            except SplurgeSqlGeneratorTokenizationError:
                 return None
             i = next_i
 
@@ -226,8 +296,9 @@ def find_main_statement_after_with(tokens: list[Token]) -> str | None:
                     i += 1
 
                 # Find next significant token after CTE body
-                next_i, _ = _next_significant_token(tokens, start=i)
-                if next_i is None:
+                try:
+                    next_i, _ = require_next_token(tokens, i, "token after CTE body")
+                except SplurgeSqlGeneratorTokenizationError:
                     return None
                 i = next_i
 
@@ -246,8 +317,9 @@ def find_main_statement_after_with(tokens: list[Token]) -> str | None:
             i += 1
 
     # Find the next significant token (the main statement)
-    next_i, token = _next_significant_token(tokens, start=i)
-    if next_i is None or token is None:
+    try:
+        next_i, token = require_next_token(tokens, i, "main statement")
+    except SplurgeSqlGeneratorTokenizationError:
         return None
 
     token_value = normalize_token(token)
@@ -348,8 +420,9 @@ def detect_statement_type(sql: str) -> str:
     if not tokens:
         return EXECUTE_STATEMENT
 
-    _, first_token = _next_significant_token(tokens)
-    if first_token is None:
+    try:
+        _, first_token = require_next_token(tokens, 0, "statement keyword")
+    except SplurgeSqlGeneratorTokenizationError:
         return EXECUTE_STATEMENT
 
     token_value = normalize_token(first_token)
@@ -576,29 +649,6 @@ def _validate_tokens_list(tokens: list[Token]) -> bool:
     return tokens is not None and len(tokens) > 0
 
 
-def _extract_identifier_name(token: Token) -> str:
-    """
-    Extract the actual name from a quoted or unquoted identifier token.
-
-    Args:
-        token: sqlparse token that may be quoted
-
-    Returns:
-        The actual identifier name without quotes
-    """
-    value = _safe_token_value(token).strip()
-
-    # Handle different quoting styles
-    if value.startswith("[") and value.endswith("]"):
-        return value[1:-1]  # Remove [ and ]
-    elif value.startswith("`") and value.endswith("`"):
-        return value[1:-1]  # Remove ` and `
-    elif value.startswith('"') and value.endswith('"'):
-        return value[1:-1]  # Remove " and "
-    else:
-        return value  # No quotes
-
-
 def _extract_create_table_components(tokens: list[Token], start_index: int) -> tuple[str | None, str | None]:
     """
     Extract table name and body from CREATE TABLE statement tokens.
@@ -671,12 +721,12 @@ def _extract_create_table_components(tokens: list[Token], start_index: int) -> t
             tmp_next_i = next_res[0]
             table_token = next_res[1]
             if tmp_next_i is not None and table_token and _is_identifier_token(table_token):
-                table_name = _extract_identifier_name(table_token)
+                table_name = extract_identifier_name(table_token)
                 i = tmp_next_i  # Update position to after the table name
             else:
                 return None, None
         else:
-            table_name = _extract_identifier_name(name_token)
+            table_name = extract_identifier_name(name_token)
     else:
         # If we get here, the token is not an identifier, so we can't find a table name
         return None, None
